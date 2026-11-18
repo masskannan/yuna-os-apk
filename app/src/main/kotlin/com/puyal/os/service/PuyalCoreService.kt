@@ -443,7 +443,7 @@ class PuyalCoreService : Service() {
                         val bSize = bubble.width.takeIf { it > 0 } ?: (52 * dm.density).toInt()
                         bubbleParams.x = (initialX + dx).coerceIn(0, (dm.widthPixels - bSize).coerceAtLeast(0))
                         bubbleParams.y = (initialY + dy).coerceIn(0, (dm.heightPixels - bSize).coerceAtLeast(0))
-                        windowManager.updateViewLayout(container, bubbleParams)
+                        windowManager.updateViewLayout(bubble, bubbleParams)
                     }
                     true
                 }
