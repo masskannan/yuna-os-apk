@@ -14,6 +14,7 @@ import android.os.Process
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -21,23 +22,33 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.puyal.os.service.PuyalCoreService
 import java.io.File
 import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var rootContainer: LinearLayout
+    private lateinit var chatFeed: LinearLayout
+    private lateinit var greetingBlock: LinearLayout
+    private lateinit var drawerCard: LinearLayout
+    private lateinit var plusSheet: LinearLayout
+    private lateinit var inputPill: LinearLayout
+    private lateinit var inputBox: EditText
+
+    private lateinit var servicePill: TextView
     private lateinit var telemetryText: TextView
     private lateinit var rootBadge: TextView
-    private lateinit var serviceBadge: TextView
-
     private lateinit var permOverlayBadge: TextView
     private lateinit var permMicBadge: TextView
     private lateinit var permNotifBadge: TextView
     private lateinit var permBatteryBadge: TextView
 
-    private var hasRootAccess = false
     private var oomScoreValue = "checking..."
+    private var isDrawerOpen = false
 
     private val permLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -47,9 +58,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.parseColor("#050807")
-        window.navigationBarColor = Color.parseColor("#050807")
-        buildSovereignDashboard()
+        // Edge-to-edge mounting cleanly above Android's 3-button navigation bar & IME keyboard
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+
+        buildGeminiCloneUi()
+        applySystemBarAndImeInsets()
         probeRootAndOomAsync()
     }
 
@@ -59,154 +74,310 @@ class MainActivity : AppCompatActivity() {
         probeRootAndOomAsync()
     }
 
-    private fun buildSovereignDashboard() {
+    private fun applySystemBarAndImeInsets() {
         val d = resources.displayMetrics.density
-        val pad = (16 * d).toInt()
+        ViewCompat.setOnApplyWindowInsetsListener(rootContainer) { view, windowInsets ->
+            val sysBars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime())
+            val bottomInset = maxOf(sysBars.bottom, ime.bottom)
+            view.setPadding(
+                sysBars.left,
+                sysBars.top,
+                sysBars.right,
+                bottomInset + (8 * d).toInt()
+            )
+            windowInsets
+        }
+    }
 
-        val root = LinearLayout(this).apply {
+    private fun buildGeminiCloneUi() {
+        val d = resources.displayMetrics.density
+
+        rootContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#050807"))
-            setPadding(pad, (18 * d).toInt(), pad, (28 * d).toInt())
+            setBackgroundColor(Color.parseColor("#0B0F14"))
         }
 
-        // Top Sovereign Bar
+        // 1. Top Bar (56dp height — exact Gemini mobile header proportions, 100% PUYAL branding)
         val topBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding((14 * d).toInt(), (12 * d).toInt(), (14 * d).toInt(), (12 * d).toInt())
-            background = cardDrawable("#0A110E", "#1F00FF88", 14 * d)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (56 * d).toInt()
+            )
+            setPadding((14 * d).toInt(), 0, (14 * d).toInt(), 0)
         }
-        val titleCol = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+
+        val menuBtn = TextView(this).apply {
+            text = "☰"
+            textSize = 20f
+            setTextColor(Color.parseColor("#E2E8F0"))
+            setPadding((8 * d).toInt(), (8 * d).toInt(), (12 * d).toInt(), (8 * d).toInt())
+            setOnClickListener {
+                isDrawerOpen = !isDrawerOpen
+                drawerCard.visibility = if (isDrawerOpen) View.VISIBLE else View.GONE
+            }
+        }
+
+        val brandTitle = TextView(this).apply {
+            text = "🌪️ Puyal"
+            textSize = 19f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.parseColor("#F8FAFC"))
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
-        titleCol.addView(TextView(this).apply {
-            text = "🌪️ PUYAL_SOVEREIGN_OS"
-            textSize = 16f
-            typeface = Typeface.MONOSPACE
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#00FF88"))
-        })
-        titleCol.addView(TextView(this).apply {
-            text = "LEVEL 1 • IMMORTAL SHELL • 0-FPS"
-            textSize = 10f
-            typeface = Typeface.MONOSPACE
-            setTextColor(Color.parseColor("#6E9181"))
-        })
-        serviceBadge = TextView(this).apply {
+
+        servicePill = TextView(this).apply {
             text = "OFFLINE"
             textSize = 10f
             typeface = Typeface.MONOSPACE
             setTypeface(typeface, Typeface.BOLD)
             setPadding((10 * d).toInt(), (5 * d).toInt(), (10 * d).toInt(), (5 * d).toInt())
-            background = cardDrawable("#111B17", "#6E9181", 99 * d)
+            background = pillDrawable("#161D26", "#334155", 99 * d)
             setTextColor(Color.parseColor("#94A3B8"))
+            setOnClickListener {
+                if (PuyalCoreService.isRunning) {
+                    startService(Intent(this@MainActivity, PuyalCoreService::class.java).apply {
+                        action = PuyalCoreService.ACTION_STOP_SERVICE
+                    })
+                } else {
+                    ContextCompat.startForegroundService(
+                        this@MainActivity,
+                        Intent(this@MainActivity, PuyalCoreService::class.java)
+                    )
+                }
+                topBar.postDelayed({ refreshDashboard(); probeRootAndOomAsync() }, 350)
+            }
         }
-        topBar.addView(titleCol)
-        topBar.addView(serviceBadge)
-        root.addView(topBar)
 
-        // Kernel Telemetry Card
-        val teleCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding((14 * d).toInt(), (12 * d).toInt(), (14 * d).toInt(), (12 * d).toInt())
-            background = cardDrawable("#0A110E", "#3800FF88", 14 * d)
-            layoutParams = marginTopLp(12 * d)
+        topBar.addView(menuBtn)
+        topBar.addView(brandTitle)
+        topBar.addView(servicePill)
+        rootContainer.addView(topBar)
+
+        // 2. Collapsible System & Permission Drawer (Sovereign OS Controls)
+        drawerCard = buildSystemDrawer(d)
+        drawerCard.visibility = View.GONE
+        rootContainer.addView(drawerCard)
+
+        // 3. Center Scrollable Stage (Greeting + Chips + Live Responses)
+        val scroll = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+            isFillViewport = true
         }
-        val teleHeader = LinearLayout(this).apply {
+        val stage = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((18 * d).toInt(), (12 * d).toInt(), (18 * d).toInt(), (12 * d).toInt())
+        }
+
+        greetingBlock = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, (36 * d).toInt(), 0, (16 * d).toInt())
+        }
+        greetingBlock.addView(TextView(this).apply {
+            text = "வணக்கம் பாஸ்"
+            textSize = 30f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.parseColor("#38BDF8"))
+        })
+        greetingBlock.addView(TextView(this).apply {
+            text = "என்ன உதவி செய்யணும்?"
+            textSize = 24f
+            setTextColor(Color.parseColor("#64748B"))
+            setPadding(0, (4 * d).toInt(), 0, (22 * d).toInt())
+        })
+
+        // 2x2 Quick Action Chips (matching Gemini pill-card proportions)
+        val chipRow1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        chipRow1.addView(makeSuggestionCard("🚀 Start Immortal Core", 0) {
+            ContextCompat.startForegroundService(this, Intent(this, PuyalCoreService::class.java))
+            appendMessage("user", "Start Puyal Immortal Core")
+            appendMessage("puyal", "Immortal Core active! 3D 🌪️ bubble launched with 0-FPS screen-off guard.")
+            topBar.postDelayed({ refreshDashboard(); probeRootAndOomAsync() }, 350)
+        })
+        chipRow1.addView(makeSuggestionCard("🎙️ Test 3D Mic Swirl", (10 * d).toInt()) {
+            triggerServiceState("LISTENING")
+            appendMessage("puyal", "Mic Listening ON — 3D 🌪️ helical spin + Cyan sonar ring active.")
+        })
+
+        val chipRow2 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = (10 * d).toInt() }
+        }
+        chipRow2.addView(makeSuggestionCard("💬 Open :7777 UI", 0) {
+            openUrl("http://127.0.0.1:7777")
+        })
+        chipRow2.addView(makeSuggestionCard("⚙️ System & Perms", (10 * d).toInt()) {
+            isDrawerOpen = true
+            drawerCard.visibility = View.VISIBLE
+        })
+
+        greetingBlock.addView(chipRow1)
+        greetingBlock.addView(chipRow2)
+        stage.addView(greetingBlock)
+
+        chatFeed = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        stage.addView(chatFeed)
+
+        scroll.addView(stage)
+        rootContainer.addView(scroll)
+
+        // 4. Plus Attachment/Tool Sheet (hidden above input pill)
+        plusSheet = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            visibility = View.GONE
+            setPadding((14 * d).toInt(), (8 * d).toInt(), (14 * d).toInt(), (8 * d).toInt())
+        }
+        plusSheet.addView(makeMiniTool("📦 :7778 Store") { openUrl("http://127.0.0.1:7778") })
+        plusSheet.addView(makeMiniTool("⚡ EXEC Burst") { triggerServiceState("ACTION_BURST") })
+        plusSheet.addView(makeMiniTool("🟠 BG Drift") { triggerServiceState("PROCESSING") })
+        rootContainer.addView(plusSheet)
+
+        // 5. Bottom Floating Pill Input Bar (28dp corner radius, ~58dp height, mounted cleanly above 3-button nav bar)
+        inputPill = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = (58 * d).toInt()
+            setPadding((10 * d).toInt(), (6 * d).toInt(), (10 * d).toInt(), (6 * d).toInt())
+            background = pillDrawable("#161D26", "#263344", 28 * d)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                leftMargin = (14 * d).toInt()
+                rightMargin = (14 * d).toInt()
+                topMargin = (6 * d).toInt()
+                bottomMargin = (4 * d).toInt()
+            }
         }
-        teleHeader.addView(TextView(this).apply {
-            text = "> KERNEL_TELEMETRY"
+
+        val plusBtn = TextView(this).apply {
+            text = "＋"
+            textSize = 20f
+            gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#CBD5E1"))
+            layoutParams = LinearLayout.LayoutParams((40 * d).toInt(), (40 * d).toInt())
+            setOnClickListener {
+                plusSheet.visibility = if (plusSheet.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            }
+        }
+
+        inputBox = EditText(this).apply {
+            hint = "Puyal கிட்ட கேளுங்க..."
+            setHintTextColor(Color.parseColor("#64748B"))
+            setTextColor(Color.parseColor("#F8FAFC"))
+            textSize = 15f
+            background = null
+            maxLines = 4
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setPadding((8 * d).toInt(), (8 * d).toInt(), (8 * d).toInt(), (8 * d).toInt())
+        }
+
+        val micBtn = TextView(this).apply {
+            text = "🎙️"
+            textSize = 18f
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams((40 * d).toInt(), (40 * d).toInt())
+            setOnClickListener {
+                triggerServiceState("LISTENING")
+                appendMessage("puyal", "Voice Mic Hook ON — Level 3 Sherpa-ONNX ready.")
+            }
+        }
+
+        val sendBtn = TextView(this).apply {
+            text = "🌪️"
+            textSize = 18f
+            gravity = Gravity.CENTER
+            background = pillDrawable("#0E293B", "#38BDF8", 99 * d)
+            layoutParams = LinearLayout.LayoutParams((40 * d).toInt(), (40 * d).toInt()).apply {
+                leftMargin = (4 * d).toInt()
+            }
+            setOnClickListener {
+                val q = inputBox.text.toString().trim()
+                if (q.isNotEmpty()) {
+                    inputBox.setText("")
+                    appendMessage("user", q)
+                    triggerServiceState("ACTION_BURST")
+                    appendMessage("puyal", "Received: \"$q\" — Local Rust/Wasm Brain connects in Level 2 & 4.")
+                } else {
+                    triggerServiceState("IDLE")
+                    Toast.makeText(this@MainActivity, "Puyal Idle (0-FPS)", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        inputPill.addView(plusBtn)
+        inputPill.addView(inputBox)
+        inputPill.addView(micBtn)
+        inputPill.addView(sendBtn)
+        rootContainer.addView(inputPill)
+
+        setContentView(rootContainer)
+    }
+
+    private fun buildSystemDrawer(d: Float): LinearLayout {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((14 * d).toInt(), (12 * d).toInt(), (14 * d).toInt(), (12 * d).toInt())
+            background = pillDrawable("#11171F", "#263344", 18 * d)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                leftMargin = (14 * d).toInt()
+                rightMargin = (14 * d).toInt()
+                bottomMargin = (8 * d).toInt()
+            }
+        }
+
+        val hdr = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        hdr.addView(TextView(this).apply {
+            text = "SOVEREIGN KERNEL & PERMS"
             textSize = 11f
             typeface = Typeface.MONOSPACE
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#00E5FF"))
+            setTextColor(Color.parseColor("#38BDF8"))
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         })
         rootBadge = TextView(this).apply {
-            text = "SU: CHECKING"
+            text = "SU: ..."
             textSize = 10f
             typeface = Typeface.MONOSPACE
             setTextColor(Color.parseColor("#F59E0B"))
         }
-        teleHeader.addView(rootBadge)
-        teleCard.addView(teleHeader)
+        hdr.addView(rootBadge)
+        card.addView(hdr)
 
         telemetryText = TextView(this).apply {
-            textSize = 12f
+            textSize = 11f
             typeface = Typeface.MONOSPACE
-            setTextColor(Color.parseColor("#E2F8EE"))
-            setPadding(0, (8 * d).toInt(), 0, 0)
-            setLineSpacing(4f * d, 1.0f)
+            setTextColor(Color.parseColor("#CBD5E1"))
+            setPadding(0, (6 * d).toInt(), 0, (8 * d).toInt())
         }
-        teleCard.addView(telemetryText)
-        root.addView(teleCard)
+        card.addView(telemetryText)
 
-        // Primary Service Controls
-        val ctrlRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = marginTopLp(12 * d)
-        }
-        ctrlRow.addView(makeChipBtn("🚀 START CORE", "#00FF88", "#04110A", 1f, 0) {
-            ContextCompat.startForegroundService(this, Intent(this, PuyalCoreService::class.java))
-            telemetryText.postDelayed({
-                refreshDashboard()
-                probeRootAndOomAsync()
-            }, 350)
-        })
-        ctrlRow.addView(makeChipBtn("🛑 STOP", "#1A0B0E", "#F87171", 0.55f, (8 * d).toInt(), "#7F1D1D") {
-            val stopIntent = Intent(this, PuyalCoreService::class.java).apply {
-                action = PuyalCoreService.ACTION_STOP_SERVICE
-            }
-            startService(stopIntent)
-            telemetryText.postDelayed({ refreshDashboard() }, 350)
-        })
-        root.addView(ctrlRow)
-
-        // Bubble Animation Mode Tester (3D Tornado + Active Ring)
-        root.addView(sectionLabel("BUBBLE_MODE_CONTROLLER (3D TORNADO + RING)"))
-        val modeRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = marginTopLp(6 * d)
-        }
-        modeRow.addView(makeChipBtn("IDLE", "#0A110E", "#94A3B8", 1f, 0, "#475569") {
-            sendBubbleState("IDLE")
-        })
-        modeRow.addView(makeChipBtn("MIC", "#071A22", "#00E5FF", 1f, (6 * d).toInt(), "#00E5FF") {
-            sendBubbleState("LISTENING")
-        })
-        modeRow.addView(makeChipBtn("EXEC", "#071E14", "#00FF88", 1f, (6 * d).toInt(), "#00FF88") {
-            sendBubbleState("ACTION_BURST")
-        })
-        modeRow.addView(makeChipBtn("BG", "#1F1607", "#F59E0B", 1f, (6 * d).toInt(), "#F59E0B") {
-            sendBubbleState("PROCESSING")
-        })
-        root.addView(modeRow)
-
-        // Permission Matrix
-        root.addView(sectionLabel("PERMISSION_FORTRESS (TAP TO GRANT)"))
-        val permCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding((12 * d).toInt(), (6 * d).toInt(), (12 * d).toInt(), (6 * d).toInt())
-            background = cardDrawable("#0A110E", "#2800FF88", 14 * d)
-            layoutParams = marginTopLp(6 * d)
-        }
-        permOverlayBadge = addPermRow(permCard, "Overlay Bubble (Draw Over Apps)") {
+        permOverlayBadge = addPermRow(card, "Overlay Bubble (Draw Over Apps)") {
             if (!Settings.canDrawOverlays(this)) {
                 startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
             }
         }
-        permMicBadge = addPermRow(permCard, "Mic & Camera (Voice/Vision Hook)") {
+        permMicBadge = addPermRow(card, "Mic & Camera") {
             permLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA))
         }
-        permNotifBadge = addPermRow(permCard, "Immortal Foreground Notification") {
+        permNotifBadge = addPermRow(card, "Foreground Notification") {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 permLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
             }
         }
-        permBatteryBadge = addPermRow(permCard, "Battery Unrestricted (Vivo Guard)", isLast = true) {
+        permBatteryBadge = addPermRow(card, "Battery Unrestricted") {
             val pm = getSystemService(POWER_SERVICE) as PowerManager
             if (!pm.isIgnoringBatteryOptimizations(packageName)) {
                 startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
@@ -214,129 +385,107 @@ class MainActivity : AppCompatActivity() {
                 })
             }
         }
-        root.addView(permCard)
-
-        // Localhost Console Shortcuts
-        root.addView(sectionLabel("TERMUX_LOCAL_CONSOLE"))
-        val linkRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = marginTopLp(6 * d)
-        }
-        linkRow.addView(makeChipBtn("💬 OPEN :7777 UI", "#0E1915", "#00E5FF", 1f, 0, "#3800E5FF") {
-            openUrl("http://127.0.0.1:7777")
-        })
-        linkRow.addView(makeChipBtn("📦 STORE :7778", "#0E1915", "#00FF88", 1f, (8 * d).toInt(), "#3800FF88") {
-            openUrl("http://127.0.0.1:7778")
-        })
-        root.addView(linkRow)
-
-        setContentView(ScrollView(this).apply {
-            setBackgroundColor(Color.parseColor("#050807"))
-            addView(root)
-        })
+        return card
     }
 
-    private fun sectionLabel(title: String): TextView {
-        val d = resources.displayMetrics.density
-        return TextView(this).apply {
-            text = "> $title"
-            textSize = 10f
-            typeface = Typeface.MONOSPACE
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#6E9181"))
-            setPadding((2 * d).toInt(), (14 * d).toInt(), 0, 0)
-        }
-    }
-
-    private fun addPermRow(parent: LinearLayout, label: String, isLast: Boolean = false, onClick: () -> Unit): TextView {
+    private fun addPermRow(parent: LinearLayout, label: String, onClick: () -> Unit): TextView {
         val d = resources.displayMetrics.density
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, (10 * d).toInt(), 0, (10 * d).toInt())
+            setPadding(0, (6 * d).toInt(), 0, (6 * d).toInt())
             setOnClickListener { onClick() }
         }
         row.addView(TextView(this).apply {
             text = label
             textSize = 12f
-            setTextColor(Color.parseColor("#E2F8EE"))
+            setTextColor(Color.parseColor("#E2E8F0"))
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         })
-        val badge = TextView(this).apply {
+        val b = TextView(this).apply {
             text = "..."
             textSize = 10f
             typeface = Typeface.MONOSPACE
-            setTypeface(typeface, Typeface.BOLD)
-            setPadding((8 * d).toInt(), (4 * d).toInt(), (8 * d).toInt(), (4 * d).toInt())
+            setPadding((8 * d).toInt(), (3 * d).toInt(), (8 * d).toInt(), (3 * d).toInt())
         }
-        row.addView(badge)
+        row.addView(b)
         parent.addView(row)
-        if (!isLast) {
-            parent.addView(View(this).apply {
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1)
-                setBackgroundColor(Color.parseColor("#182822"))
-            })
-        }
-        return badge
+        return b
     }
 
-    private fun makeChipBtn(
-        label: String,
-        bgHex: String,
-        fgHex: String,
-        weight: Float,
-        leftMarginPx: Int,
-        strokeHex: String? = null,
-        onClick: () -> Unit
-    ): TextView {
+    private fun makeSuggestionCard(label: String, leftMarginPx: Int, onClick: () -> Unit): TextView {
         val d = resources.displayMetrics.density
         return TextView(this).apply {
             text = label
-            textSize = 11f
-            typeface = Typeface.MONOSPACE
-            setTypeface(typeface, Typeface.BOLD)
-            gravity = Gravity.CENTER
-            setTextColor(Color.parseColor(fgHex))
-            setPadding((8 * d).toInt(), (12 * d).toInt(), (8 * d).toInt(), (12 * d).toInt())
-            background = cardDrawable(bgHex, strokeHex ?: bgHex, 11 * d)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, weight).apply {
+            textSize = 13f
+            setTextColor(Color.parseColor("#E2E8F0"))
+            setPadding((14 * d).toInt(), (14 * d).toInt(), (14 * d).toInt(), (14 * d).toInt())
+            background = pillDrawable("#161D26", "#263344", 16 * d)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                 leftMargin = leftMarginPx
             }
             setOnClickListener { onClick() }
         }
     }
 
-    private fun cardDrawable(bgHex: String, strokeHex: String, radiusPx: Float): GradientDrawable {
+    private fun makeMiniTool(label: String, onClick: () -> Unit): TextView {
         val d = resources.displayMetrics.density
-        val strokeColor = if (strokeHex.length == 9 && strokeHex.startsWith("#")) {
-            Color.parseColor(strokeHex)
-        } else {
-            Color.parseColor(strokeHex)
-        }
-        return GradientDrawable().apply {
-            cornerRadius = radiusPx
-            setColor(Color.parseColor(bgHex))
-            setStroke((1.2f * d).toInt(), strokeColor)
+        return TextView(this).apply {
+            text = label
+            textSize = 11f
+            setTextColor(Color.parseColor("#CBD5E1"))
+            setPadding((12 * d).toInt(), (8 * d).toInt(), (12 * d).toInt(), (8 * d).toInt())
+            background = pillDrawable("#161D26", "#334155", 99 * d)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { rightMargin = (8 * d).toInt() }
+            setOnClickListener { onClick() }
         }
     }
 
-    private fun marginTopLp(topPx: Float): LinearLayout.LayoutParams {
-        return LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = topPx.toInt() }
+    private fun appendMessage(role: String, text: String) {
+        greetingBlock.visibility = View.GONE
+        val d = resources.displayMetrics.density
+        val msg = TextView(this).apply {
+            this.text = if (role == "user") text else "🌪️  $text"
+            textSize = 14f
+            setTextColor(Color.parseColor("#F1F5F9"))
+            setPadding((14 * d).toInt(), (11 * d).toInt(), (14 * d).toInt(), (11 * d).toInt())
+            background = if (role == "user") {
+                pillDrawable("#1E293B", "#334155", 18 * d)
+            } else {
+                pillDrawable("#11171F", "#1E293B", 18 * d)
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = if (role == "user") Gravity.END else Gravity.START
+                bottomMargin = (10 * d).toInt()
+            }
+        }
+        chatFeed.addView(msg)
     }
 
-    private fun sendBubbleState(stateName: String) {
+    private fun triggerServiceState(stateName: String) {
         if (!PuyalCoreService.isRunning) {
-            Toast.makeText(this, "Start Core Service first!", Toast.LENGTH_SHORT).show()
-            return
+            ContextCompat.startForegroundService(this, Intent(this, PuyalCoreService::class.java))
         }
         startService(Intent(this, PuyalCoreService::class.java).apply {
             action = PuyalCoreService.ACTION_SET_STATE
             putExtra(PuyalCoreService.EXTRA_STATE, stateName)
         })
-        telemetryText.postDelayed({ refreshDashboard() }, 150)
+        telemetryText.postDelayed({ refreshDashboard() }, 200)
+    }
+
+    private fun pillDrawable(bgHex: String, strokeHex: String, radiusPx: Float): GradientDrawable {
+        val d = resources.displayMetrics.density
+        return GradientDrawable().apply {
+            cornerRadius = radiusPx
+            setColor(Color.parseColor(bgHex))
+            setStroke((1 * d).toInt(), Color.parseColor(strokeHex))
+        }
     }
 
     private fun openUrl(url: String) {
@@ -347,17 +496,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun styleBadge(badge: TextView, ok: Boolean, okText: String = "READY", badText: String = "GRANT") {
+    private fun styleBadge(badge: TextView, ok: Boolean, okText: String = "READY", badText: String = "FIX") {
         val d = resources.displayMetrics.density
-        if (ok) {
-            badge.text = okText
-            badge.setTextColor(Color.parseColor("#00FF88"))
-            badge.background = cardDrawable("#071E14", "#00FF88", 99 * d)
-        } else {
-            badge.text = badText
-            badge.setTextColor(Color.parseColor("#F59E0B"))
-            badge.background = cardDrawable("#1F1607", "#F59E0B", 99 * d)
-        }
+        badge.text = if (ok) okText else badText
+        badge.setTextColor(Color.parseColor(if (ok) "#00FF88" else "#F59E0B"))
+        badge.background = pillDrawable(if (ok) "#071E14" else "#1F1607", if (ok) "#00FF88" else "#F59E0B", 99 * d)
     }
 
     private fun refreshDashboard() {
@@ -373,26 +516,15 @@ class MainActivity : AppCompatActivity() {
         styleBadge(permOverlayBadge, overlayOk)
         styleBadge(permMicBadge, micOk)
         styleBadge(permNotifBadge, notifOk)
-        styleBadge(permBatteryBadge, batteryOk, "UNRESTRICTED", "FIX")
+        styleBadge(permBatteryBadge, batteryOk, "OK", "FIX")
 
         val d = resources.displayMetrics.density
-        if (svcOk) {
-            serviceBadge.text = "IMMORTAL ON"
-            serviceBadge.setTextColor(Color.parseColor("#00FF88"))
-            serviceBadge.background = cardDrawable("#071E14", "#00FF88", 99 * d)
-        } else {
-            serviceBadge.text = "STOPPED"
-            serviceBadge.setTextColor(Color.parseColor("#94A3B8"))
-            serviceBadge.background = cardDrawable("#111B17", "#475569", 99 * d)
-        }
+        servicePill.text = if (svcOk) "● IMMORTAL" else "OFFLINE"
+        servicePill.setTextColor(Color.parseColor(if (svcOk) "#00FF88" else "#94A3B8"))
+        servicePill.background = pillDrawable(if (svcOk) "#071E14" else "#161D26", if (svcOk) "#00FF88" else "#334155", 99 * d)
 
         val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"
-        telemetryText.text = buildString {
-            appendLine("PID       : ${Process.myPid()} ($abi)")
-            appendLine("OOM_SCORE : $oomScoreValue")
-            appendLine("BUBBLE    : ${PuyalCoreService.currentStateName}")
-            append("0-FPS_GRD : ${if (svcOk) "ARMED (Screen-Off Freeze)" else "STANDBY"}")
-        }
+        telemetryText.text = "PID ${Process.myPid()} ($abi) • OOM: $oomScoreValue • Bubble: ${PuyalCoreService.currentStateName}"
     }
 
     private fun probeRootAndOomAsync() {
@@ -408,9 +540,8 @@ class MainActivity : AppCompatActivity() {
             val oom = try {
                 File("/proc/$pid/oom_score_adj").readText().trim()
             } catch (_: Exception) {
-                if (rootOk) "-1000 (Root Target)" else "0 (Non-Root)"
+                if (rootOk) "-1000" else "0"
             }
-            hasRootAccess = rootOk
             oomScoreValue = oom
             runOnUiThread {
                 rootBadge.text = if (rootOk) "SU: GRANTED" else "SU: NO ROOT"
