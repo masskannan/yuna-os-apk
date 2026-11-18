@@ -36,14 +36,18 @@ import android.view.Choreographer
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.ViewConfiguration
+import android.view.ViewOutlineProvider
+import android.graphics.Outline
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.puyal.os.MainActivity
+import com.puyal.os.R
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
@@ -59,7 +63,7 @@ class PuyalCoreService : Service() {
     }
 
     private lateinit var windowManager: WindowManager
-    private var bubbleView: PuyalVortexView? = null
+    private var bubbleView: ImageView? = null
     private var menuView: LinearLayout? = null
     private lateinit var bubbleParams: WindowManager.LayoutParams
     private lateinit var menuParams: WindowManager.LayoutParams
@@ -83,12 +87,12 @@ class PuyalCoreService : Service() {
                 val scale = 1.0f + 0.08f * kotlin.math.sin(pulsePhase)
                 bubbleView?.scaleX = scale
                 bubbleView?.scaleY = scale
-                bubbleView?.advanceVortex(2.4f)
+                bubbleView?.rotation = ((bubbleView?.rotation ?: 0f) - 1.8f) % 360f
                 choreographer.postFrameCallback(this)
             } else {
                 bubbleView?.scaleX = 1.0f
                 bubbleView?.scaleY = 1.0f
-                bubbleView?.resetVortex()
+                bubbleView?.rotation = 0f
             }
         }
     }
@@ -260,11 +264,19 @@ class PuyalCoreService : Service() {
         val density = resources.displayMetrics.density
         val sizePx = (52 * density).toInt()
 
-        val bubble = PuyalVortexView(this).apply {
+        val bubble = ImageView(this).apply {
+            setImageResource(R.drawable.puyal_cyclone)
+            scaleType = ImageView.ScaleType.CENTER_CROP
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#06090D"))
-                setStroke((2 * density).toInt(), Color.parseColor("#E2E8F0"))
+                setColor(Color.parseColor("#04070B"))
+                setStroke((1.5f * density).toInt(), Color.parseColor("#CBD5E1"))
+            }
+            clipToOutline = true
+            outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    outline.setOval(0, 0, view.width, view.height)
+                }
             }
             elevation = 8 * density
         }
@@ -374,7 +386,7 @@ class PuyalCoreService : Service() {
             choreographer.removeFrameCallback(frameCallback)
             bubbleView?.scaleX = 1.0f
             bubbleView?.scaleY = 1.0f
-            bubbleView?.resetVortex()
+            bubbleView?.rotation = 0f
         }
     }
 
@@ -530,141 +542,4 @@ class PuyalCoreService : Service() {
         }
     }
 
-    private class PuyalVortexView(context: Context) : View(context) {
-        private var cloudColor = Color.parseColor("#E2E8F0")
-        private var coreColor = Color.parseColor("#FFFFFF")
-        private var driftAngle = 0f
-        private var flowPhase = 0f
-
-        private val shieldPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val cloudArmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeCap = Paint.Cap.ROUND
-        }
-        private val windFlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeCap = Paint.Cap.ROUND
-        }
-        private val eyewallPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-        }
-        private val eyeCorePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-            color = Color.parseColor("#04070B")
-        }
-        private val spiralPath = Path()
-        private var blurInitialized = false
-
-        init {
-            setLayerType(LAYER_TYPE_SOFTWARE, null)
-        }
-
-        fun setVortexColor(color: Int) {
-            cloudColor = color
-            coreColor = Color.parseColor("#FFFFFF")
-            invalidate()
-        }
-
-        fun advanceVortex(deltaDeg: Float) {
-            driftAngle = (driftAngle - deltaDeg * 0.28f) % 360f
-            flowPhase = (flowPhase - deltaDeg * 1.6f)
-            invalidate()
-        }
-
-        fun resetVortex() {
-            driftAngle = 0f
-            flowPhase = 0f
-            invalidate()
-        }
-
-        private fun buildLogSpiral(cx: Float, cy: Float, rStart: Float, rEnd: Float, startDeg: Float, sweepDeg: Float) {
-            spiralPath.reset()
-            val steps = 26
-            val ratio = (rEnd / rStart).toDouble()
-            for (i in 0..steps) {
-                val t = i.toDouble() / steps
-                val r = (rStart * Math.pow(ratio, t)).toFloat()
-                val rad = Math.toRadians((startDeg - sweepDeg * t))
-                val x = cx + (r * Math.cos(rad)).toFloat()
-                val y = cy + (r * Math.sin(rad)).toFloat()
-                if (i == 0) spiralPath.moveTo(x, y) else spiralPath.lineTo(x, y)
-            }
-        }
-
-        override fun onDraw(canvas: Canvas) {
-            super.onDraw(canvas)
-            val w = width.toFloat()
-            val h = height.toFloat()
-            val cx = w / 2f
-            val cy = h / 2f
-            val minDim = minOf(w, h)
-            val density = resources.displayMetrics.density
-
-            if (!blurInitialized) {
-                val blur = BlurMaskFilter(1.4f * density, BlurMaskFilter.Blur.NORMAL)
-                cloudArmPaint.maskFilter = blur
-                eyewallPaint.maskFilter = blur
-                blurInitialized = true
-            }
-
-            // Soft satellite cloud overcast shield
-            shieldPaint.shader = RadialGradient(
-                cx, cy, minDim * 0.46f,
-                intArrayOf(
-                    Color.parseColor("#04070B"),
-                    Color.argb(215, 255, 255, 255),
-                    Color.argb(95, 203, 213, 225),
-                    Color.argb(30, 148, 163, 184),
-                    Color.TRANSPARENT
-                ),
-                floatArrayOf(0f, 0.17f, 0.32f, 0.68f, 1f),
-                Shader.TileMode.CLAMP
-            )
-            canvas.drawCircle(cx, cy, minDim * 0.45f, shieldPaint)
-
-            canvas.save()
-            canvas.rotate(driftAngle, cx, cy)
-
-            // Soft sweeping satellite cloud bands (2 primary + 2 feeder)
-            cloudArmPaint.color = cloudColor
-            cloudArmPaint.alpha = 115
-            cloudArmPaint.strokeWidth = 3.8f * density
-            for (startAngle in floatArrayOf(10f, 190f)) {
-                buildLogSpiral(cx, cy, minDim * 0.43f, minDim * 0.11f, startAngle, 220f)
-                canvas.drawPath(spiralPath, cloudArmPaint)
-            }
-            cloudArmPaint.alpha = 78
-            cloudArmPaint.strokeWidth = 2.4f * density
-            for (startAngle in floatArrayOf(105f, 285f)) {
-                buildLogSpiral(cx, cy, minDim * 0.40f, minDim * 0.16f, startAngle, 142f)
-                canvas.drawPath(spiralPath, cloudArmPaint)
-            }
-
-            // Inward-flowing bright cloud wind gusts
-            windFlowPaint.color = coreColor
-            windFlowPaint.alpha = 215
-            windFlowPaint.strokeWidth = 1.4f * density
-            windFlowPaint.pathEffect = DashPathEffect(floatArrayOf(18f * density, 14f * density), flowPhase * density)
-            for (startAngle in floatArrayOf(10f, 190f)) {
-                buildLogSpiral(cx, cy, minDim * 0.43f, minDim * 0.11f, startAngle, 220f)
-                canvas.drawPath(spiralPath, windFlowPaint)
-            }
-            windFlowPaint.alpha = 155
-            windFlowPaint.strokeWidth = 1.0f * density
-            windFlowPaint.pathEffect = DashPathEffect(floatArrayOf(12f * density, 16f * density), flowPhase * 1.25f * density)
-            for (startAngle in floatArrayOf(105f, 285f)) {
-                buildLogSpiral(cx, cy, minDim * 0.40f, minDim * 0.16f, startAngle, 142f)
-                canvas.drawPath(spiralPath, windFlowPaint)
-            }
-            windFlowPaint.pathEffect = null
-            canvas.restore()
-
-            // Glowing eyewall ring + deep calm dark Eye
-            eyewallPaint.color = coreColor
-            eyewallPaint.alpha = 225
-            eyewallPaint.strokeWidth = 2.0f * density
-            canvas.drawCircle(cx, cy, minDim * 0.095f, eyewallPaint)
-            canvas.drawCircle(cx, cy, minDim * 0.056f, eyeCorePaint)
-        }
-    }
 }
