@@ -8,6 +8,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - uses: actions/checkout@v4
 
@@ -17,11 +20,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK & NDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install NDK 26
-        run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;26.1.10909125"
+      - name: Accept SDK Licenses & Install NDK 26
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;26.1.10909125"
 
       - name: Setup Rust (arm64-v8a)
         uses: dtolnay/rust-toolchain@stable
@@ -30,7 +32,7 @@ jobs:
 
       - name: Build Rust Brain (.so)
         env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
+          ANDROID_NDK_HOME: /usr/local/lib/android/sdk/ndk/26.1.10909125
         run: |
           cargo install cargo-ndk --locked
           cargo ndk -t arm64-v8a -o app/src/main/jniLibs build --manifest-path wasm_modules/rust_brain/Cargo.toml --release
@@ -42,6 +44,7 @@ jobs:
 
       - name: Build Zig Hands (.so)
         run: |
+          mkdir -p app/src/main/jniLibs/arm64-v8a
           zig build-lib wasm_modules/zig_hands/src/main.zig -target aarch64-linux-android -dynamic -O ReleaseSmall -femit-bin=app/src/main/jniLibs/arm64-v8a/libyuna_zig.so
 
       - name: Build Polyglot Debug APK
