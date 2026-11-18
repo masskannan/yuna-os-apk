@@ -1,19 +1,9 @@
 package com.puyal.os
 
 import android.Manifest
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.LinearGradient
-import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RadialGradient
-import android.graphics.RectF
-import android.graphics.Shader
-import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
+import android.graphics.RuntimeShader
 import android.hardware.camera2.CameraManager
 import android.net.Uri
 import android.os.Build
@@ -21,705 +11,823 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.os.Process
 import android.provider.Settings
-import android.view.Gravity
-import android.view.View
-import android.view.ViewOutlineProvider
-import android.graphics.Outline
-import android.widget.EditText
-import android.widget.FrameLayout
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
 import com.puyal.os.service.PuyalCoreService
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-class MainActivity : AppCompatActivity() {
+private const val AURORA_AGSL = """
+uniform float2 uRes;
+uniform float uTime;
+half4 main(float2 fragCoord) {
+    float2 uv = fragCoord / max(uRes, float2(1.0, 1.0));
+    float w1 = sin(uv.x * 3.1 + uTime * 0.4) * cos(uv.y * 2.4 - uTime * 0.3);
+    float w2 = cos(uv.x * 2.2 - uv.y * 2.8 + uTime * 0.25);
+    float tealMask = smoothstep(0.95, 0.08, distance(uv, float2(0.84, 0.16 + 0.03 * w1)));
+    float indigoMask = smoothstep(1.05, 0.12, distance(uv, float2(0.16, 0.46 + 0.04 * w2)));
+    float3 base = float3(0.020, 0.027, 0.047);
+    float3 teal = float3(0.055, 0.647, 0.914) * tealMask * 0.42;
+    float3 indigo = float3(0.388, 0.400, 0.945) * indigoMask * 0.38;
+    return half4(base + teal + indigo, 1.0);
+}
+"""
 
-    private lateinit var rootFrame: FrameLayout
-    private lateinit var mainCol: LinearLayout
-    private lateinit var chatFeed: LinearLayout
-    private lateinit var heroStage: LinearLayout
-    private lateinit var yunaOrbView: YunaOrbView
-    private lateinit var drawerOverlay: FrameLayout
-    private lateinit var settingsModal: FrameLayout
-    private lateinit var plusSheet: LinearLayout
-    private lateinit var inputBox: EditText
+private const val PLASMA_ORB_AGSL = """
+uniform float2 uRes;
+uniform float uTime;
+uniform float3 uAccent;
+half4 main(float2 fragCoord) {
+    float2 uv = (fragCoord - 0.5 * uRes) / max(min(uRes.x, uRes.y), 1.0);
+    float d = length(uv);
+    float angle = atan(uv.y, uv.x);
+    float swirl = sin(angle * 3.0 + d * 10.0 - uTime * 2.2) * 0.5 + 0.5;
+    float plasma = sin(uv.x * 7.0 + uTime * 1.4) * cos(uv.y * 7.0 - uTime * 1.1) * 0.5 + 0.5;
+    float core = smoothstep(0.50, 0.05, d);
+    float rim = smoothstep(0.50, 0.44, d) * smoothstep(0.35, 0.47, d);
+    float3 violet = float3(0.388, 0.400, 0.945);
+    float3 col = mix(violet, uAccent, swirl * 0.65 + plasma * 0.35) * core;
+    col += float3(0.72, 0.90, 0.99) * rim * 0.75;
+    float alpha = smoothstep(0.50, 0.46, d);
+    return half4(col, alpha);
+}
+"""
 
-    private lateinit var orbStatusLabel: TextView
-    private lateinit var nav3Btn: TextView
-    private lateinit var nav2Btn: TextView
-    private lateinit var navGestBtn: TextView
-    private lateinit var svcToggleBtn: TextView
-    private lateinit var settingsTeleText: TextView
-    private lateinit var permOverlayBadge: TextView
-    private lateinit var permMicBadge: TextView
-    private lateinit var permNotifBadge: TextView
-    private lateinit var permBatteryBadge: TextView
+data class ChatEntry(val isUser: Boolean, val title: String, val body: String)
 
-    private var navMode = "3BTN"
-    private var oomScoreValue = "-1000"
-    private var isRootGranted = false
-    private var isTorchOn = false
+class MainActivity : ComponentActivity() {
+
+    private val hasRootState = mutableStateOf(false)
+    private val oomScoreState = mutableStateOf("-1000")
+    private val overlayGranted = mutableStateOf(false)
+    private val micGranted = mutableStateOf(false)
+    private val notifGranted = mutableStateOf(false)
+    private val batteryExempt = mutableStateOf(false)
+    private val serviceRunning = mutableStateOf(false)
+    private val bubbleMode = mutableStateOf("IDLE")
+    private val torchOn = mutableStateOf(false)
 
     private val permLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { refreshSettings() }
+    ) { refreshSystemState() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.statusBarColor = Color.TRANSPARENT
-        window.navigationBarColor = Color.TRANSPARENT
-
-        buildYunaAuroraUi()
-        applyNavAndImeInsets()
+        refreshSystemState()
         probeRootAndOomAsync()
+
+        setContent {
+            YunaSovereignScreen()
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        refreshSettings()
+        refreshSystemState()
         probeRootAndOomAsync()
     }
 
-    private fun applyNavAndImeInsets() {
-        val d = resources.displayMetrics.density
-        ViewCompat.setOnApplyWindowInsetsListener(mainCol) { view, windowInsets ->
-            val sysBars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-            val ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime())
-            val extraNavDp = when (navMode) {
-                "3BTN" -> 8
-                "2BTN" -> 6
-                else -> 4
-            }
-            val bottomInset = maxOf(sysBars.bottom, ime.bottom) + (extraNavDp * d).toInt()
-            view.setPadding(sysBars.left, sysBars.top, sysBars.right, bottomInset)
-            windowInsets
-        }
-        ViewCompat.requestApplyInsets(mainCol)
-    }
+    @Composable
+    private fun YunaSovereignScreen() {
+        var inputText by remember { mutableStateOf("") }
+        var navMode by remember { mutableStateOf("3BTN") }
+        var showDrawer by remember { mutableStateOf(false) }
+        var showSettings by remember { mutableStateOf(false) }
+        var showPlusTools by remember { mutableStateOf(false) }
+        val messages = remember { mutableStateListOf<ChatEntry>() }
 
-    private fun buildYunaAuroraUi() {
-        val d = resources.displayMetrics.density
-        rootFrame = FrameLayout(this).apply {
-            setBackgroundColor(Color.parseColor("#05070C"))
-            addView(AuroraBackdropView(this@MainActivity), FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            ))
-        }
+        val activeMode = bubbleMode.value
+        val isAnimating = activeMode != "IDLE"
+        var animTime by remember { mutableFloatStateOf(0f) }
 
-        mainCol = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-
-        // 1. Top Bar: [☰]   YUNA [20MB • LOCAL]   [⚙️]
-        val topBar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (56 * d).toInt())
-            setPadding((14 * d).toInt(), 0, (14 * d).toInt(), 0)
-        }
-
-        val menuBtn = TextView(this).apply {
-            text = "☰"
-            textSize = 18f
-            gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#E2E8F0"))
-            background = glassPill("#1A132036", "#3838BDF8", 12 * d)
-            layoutParams = LinearLayout.LayoutParams((38 * d).toInt(), (38 * d).toInt())
-            setOnClickListener { drawerOverlay.visibility = View.VISIBLE }
-        }
-
-        val centerWrap = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-        centerWrap.addView(TextView(this).apply {
-            text = "YUNA"
-            textSize = 19f
-            letterSpacing = 0.18f
-            setTypeface(Typeface.SANS_SERIF, Typeface.BOLD)
-            setTextColor(Color.parseColor("#F8FAFC"))
-            setPadding(0, 0, (10 * d).toInt(), 0)
-        })
-        centerWrap.addView(TextView(this).apply {
-            text = "20MB • LOCAL"
-            textSize = 9.5f
-            typeface = Typeface.MONOSPACE
-            setTextColor(Color.parseColor("#BAE6FD"))
-            setPadding((10 * d).toInt(), (4 * d).toInt(), (10 * d).toInt(), (4 * d).toInt())
-            background = glassPill("#1A0D1829", "#4438BDF8", 99 * d)
-        })
-
-        val settingsBtn = TextView(this).apply {
-            text = "⚙️"
-            textSize = 17f
-            gravity = Gravity.CENTER
-            background = glassPill("#1A132036", "#3838BDF8", 12 * d)
-            layoutParams = LinearLayout.LayoutParams((38 * d).toInt(), (38 * d).toInt())
-            setOnClickListener { openSettingsModal() }
-        }
-
-        topBar.addView(menuBtn)
-        topBar.addView(centerWrap)
-        topBar.addView(settingsBtn)
-        mainCol.addView(topBar)
-
-        // 2. Center Scroll Stage (0-FPS Liquid-Glass Orb + Wave Hero Card + 3-Pill Rail)
-        val scroll = ScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
-            isFillViewport = true
-        }
-        val stage = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding((18 * d).toInt(), (4 * d).toInt(), (18 * d).toInt(), (10 * d).toInt())
-        }
-
-        heroStage = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, (4 * d).toInt(), 0, (8 * d).toInt())
-        }
-
-        val orbFrame = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams((186 * d).toInt(), (186 * d).toInt())
-            setOnClickListener {
-                if (PuyalCoreService.currentStateName == "LISTENING") {
-                    triggerServiceState("IDLE")
-                } else {
-                    triggerServiceState("LISTENING")
-                }
-            }
-        }
-        yunaOrbView = YunaOrbView(this)
-        orbFrame.addView(yunaOrbView, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        ))
-        val orbImg = ImageView(this).apply {
-            setImageResource(R.drawable.yuna_orb)
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            clipToOutline = true
-            outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: Outline) {
-                    outline.setOval(0, 0, view.width, view.height)
-                }
-            }
-        }
-        orbFrame.addView(orbImg, FrameLayout.LayoutParams((114 * d).toInt(), (114 * d).toInt(), Gravity.CENTER))
-        heroStage.addView(orbFrame)
-
-        heroStage.addView(TextView(this).apply {
-            text = "Vanakkam Boss"
-            textSize = 25f
-            gravity = Gravity.CENTER
-            setTypeface(Typeface.SANS_SERIF, Typeface.BOLD)
-            setTextColor(Color.parseColor("#F8FAFC"))
-            setPadding(0, (2 * d).toInt(), 0, (2 * d).toInt())
-        })
-
-        orbStatusLabel = TextView(this).apply {
-            text = "0-FPS IDLE • TAP ORB FOR MIC"
-            textSize = 10f
-            typeface = Typeface.MONOSPACE
-            gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#38BDF8"))
-            setPadding(0, 0, 0, (14 * d).toInt())
-        }
-        heroStage.addView(orbStatusLabel)
-
-        // Frosted Wave Hero Card (matching the showcase wave-accent glass card)
-        val visionFrame = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (88 * d).toInt())
-            setOnClickListener { submitPrompt("Screen Vision & Scan") }
-        }
-        visionFrame.addView(WaveGlassCardView(this), FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        ))
-        val visionContent = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding((20 * d).toInt(), (14 * d).toInt(), (20 * d).toInt(), (14 * d).toInt())
-        }
-        visionContent.addView(TextView(this).apply {
-            text = "Screen Vision & Scan"
-            textSize = 16f
-            setTypeface(Typeface.SANS_SERIF, Typeface.BOLD)
-            setTextColor(Color.parseColor("#F8FAFC"))
-        })
-        visionContent.addView(TextView(this).apply {
-            text = "⛶  DOM + OCR local screen reader"
-            textSize = 12f
-            setTextColor(Color.parseColor("#94A3B8"))
-            setPadding(0, (5 * d).toInt(), 0, 0)
-        })
-        visionFrame.addView(visionContent)
-        heroStage.addView(visionFrame)
-
-        // 3-Pill Quick Rail with subtle glowing indicator bar underneath
-        val rail = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                topMargin = (12 * d).toInt()
-            }
-        }
-        rail.addView(makeRailPill("WA Intel", "#38BDF8", 0) { submitPrompt("WhatsApp VIP Intel check") })
-        rail.addView(makeRailPill("Root Shield", "#00FF88", (8 * d).toInt()) { openSettingsModal() })
-        rail.addView(makeRailPill("Torch", "#818CF8", (8 * d).toInt()) { toggleTorchLocal() })
-        heroStage.addView(rail)
-
-        stage.addView(heroStage)
-
-        chatFeed = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        stage.addView(chatFeed)
-        scroll.addView(stage)
-        mainCol.addView(scroll)
-
-        // 3. Plus Input Sheet (Camera, Photo, File, Scan)
-        plusSheet = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            visibility = View.GONE
-            setPadding((14 * d).toInt(), (6 * d).toInt(), (14 * d).toInt(), (6 * d).toInt())
-        }
-        plusSheet.addView(makeInputTool("📷 Camera") { toastInfo("Camera Vision ready in Level 5") })
-        plusSheet.addView(makeInputTool("🖼️ Photo") { toastInfo("Photo picker ready in Level 5") })
-        plusSheet.addView(makeInputTool("📁 File") { toastInfo("File attach ready in Level 2") })
-        plusSheet.addView(makeInputTool("👁️ Scan") { submitPrompt("Screen Vision & Scan") })
-        mainCol.addView(plusSheet)
-
-        // 4. Thumb-Arc Command Dock (＋ | Input | Waveform | Vortex Orb — cleanly above 3-Button Nav Bar)
-        val inputPill = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            minimumHeight = (58 * d).toInt()
-            setPadding((10 * d).toInt(), (6 * d).toInt(), (8 * d).toInt(), (6 * d).toInt())
-            background = glassPill("#CC0E1525", "#3838BDF8", 29 * d)
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                leftMargin = (14 * d).toInt()
-                rightMargin = (14 * d).toInt()
-                topMargin = (6 * d).toInt()
-            }
-        }
-
-        val plusBtn = TextView(this).apply {
-            text = "＋"
-            textSize = 20f
-            gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#CBD5E1"))
-            background = glassPill("#18FFFFFF", "#26FFFFFF", 99 * d)
-            layoutParams = LinearLayout.LayoutParams((38 * d).toInt(), (38 * d).toInt())
-            setOnClickListener {
-                plusSheet.visibility = if (plusSheet.visibility == View.VISIBLE) View.GONE else View.VISIBLE
-            }
-        }
-
-        inputBox = EditText(this).apply {
-            hint = "Yuna kitta sollunga..."
-            setHintTextColor(Color.parseColor("#64748B"))
-            setTextColor(Color.parseColor("#F8FAFC"))
-            textSize = 15f
-            background = null
-            maxLines = 4
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            setPadding((10 * d).toInt(), (8 * d).toInt(), (6 * d).toInt(), (8 * d).toInt())
-        }
-
-        val waveBtn = WaveformIconView(this).apply {
-            layoutParams = LinearLayout.LayoutParams((34 * d).toInt(), (34 * d).toInt()).apply {
-                rightMargin = (6 * d).toInt()
-            }
-            setOnClickListener {
-                triggerServiceState("LISTENING")
-                appendMessage("yuna", "Yuna Listening ON — Level 3 Sherpa-ONNX Tamil STT hook.")
-            }
-        }
-
-        val orbSendBtn = TextView(this).apply {
-            text = "🌪️"
-            textSize = 19f
-            gravity = Gravity.CENTER
-            background = GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.parseColor("#38BDF8"), Color.parseColor("#6366F1"))
-            ).apply {
-                shape = GradientDrawable.OVAL
-                setStroke((1.5f * d).toInt(), Color.parseColor("#7DD3FC"))
-            }
-            layoutParams = LinearLayout.LayoutParams((42 * d).toInt(), (42 * d).toInt())
-            setOnClickListener {
-                val q = inputBox.text.toString().trim()
-                if (q.isNotEmpty()) {
-                    inputBox.setText("")
-                    submitPrompt(q)
-                } else {
-                    triggerServiceState("IDLE")
+        // 0-FPS Idle Battery Lock: frame loop runs ONLY when activeMode != IDLE
+        LaunchedEffect(isAnimating) {
+            if (isAnimating) {
+                var last = 0L
+                while (true) {
+                    withFrameNanos { now ->
+                        if (last != 0L) animTime += (now - last) / 1_000_000_000f
+                        last = now
+                    }
                 }
             }
         }
 
-        inputPill.addView(plusBtn)
-        inputPill.addView(inputBox)
-        inputPill.addView(waveBtn)
-        inputPill.addView(orbSendBtn)
-        mainCol.addView(inputPill)
-
-        rootFrame.addView(mainCol)
-
-        // 5. Left Slide Drawer
-        drawerOverlay = buildLeftDrawer(d)
-        drawerOverlay.visibility = View.GONE
-        rootFrame.addView(drawerOverlay)
-
-        // 6. Settings Modal
-        settingsModal = buildSettingsModal(d)
-        settingsModal.visibility = View.GONE
-        rootFrame.addView(settingsModal)
-
-        setContentView(rootFrame)
-    }
-
-    private fun buildLeftDrawer(d: Float): FrameLayout {
-        val scrim = FrameLayout(this).apply {
-            setBackgroundColor(Color.argb(185, 0, 0, 0))
-            setOnClickListener { visibility = View.GONE }
-        }
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#080C16"))
-            setPadding((18 * d).toInt(), (46 * d).toInt(), (18 * d).toInt(), (24 * d).toInt())
-            layoutParams = FrameLayout.LayoutParams((275 * d).toInt(), FrameLayout.LayoutParams.MATCH_PARENT, Gravity.START)
-            setOnClickListener { }
+        val extraNavBottom = when (navMode) {
+            "3BTN" -> 8.dp
+            "2BTN" -> 6.dp
+            else -> 4.dp
         }
 
-        panel.addView(TextView(this).apply {
-            text = "YUNA • LOCAL OS"
-            textSize = 17f
-            letterSpacing = 0.14f
-            setTypeface(Typeface.SANS_SERIF, Typeface.BOLD)
-            setTextColor(Color.parseColor("#38BDF8"))
-            setPadding(0, 0, 0, (16 * d).toInt())
-        })
+        Box(modifier = Modifier.fillMaxSize().background(Color(0xFF05070C))) {
+            // 1. AGSL Multi-Layer Aurora Background
+            AgslAuroraLayer(timeSec = animTime)
 
-        panel.addView(makeDrawerItem("＋  New Chat") {
-            chatFeed.removeAllViews()
-            heroStage.visibility = View.VISIBLE
-            scrim.visibility = View.GONE
-        })
-        panel.addView(makeDrawerItem("📁  Files & Vault") { openUrl("http://127.0.0.1:7778"); scrim.visibility = View.GONE })
-        panel.addView(makeDrawerItem("⚡  Wasm Skills") { toastInfo("Level 2 & 4 Wasm Brain"); scrim.visibility = View.GONE })
-        panel.addView(makeDrawerItem("🕒  Schedules") { toastInfo("Level 6 Autonomous Loop"); scrim.visibility = View.GONE })
-        panel.addView(makeDrawerItem("⚙️  Settings") { scrim.visibility = View.GONE; openSettingsModal() })
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(bottom = extraNavBottom)
+            ) {
+                // Top Bar: Menu | YUNA [20MB • LOCAL] | Settings Gear
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    GlassIconBtn("☰") { showDrawer = true }
 
-        panel.addView(TextView(this).apply {
-            text = "ALL CHATS"
-            textSize = 10f
-            typeface = Typeface.MONOSPACE
-            setTextColor(Color.parseColor("#64748B"))
-            setPadding(0, (18 * d).toInt(), 0, (8 * d).toInt())
-        })
-        panel.addView(makeStatusRow("●", "#00FF88", "READY", "OOM -1000 Immortal Core"))
-        panel.addView(makeStatusRow("▲", "#F59E0B", "NEEDS ACTION", "Level 1 Smoke Test"))
-        panel.addView(makeStatusRow("◌", "#38BDF8", "PROCESSING", "0-FPS Idle Guard"))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "YUNA",
+                            color = Color(0xFFF8FAFC),
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 3.sp
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(99.dp))
+                                .background(Color(0xB30D1829))
+                                .border(1.dp, Color(0x4D38BDF8), RoundedCornerShape(99.dp))
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "20MB • LOCAL",
+                                color = Color(0xFFBAE6FD),
+                                fontSize = 9.5.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
 
-        scrim.addView(panel)
-        return scrim
-    }
-
-    private fun buildSettingsModal(d: Float): FrameLayout {
-        val scrim = FrameLayout(this).apply {
-            setBackgroundColor(Color.argb(195, 0, 0, 0))
-            setOnClickListener { visibility = View.GONE }
-        }
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding((18 * d).toInt(), (16 * d).toInt(), (18 * d).toInt(), (18 * d).toInt())
-            background = glassPill("#0B101D", "#2E4360", 20 * d)
-            setOnClickListener { }
-        }
-
-        val hdr = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        hdr.addView(TextView(this).apply {
-            text = "⚙️ YUNA SETTINGS"
-            textSize = 14f
-            typeface = Typeface.MONOSPACE
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#38BDF8"))
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        })
-        hdr.addView(TextView(this).apply {
-            text = "✕"
-            textSize = 18f
-            setTextColor(Color.parseColor("#94A3B8"))
-            setPadding((8 * d).toInt(), (4 * d).toInt(), (4 * d).toInt(), (4 * d).toInt())
-            setOnClickListener { scrim.visibility = View.GONE }
-        })
-        card.addView(hdr)
-
-        card.addView(settingsLabel("Navigation Bar Clearance"))
-        val navRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                bottomMargin = (12 * d).toInt()
-            }
-        }
-        nav3Btn = makeNavChip("3-Button", 0) { setNavMode("3BTN") }
-        nav2Btn = makeNavChip("2-Button", (6 * d).toInt()) { setNavMode("2BTN") }
-        navGestBtn = makeNavChip("Gesture", (6 * d).toInt()) { setNavMode("GESTURE") }
-        navRow.addView(nav3Btn); navRow.addView(nav2Btn); navRow.addView(navGestBtn)
-        card.addView(navRow)
-
-        card.addView(settingsLabel("Immortal Core & Floating 🌪️ Bubble"))
-        svcToggleBtn = TextView(this).apply {
-            textSize = 12f
-            gravity = Gravity.CENTER
-            typeface = Typeface.MONOSPACE
-            setTypeface(typeface, Typeface.BOLD)
-            setPadding((12 * d).toInt(), (11 * d).toInt(), (12 * d).toInt(), (11 * d).toInt())
-            setOnClickListener {
-                if (PuyalCoreService.isRunning) {
-                    startService(Intent(this@MainActivity, PuyalCoreService::class.java).apply { action = PuyalCoreService.ACTION_STOP_SERVICE })
-                } else {
-                    ContextCompat.startForegroundService(this@MainActivity, Intent(this@MainActivity, PuyalCoreService::class.java))
+                    GlassIconBtn("⚙️") {
+                        refreshSystemState()
+                        probeRootAndOomAsync()
+                        showSettings = true
+                    }
                 }
-                postDelayed({ refreshSettings(); probeRootAndOomAsync() }, 350)
-            }
-        }
-        card.addView(svcToggleBtn)
 
-        settingsTeleText = TextView(this).apply {
-            textSize = 11f
-            typeface = Typeface.MONOSPACE
-            setTextColor(Color.parseColor("#94A3B8"))
-            setPadding(0, (8 * d).toInt(), 0, (12 * d).toInt())
-        }
-        card.addView(settingsTeleText)
+                // Center Scrollable Stage
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 18.dp, vertical = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (messages.isEmpty()) {
+                        // Cybernetic HUD Rings + AGSL Breathing Plasma Orb
+                        Box(
+                            modifier = Modifier
+                                .size(190.dp)
+                                .clickable {
+                                    val next = if (bubbleMode.value == "LISTENING") "IDLE" else "LISTENING"
+                                    triggerServiceState(next)
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            HudOrbitalRings(activeMode = activeMode)
+                            AgslPlasmaOrb(
+                                modifier = Modifier.size(116.dp),
+                                timeSec = animTime,
+                                activeMode = activeMode
+                            )
+                        }
 
-        card.addView(settingsLabel("Permissions (Tap to Grant)"))
-        permOverlayBadge = addPermRow(card, "Overlay Bubble") {
-            if (!Settings.canDrawOverlays(this)) startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-        }
-        permMicBadge = addPermRow(card, "Microphone & Camera") {
-            permLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA))
-        }
-        permNotifBadge = addPermRow(card, "Notifications") {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) permLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
-        }
-        permBatteryBadge = addPermRow(card, "Battery Unrestricted") {
-            val pm = getSystemService(POWER_SERVICE) as PowerManager
-            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-                startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply { data = Uri.parse("package:$packageName") })
-            }
-        }
+                        Text(
+                            text = "Vanakkam Boss",
+                            color = Color(0xFFF8FAFC),
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "OOM ${oomScoreState.value} • ${if (activeMode == "IDLE") "0-FPS IDLE (TAP ORB)" else activeMode}",
+                            color = Color(0xFF38BDF8),
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 0.8.sp
+                        )
 
-        card.addView(settingsLabel("Local Consoles"))
-        val portRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        portRow.addView(makeNavChip(":7777 Web UI", 0) { openUrl("http://127.0.0.1:7777") })
-        portRow.addView(makeNavChip(":7778 App Store", (6 * d).toInt()) { openUrl("http://127.0.0.1:7778") })
-        card.addView(portRow)
+                        Spacer(Modifier.height(16.dp))
 
-        val scroll = ScrollView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER).apply {
-                leftMargin = (18 * d).toInt()
-                rightMargin = (18 * d).toInt()
-            }
-            addView(card)
-        }
-        scrim.addView(scroll)
-        return scrim
-    }
+                        // Frosted Glass "Screen Vision & Scan" Hero Card
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(Color(0xCC112238), Color(0xCC161A33))
+                                    )
+                                )
+                                .border(1.dp, Color(0x557DD3FC), RoundedCornerShape(20.dp))
+                                .clickable {
+                                    submitUserQuery("Screen Vision & Scan", messages)
+                                }
+                                .padding(horizontal = 20.dp, vertical = 18.dp)
+                        ) {
+                            Column {
+                                Text(
+                                    text = "⛶  Screen Vision & Scan",
+                                    color = Color(0xFFF8FAFC),
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = "Read active app DOM, OCR & local triggers",
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
 
-    private fun openSettingsModal() {
-        refreshSettings()
-        probeRootAndOomAsync()
-        settingsModal.visibility = View.VISIBLE
-    }
+                        Spacer(Modifier.height(12.dp))
 
-    private fun makeRailPill(label: String, dotHex: String, leftMarginPx: Int, onClick: () -> Unit): LinearLayout {
-        val d = resources.displayMetrics.density
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding((8 * d).toInt(), (11 * d).toInt(), (8 * d).toInt(), (8 * d).toInt())
-            background = glassPill("#CC0E1525", "#2E4360", 99 * d)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                leftMargin = leftMarginPx
-            }
-            addView(TextView(this@MainActivity).apply {
-                text = label
-                textSize = 12f
-                gravity = Gravity.CENTER
-                setTextColor(Color.parseColor("#E2E8F0"))
-            })
-            addView(View(this@MainActivity).apply {
-                layoutParams = LinearLayout.LayoutParams((14 * d).toInt(), (2.5f * d).toInt()).apply {
-                    topMargin = (5 * d).toInt()
+                        // Quick Action Pills (WA Intel, Root Shield, Torch)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            QuickActionPill("WA Intel", Color(0xFF38BDF8), Modifier.weight(1f)) {
+                                submitUserQuery("WhatsApp VIP Intel check", messages)
+                            }
+                            QuickActionPill("Root Shield", Color(0xFF00FF88), Modifier.weight(1f)) {
+                                refreshSystemState()
+                                probeRootAndOomAsync()
+                                showSettings = true
+                            }
+                            QuickActionPill(
+                                if (torchOn.value) "Torch ON" else "Torch",
+                                Color(0xFF818CF8),
+                                Modifier.weight(1f)
+                            ) { toggleTorch() }
+                        }
+                    } else {
+                        messages.forEach { entry ->
+                            ChatBubbleItem(entry)
+                            Spacer(Modifier.height(10.dp))
+                        }
+                    }
                 }
-                background = GradientDrawable().apply {
-                    cornerRadius = 99 * d
-                    setColor(Color.parseColor(dotHex))
+
+                // Plus Attachment Sheet
+                AnimatedVisibility(visible = showPlusTools, enter = fadeIn(), exit = fadeOut()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        MiniChip("📷 Camera") { toast("Camera Vision ready in Level 5"); showPlusTools = false }
+                        MiniChip("🖼️ Photo") { toast("Photo picker ready in Level 5"); showPlusTools = false }
+                        MiniChip("📁 File") { toast("File attach ready in Level 2"); showPlusTools = false }
+                        MiniChip("👁️ Scan") {
+                            showPlusTools = false
+                            submitUserQuery("Screen Vision & Scan", messages)
+                        }
+                    }
                 }
-            })
-            setOnClickListener { onClick() }
-        }
-    }
 
-    private fun makeDrawerItem(label: String, onClick: () -> Unit): TextView {
-        val d = resources.displayMetrics.density
-        return TextView(this).apply {
-            text = label
-            textSize = 14f
-            setTextColor(Color.parseColor("#E2E8F0"))
-            setPadding((10 * d).toInt(), (11 * d).toInt(), (10 * d).toInt(), (11 * d).toInt())
-            setOnClickListener { onClick() }
-        }
-    }
+                // Bottom Floating Input Pill ("+", "Yuna kitta sollunga...", Voice Wave, AI Orb Button)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(29.dp))
+                        .background(Color(0xD90E1525))
+                        .border(1.dp, Color(0x4D38BDF8), RoundedCornerShape(29.dp))
+                        .padding(start = 10.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x18FFFFFF))
+                            .clickable { showPlusTools = !showPlusTools },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("＋", color = Color(0xFFCBD5E1), fontSize = 19.sp)
+                    }
 
-    private fun makeStatusRow(dot: String, hex: String, badge: String, title: String): LinearLayout {
-        val d = resources.displayMetrics.density
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, (6 * d).toInt(), 0, (6 * d).toInt())
-            addView(TextView(this@MainActivity).apply {
-                text = "$dot $badge"
-                textSize = 9f
-                typeface = Typeface.MONOSPACE
-                setTextColor(Color.parseColor(hex))
-                setPadding(0, 0, (8 * d).toInt(), 0)
-            })
-            addView(TextView(this@MainActivity).apply {
-                text = title
-                textSize = 12f
-                setTextColor(Color.parseColor("#94A3B8"))
-            })
-        }
-    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 10.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        if (inputText.isEmpty()) {
+                            Text("Yuna kitta sollunga...", color = Color(0xFF64748B), fontSize = 14.5.sp)
+                        }
+                        BasicTextField(
+                            value = inputText,
+                            onValueChange = { inputText = it },
+                            singleLine = true,
+                            textStyle = TextStyle(color = Color(0xFFF8FAFC), fontSize = 14.5.sp),
+                            cursorBrush = SolidColor(Color(0xFF38BDF8)),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
 
-    private fun setNavMode(mode: String) {
-        navMode = mode
-        applyNavAndImeInsets()
-        refreshSettings()
-    }
+                    // 5-Bar Voice Wave Trigger
+                    VoiceWaveButton(active = activeMode == "LISTENING") {
+                        val next = if (bubbleMode.value == "LISTENING") "IDLE" else "LISTENING"
+                        triggerServiceState(next)
+                        if (next == "LISTENING") {
+                            messages.add(ChatEntry(false, "YUNA Mic ON", "Level 3 Tamil STT hook active (0-FPS resumes on stop)."))
+                        }
+                    }
 
-    private fun settingsLabel(title: String): TextView {
-        val d = resources.displayMetrics.density
-        return TextView(this).apply {
-            text = title
-            textSize = 11f
-            setTextColor(Color.parseColor("#64748B"))
-            setPadding(0, (8 * d).toInt(), 0, (6 * d).toInt())
-        }
-    }
+                    Spacer(Modifier.width(6.dp))
 
-    private fun makeNavChip(label: String, leftMarginPx: Int, onClick: () -> Unit): TextView {
-        val d = resources.displayMetrics.density
-        return TextView(this).apply {
-            text = label
-            textSize = 11f
-            gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#E2E8F0"))
-            setPadding((8 * d).toInt(), (9 * d).toInt(), (8 * d).toInt(), (9 * d).toInt())
-            background = glassPill("#111726", "#26354D", 10 * d)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                leftMargin = leftMarginPx
+                    // AI Orb Send Button
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(Brush.linearGradient(listOf(Color(0xFF38BDF8), Color(0xFF6366F1))))
+                            .border(1.5.dp, Color(0xFF7DD3FC), CircleShape)
+                            .clickable {
+                                val q = inputText.trim()
+                                if (q.isNotEmpty()) {
+                                    inputText = ""
+                                    submitUserQuery(q, messages)
+                                } else {
+                                    triggerServiceState("IDLE")
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("🌪️", fontSize = 18.sp)
+                    }
+                }
             }
-            setOnClickListener { onClick() }
-        }
-    }
 
-    private fun addPermRow(parent: LinearLayout, label: String, onClick: () -> Unit): TextView {
-        val d = resources.displayMetrics.density
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, (6 * d).toInt(), 0, (6 * d).toInt())
-            setOnClickListener { onClick() }
-        }
-        row.addView(TextView(this).apply {
-            text = label
-            textSize = 12f
-            setTextColor(Color.parseColor("#E2E8F0"))
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        })
-        val b = TextView(this).apply {
-            text = "..."
-            textSize = 10f
-            typeface = Typeface.MONOSPACE
-            setPadding((8 * d).toInt(), (3 * d).toInt(), (8 * d).toInt(), (3 * d).toInt())
-        }
-        row.addView(b)
-        parent.addView(row)
-        return b
-    }
+            // Left Slide-Out Drawer (New Chat, Files, Skills, Schedules, ALL CHATS)
+            AnimatedVisibility(visible = showDrawer, enter = fadeIn(), exit = fadeOut()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xB8000000))
+                        .clickable { showDrawer = false }
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(275.dp)
+                            .background(Color(0xFF080C16))
+                            .statusBarsPadding()
+                            .padding(horizontal = 18.dp, vertical = 20.dp)
+                            .clickable(enabled = false) {}
+                    ) {
+                        Text(
+                            text = "YUNA • LOCAL OS",
+                            color = Color(0xFF38BDF8),
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.sp
+                        )
+                        Spacer(Modifier.height(18.dp))
+                        DrawerRow("＋  New Chat") { messages.clear(); showDrawer = false }
+                        DrawerRow("📁  Files & App Store") { openUrl("http://127.0.0.1:7778"); showDrawer = false }
+                        DrawerRow("⚡  Wasm Skills") { toast("Unlocks in Level 2 & 4"); showDrawer = false }
+                        DrawerRow("🕒  Schedules") { toast("Unlocks in Level 6"); showDrawer = false }
+                        DrawerRow("⚙️  Settings") { showDrawer = false; showSettings = true }
 
-    private fun makeInputTool(label: String, onClick: () -> Unit): TextView {
-        val d = resources.displayMetrics.density
-        return TextView(this).apply {
-            text = label
-            textSize = 11f
-            setTextColor(Color.parseColor("#CBD5E1"))
-            setPadding((11 * d).toInt(), (7 * d).toInt(), (11 * d).toInt(), (7 * d).toInt())
-            background = glassPill("#0E1422", "#283B54", 99 * d)
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                rightMargin = (8 * d).toInt()
+                        Spacer(Modifier.height(18.dp))
+                        Text("ALL CHATS", color = Color(0xFF64748B), fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                        Spacer(Modifier.height(8.dp))
+                        DrawerStatusRow("● READY", Color(0xFF00FF88), "OOM -1000 Immortal Core")
+                        DrawerStatusRow("▲ ACTION", Color(0xFFF59E0B), "Level 1 Phone Verify")
+                        DrawerStatusRow("◌ PROC", Color(0xFF38BDF8), "0-FPS Idle Guard")
+                    }
+                }
             }
-            setOnClickListener { plusSheet.visibility = View.GONE; onClick() }
+
+            // Settings Modal (3-Button / 2-Button / Gesture + Immortal Bubble + Perms + Local Ports)
+            AnimatedVisibility(visible = showSettings, enter = fadeIn(), exit = fadeOut()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xCC000000))
+                        .clickable { showSettings = false },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFF0B101D))
+                            .border(1.dp, Color(0xFF2E4360), RoundedCornerShape(20.dp))
+                            .clickable(enabled = false) {}
+                            .padding(18.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("⚙️ YUNA SETTINGS", color = Color(0xFF38BDF8), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                            Text("✕", color = Color(0xFF94A3B8), fontSize = 18.sp, modifier = Modifier.clickable { showSettings = false })
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+                        Text("Navigation Bar Clearance", color = Color(0xFF64748B), fontSize = 11.sp)
+                        Spacer(Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                            NavChip("3-Button", navMode == "3BTN", Modifier.weight(1f)) { navMode = "3BTN" }
+                            NavChip("2-Button", navMode == "2BTN", Modifier.weight(1f)) { navMode = "2BTN" }
+                            NavChip("Gesture", navMode == "GESTURE", Modifier.weight(1f)) { navMode = "GESTURE" }
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+                        val svcOk = serviceRunning.value
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (svcOk) Color(0xFF071E14) else Color(0xFF00FF88))
+                                .border(1.dp, Color(0xFF00FF88), RoundedCornerShape(12.dp))
+                                .clickable {
+                                    if (svcOk) {
+                                        startService(Intent(this@MainActivity, PuyalCoreService::class.java).apply {
+                                            action = PuyalCoreService.ACTION_STOP_SERVICE
+                                        })
+                                    } else {
+                                        ContextCompat.startForegroundService(
+                                            this@MainActivity,
+                                            Intent(this@MainActivity, PuyalCoreService::class.java)
+                                        )
+                                    }
+                                    window.decorView.postDelayed({ refreshSystemState(); probeRootAndOomAsync() }, 350)
+                                }
+                                .padding(vertical = 11.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (svcOk) "🟢 YUNA FLOATING 🌪️ ACTIVE (STOP)" else "🚀 START YUNA FLOATING 🌪️ BUBBLE",
+                                color = if (svcOk) Color(0xFF00FF88) else Color(0xFF04110A),
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+                        val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"
+                        Text(
+                            text = "PID ${Process.myPid()} ($abi) • SU: ${if (hasRootState.value) "OK" else "NO"} • OOM ${oomScoreState.value}",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 10.5.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+
+                        Spacer(Modifier.height(12.dp))
+                        PermRow("Overlay Bubble", overlayGranted.value) {
+                            if (!Settings.canDrawOverlays(this@MainActivity)) {
+                                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+                            }
+                        }
+                        PermRow("Mic & Camera", micGranted.value) {
+                            permLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA))
+                        }
+                        PermRow("Notifications", notifGranted.value) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                permLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
+                            }
+                        }
+                        PermRow("Battery Unrestricted", batteryExempt.value) {
+                            val pm = getSystemService(POWER_SERVICE) as PowerManager
+                            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                                startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                    data = Uri.parse("package:$packageName")
+                                })
+                            }
+                        }
+
+                        Spacer(Modifier.height(10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            NavChip(":7777 Web UI", false, Modifier.weight(1f)) { openUrl("http://127.0.0.1:7777") }
+                            NavChip(":7778 Store", false, Modifier.weight(1f)) { openUrl("http://127.0.0.1:7778") }
+                        }
+                    }
+                }
+            }
         }
     }
 
-    private fun toggleTorchLocal() {
-        try {
-            val cm = getSystemService(CAMERA_SERVICE) as CameraManager
-            val id = cm.cameraIdList.firstOrNull() ?: return
-            isTorchOn = !isTorchOn
-            cm.setTorchMode(id, isTorchOn)
-            toastInfo(if (isTorchOn) "Torch ON" else "Torch OFF")
-        } catch (e: Exception) {
-            toastInfo("Torch error: ${e.message}")
+    @Composable
+    private fun AgslAuroraLayer(timeSec: Float) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val shader = remember { RuntimeShader(AURORA_AGSL) }
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                shader.setFloatUniform("uRes", size.width, size.height)
+                shader.setFloatUniform("uTime", timeSec)
+                drawRect(brush = ShaderBrush(shader))
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(Color(0x400EA5E9), Color(0x336366F1), Color(0xFF05070C)),
+                            center = Offset(720f, 260f),
+                            radius = 1100f
+                        )
+                    )
+            )
         }
     }
 
-    private fun submitPrompt(q: String) {
-        plusSheet.visibility = View.GONE
-        appendMessage("user", q)
+    @Composable
+    private fun AgslPlasmaOrb(modifier: Modifier, timeSec: Float, activeMode: String) {
+        val accentRgb = when (activeMode) {
+            "LISTENING" -> floatArrayOf(0.0f, 0.90f, 1.0f)
+            "ACTION_BURST" -> floatArrayOf(0.0f, 1.0f, 0.53f)
+            "PROCESSING" -> floatArrayOf(0.96f, 0.62f, 0.04f)
+            else -> floatArrayOf(0.22f, 0.74f, 0.97f)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val shader = remember { RuntimeShader(PLASMA_ORB_AGSL) }
+            Canvas(modifier = modifier) {
+                shader.setFloatUniform("uRes", size.width, size.height)
+                shader.setFloatUniform("uTime", timeSec)
+                shader.setFloatUniform("uAccent", accentRgb[0], accentRgb[1], accentRgb[2])
+                drawCircle(brush = ShaderBrush(shader))
+            }
+        } else {
+            val c = Color(accentRgb[0], accentRgb[1], accentRgb[2])
+            Canvas(modifier = modifier) {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        listOf(Color(0xFFBAE6FD), c, Color(0xFF6366F1), Color(0xFF080D1C))
+                    )
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun HudOrbitalRings(activeMode: String) {
+        val ringColor = when (activeMode) {
+            "LISTENING" -> Color(0xFF00E5FF)
+            "ACTION_BURST" -> Color(0xFF00FF88)
+            "PROCESSING" -> Color(0xFFF59E0B)
+            else -> Color(0x6638BDF8)
+        }
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val r1 = size.minDimension * 0.36f
+            val r2 = size.minDimension * 0.45f
+            drawCircle(color = ringColor, radius = r1, style = Stroke(width = 1.2.dp.toPx()))
+            drawCircle(color = ringColor.copy(alpha = 0.45f), radius = r2, style = Stroke(width = 1.dp.toPx()))
+        }
+    }
+
+    @Composable
+    private fun VoiceWaveButton(active: Boolean, onClick: () -> Unit) {
+        val barColor = if (active) Color(0xFF00FF88) else Color(0xFF38BDF8)
+        Canvas(
+            modifier = Modifier
+                .size(34.dp)
+                .clickable { onClick() }
+        ) {
+            val heights = listOf(0.26f, 0.50f, 0.76f, 0.46f, 0.28f)
+            val startX = size.width * 0.18f
+            val step = (size.width * 0.64f) / 4f
+            heights.forEachIndexed { idx, frac ->
+                val x = startX + idx * step
+                val halfH = size.height * frac / 2f
+                drawLine(
+                    color = barColor,
+                    start = Offset(x, center.y - halfH),
+                    end = Offset(x, center.y + halfH),
+                    strokeWidth = 2.3.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun GlassIconBtn(icon: String, onClick: () -> Unit) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xB3132036))
+                .border(1.dp, Color(0x4D38BDF8), RoundedCornerShape(12.dp))
+                .clickable { onClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(icon, color = Color(0xFFE2E8F0), fontSize = 16.sp)
+        }
+    }
+
+    @Composable
+    private fun QuickActionPill(label: String, dotColor: Color, modifier: Modifier, onClick: () -> Unit) {
+        Column(
+            modifier = modifier
+                .clip(RoundedCornerShape(99.dp))
+                .background(Color(0xCC0E1525))
+                .border(1.dp, Color(0xFF2E4360), RoundedCornerShape(99.dp))
+                .clickable { onClick() }
+                .padding(vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(label, color = Color(0xFFE2E8F0), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(5.dp))
+            Box(
+                modifier = Modifier
+                    .width(14.dp)
+                    .height(2.5.dp)
+                    .clip(RoundedCornerShape(99.dp))
+                    .background(dotColor)
+            )
+        }
+    }
+
+    @Composable
+    private fun MiniChip(label: String, onClick: () -> Unit) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(99.dp))
+                .background(Color(0xFF0E1525))
+                .border(1.dp, Color(0xFF283B54), RoundedCornerShape(99.dp))
+                .clickable { onClick() }
+                .padding(horizontal = 11.dp, vertical = 7.dp)
+        ) {
+            Text(label, color = Color(0xFFCBD5E1), fontSize = 11.sp)
+        }
+    }
+
+    @Composable
+    private fun ChatBubbleItem(entry: ChatEntry) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = if (entry.isUser) Arrangement.End else Arrangement.Start
+        ) {
+            Column(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(if (entry.isUser) Color(0xFF162336) else Color(0xCC0D1320))
+                    .border(1.dp, Color(0x3338BDF8), RoundedCornerShape(18.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                if (!entry.isUser) {
+                    Text("🌪️ ${entry.title}", color = Color(0xFF38BDF8), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(3.dp))
+                }
+                Text(entry.body, color = Color(0xFFF1F5F9), fontSize = 13.5.sp)
+            }
+        }
+    }
+
+    @Composable
+    private fun DrawerRow(label: String, onClick: () -> Unit) {
+        Text(
+            text = label,
+            color = Color(0xFFE2E8F0),
+            fontSize = 14.sp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onClick() }
+                .padding(vertical = 11.dp)
+        )
+    }
+
+    @Composable
+    private fun DrawerStatusRow(badge: String, color: Color, title: String) {
+        Row(
+            modifier = Modifier.padding(vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(badge, color = color, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+            Spacer(Modifier.width(8.dp))
+            Text(title, color = Color(0xFF94A3B8), fontSize = 12.sp)
+        }
+    }
+
+    @Composable
+    private fun NavChip(label: String, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
+        Box(
+            modifier = modifier
+                .clip(RoundedCornerShape(10.dp))
+                .background(if (active) Color(0xFF0D2436) else Color(0xFF111726))
+                .border(1.dp, if (active) Color(0xFF38BDF8) else Color(0xFF26354D), RoundedCornerShape(10.dp))
+                .clickable { onClick() }
+                .padding(vertical = 9.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(label, color = if (active) Color(0xFF38BDF8) else Color(0xFF94A3B8), fontSize = 11.sp)
+        }
+    }
+
+    @Composable
+    private fun PermRow(label: String, ok: Boolean, onClick: () -> Unit) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onClick() }
+                .padding(vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label, color = Color(0xFFE2E8F0), fontSize = 12.sp)
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(99.dp))
+                    .background(if (ok) Color(0xFF071E14) else Color(0xFF1F1607))
+                    .border(1.dp, if (ok) Color(0xFF00FF88) else Color(0xFFF59E0B), RoundedCornerShape(99.dp))
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
+            ) {
+                Text(
+                    text = if (ok) "READY" else "GRANT",
+                    color = if (ok) Color(0xFF00FF88) else Color(0xFFF59E0B),
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+    }
+
+    private fun submitUserQuery(q: String, messages: MutableList<ChatEntry>) {
+        messages.add(ChatEntry(true, "You", q))
         triggerServiceState("ACTION_BURST")
-        appendMessage("yuna", "Queued locally: \"$q\" (Rust/Wasm Brain connects in Level 2 & 4).")
-    }
-
-    private fun appendMessage(role: String, text: String) {
-        heroStage.visibility = View.GONE
-        val d = resources.displayMetrics.density
-        val msg = TextView(this).apply {
-            this.text = if (role == "user") text else "🌪️  $text"
-            textSize = 14f
-            setTextColor(Color.parseColor("#F1F5F9"))
-            setPadding((14 * d).toInt(), (11 * d).toInt(), (14 * d).toInt(), (11 * d).toInt())
-            background = if (role == "user") {
-                glassPill("#162336", "#2D4666", 18 * d)
-            } else {
-                glassPill("#0D1320", "#223044", 18 * d)
-            }
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                gravity = if (role == "user") Gravity.END else Gravity.START
-                bottomMargin = (10 * d).toInt()
-            }
-        }
-        chatFeed.addView(msg)
+        messages.add(ChatEntry(false, "YUNA Local Core", "Queued: \"$q\" — Rust/Wasm Brain attaches in Level 2 & 4."))
     }
 
     private fun triggerServiceState(stateName: String) {
+        bubbleMode.value = stateName
         if (!PuyalCoreService.isRunning) {
             ContextCompat.startForegroundService(this, Intent(this, PuyalCoreService::class.java))
         }
@@ -727,67 +835,37 @@ class MainActivity : AppCompatActivity() {
             action = PuyalCoreService.ACTION_SET_STATE
             putExtra(PuyalCoreService.EXTRA_STATE, stateName)
         })
-        yunaOrbView.setActive(stateName != "IDLE", stateName, oomScoreValue)
-        orbStatusLabel.postDelayed({ refreshSettings() }, 180)
+        serviceRunning.value = true
     }
 
-    private fun glassPill(bgHex: String, strokeHex: String, radiusPx: Float): GradientDrawable {
-        val d = resources.displayMetrics.density
-        return GradientDrawable().apply {
-            cornerRadius = radiusPx
-            setColor(Color.parseColor(bgHex))
-            setStroke((1 * d).toInt(), Color.parseColor(strokeHex))
+    private fun toggleTorch() {
+        try {
+            val cm = getSystemService(CAMERA_SERVICE) as CameraManager
+            val id = cm.cameraIdList.firstOrNull() ?: return
+            torchOn.value = !torchOn.value
+            cm.setTorchMode(id, torchOn.value)
+            toast(if (torchOn.value) "Torch ON" else "Torch OFF")
+        } catch (e: Exception) {
+            toast("Torch error: ${e.message}")
         }
     }
 
     private fun openUrl(url: String) {
-        try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (e: Exception) { toastInfo("Browser error: ${e.message}") }
+        try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (e: Exception) { toast("Browser error: ${e.message}") }
     }
 
-    private fun toastInfo(msg: String) { Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() }
+    private fun toast(msg: String) { Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() }
 
-    private fun stylePerm(badge: TextView, ok: Boolean) {
-        val d = resources.displayMetrics.density
-        badge.text = if (ok) "READY" else "GRANT"
-        badge.setTextColor(Color.parseColor(if (ok) "#00FF88" else "#F59E0B"))
-        badge.background = glassPill(if (ok) "#071E14" else "#1F1607", if (ok) "#00FF88" else "#F59E0B", 99 * d)
-    }
-
-    private fun styleNavChip(chip: TextView, active: Boolean) {
-        val d = resources.displayMetrics.density
-        chip.setTextColor(Color.parseColor(if (active) "#38BDF8" else "#94A3B8"))
-        chip.background = glassPill(if (active) "#0D2436" else "#111726", if (active) "#38BDF8" else "#26354D", 10 * d)
-    }
-
-    private fun refreshSettings() {
-        val overlayOk = Settings.canDrawOverlays(this)
-        val micOk = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        val notifOk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    private fun refreshSystemState() {
+        overlayGranted.value = Settings.canDrawOverlays(this)
+        micGranted.value = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        notifGranted.value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         } else true
         val pm = getSystemService(POWER_SERVICE) as PowerManager
-        val batteryOk = pm.isIgnoringBatteryOptimizations(packageName)
-        val svcOk = PuyalCoreService.isRunning
-
-        stylePerm(permOverlayBadge, overlayOk)
-        stylePerm(permMicBadge, micOk)
-        stylePerm(permNotifBadge, notifOk)
-        stylePerm(permBatteryBadge, batteryOk)
-
-        styleNavChip(nav3Btn, navMode == "3BTN")
-        styleNavChip(nav2Btn, navMode == "2BTN")
-        styleNavChip(navGestBtn, navMode == "GESTURE")
-
-        val d = resources.displayMetrics.density
-        svcToggleBtn.text = if (svcOk) "🟢 YUNA FLOATING 🌪️ ACTIVE (STOP)" else "🚀 START YUNA FLOATING 🌪️ BUBBLE"
-        svcToggleBtn.setTextColor(Color.parseColor(if (svcOk) "#00FF88" else "#04110A"))
-        svcToggleBtn.background = glassPill(if (svcOk) "#071E14" else "#00FF88", "#00FF88", 12 * d)
-
-        val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"
-        val st = PuyalCoreService.currentStateName
-        yunaOrbView.setActive(st != "IDLE", st, oomScoreValue)
-        orbStatusLabel.text = "OOM $oomScoreValue • ${if (st == "IDLE") "0-FPS IDLE (TAP ORB)" else st}"
-        settingsTeleText.text = "PID ${Process.myPid()} ($abi) • SU: ${if (isRootGranted) "OK" else "NO"} • State: $st"
+        batteryExempt.value = pm.isIgnoringBatteryOptimizations(packageName)
+        serviceRunning.value = PuyalCoreService.isRunning
+        bubbleMode.value = PuyalCoreService.currentStateName
     }
 
     private fun probeRootAndOomAsync() {
@@ -801,185 +879,8 @@ class MainActivity : AppCompatActivity() {
             val oom = try {
                 File("/proc/$pid/oom_score_adj").readText().trim()
             } catch (_: Exception) { if (rootOk) "-1000" else "0" }
-            isRootGranted = rootOk
-            oomScoreValue = oom
-            runOnUiThread { refreshSettings() }
+            hasRootState.value = rootOk
+            oomScoreState.value = oom
         }.start()
-    }
-
-    // 1. Multi-layer Liquid Teal-Indigo Aurora Backdrop (0 KB assets, 0-FPS static)
-    private class AuroraBackdropView(context: Context) : View(context) {
-        private val p1 = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val p2 = Paint(Paint.ANTI_ALIAS_FLAG)
-        override fun onDraw(canvas: Canvas) {
-            super.onDraw(canvas)
-            val w = width.toFloat()
-            val h = height.toFloat()
-            canvas.drawColor(Color.parseColor("#05070C"))
-            p1.shader = RadialGradient(
-                w * 0.85f, h * 0.14f, w * 0.85f,
-                intArrayOf(Color.argb(115, 6, 182, 212), Color.argb(30, 45, 212, 191), Color.TRANSPARENT),
-                floatArrayOf(0f, 0.45f, 1f),
-                Shader.TileMode.CLAMP
-            )
-            canvas.drawRect(0f, 0f, w, h, p1)
-            p2.shader = RadialGradient(
-                w * 0.15f, h * 0.46f, w * 0.90f,
-                intArrayOf(Color.argb(105, 99, 102, 241), Color.argb(22, 14, 165, 233), Color.TRANSPARENT),
-                floatArrayOf(0f, 0.50f, 1f),
-                Shader.TileMode.CLAMP
-            )
-            canvas.drawRect(0f, 0f, w, h, p2)
-        }
-    }
-
-    // 2. 0-FPS Static Liquid-Glass Orb + Orbital Arcs with Curved Telemetry Labels
-    private class YunaOrbView(context: Context) : View(context) {
-        private val orbPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-        private val arcTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = Typeface.MONOSPACE
-            color = Color.argb(165, 203, 213, 225)
-        }
-        private val arcPath = Path()
-        private val arcRect = RectF()
-        private var stateName = "IDLE"
-        private var oomLabel = "-1000"
-
-        fun setActive(active: Boolean, mode: String, oom: String) {
-            stateName = if (active) mode else "IDLE"
-            oomLabel = oom
-            invalidate()
-        }
-
-        override fun onDraw(canvas: Canvas) {
-            super.onDraw(canvas)
-            val cx = width / 2f
-            val cy = height / 2f
-            val r = minOf(width, height) * 0.27f
-            val d = resources.displayMetrics.density
-
-            val coreColor = when (stateName) {
-                "LISTENING" -> Color.parseColor("#00E5FF")
-                "ACTION_BURST" -> Color.parseColor("#00FF88")
-                "PROCESSING" -> Color.parseColor("#F59E0B")
-                else -> Color.parseColor("#38BDF8")
-            }
-
-            // Soft atmospheric halo
-            glowPaint.shader = RadialGradient(
-                cx, cy, r * 1.65f,
-                intArrayOf(Color.argb(if (stateName == "IDLE") 70 else 135, Color.red(coreColor), Color.green(coreColor), Color.blue(coreColor)), Color.TRANSPARENT),
-                floatArrayOf(0.3f, 1f),
-                Shader.TileMode.CLAMP
-            )
-            canvas.drawCircle(cx, cy, r * 1.65f, glowPaint)
-
-            // Concentric orbital telemetry rings
-            ringPaint.strokeWidth = 1.0f * d
-            ringPaint.color = coreColor
-            ringPaint.alpha = if (stateName == "IDLE") 75 else 175
-            val r1 = r * 1.36f
-            val r2 = r * 1.66f
-            canvas.drawCircle(cx, cy, r1, ringPaint)
-            ringPaint.alpha = if (stateName == "IDLE") 45 else 115
-            canvas.drawCircle(cx, cy, r2, ringPaint)
-
-            // Curved orbital telemetry text ("OOM -1000" top-left, "0-FPS" bottom right-side-up)
-            arcTextPaint.textSize = 8.5f * d
-            arcPath.reset()
-            arcRect.set(cx - r2, cy - r2, cx + r2, cy + r2)
-            arcPath.addArc(arcRect, -135f, 90f)
-            canvas.drawTextOnPath("OOM $oomLabel", arcPath, 0f, -3f * d, arcTextPaint)
-
-            arcPath.reset()
-            arcRect.set(cx - r2, cy - r2, cx + r2, cy + r2)
-            arcPath.addArc(arcRect, 125f, -70f)
-            canvas.drawTextOnPath("0-FPS", arcPath, 0f, 10f * d, arcTextPaint)
-
-            ringPaint.strokeWidth = 1.5f * d
-            ringPaint.color = Color.parseColor("#BAE6FD")
-            ringPaint.alpha = if (stateName == "IDLE") 130 else 235
-            canvas.drawCircle(cx, cy, r, ringPaint)
-        }
-    }
-
-    // 3. Frosted Wave Hero Card (matching the cyan wave accent card)
-    private class WaveGlassCardView(context: Context) : View(context) {
-        private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val wavePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-        private val clipPath = Path()
-        private val wavePath = Path()
-        private val rect = RectF()
-
-        override fun onDraw(canvas: Canvas) {
-            super.onDraw(canvas)
-            val w = width.toFloat()
-            val h = height.toFloat()
-            val d = resources.displayMetrics.density
-            val rad = 20f * d
-
-            rect.set(0f, 0f, w, h)
-            clipPath.reset()
-            clipPath.addRoundRect(rect, rad, rad, Path.Direction.CW)
-
-            canvas.save()
-            canvas.clipPath(clipPath)
-
-            bgPaint.shader = LinearGradient(
-                0f, 0f, w, h,
-                Color.parseColor("#112034"), Color.parseColor("#14192E"),
-                Shader.TileMode.CLAMP
-            )
-            canvas.drawRect(rect, bgPaint)
-
-            // Top-right & bottom-left liquid cyan wave accent
-            wavePaint.color = Color.argb(65, 56, 189, 248)
-            wavePath.reset()
-            wavePath.moveTo(w * 0.58f, 0f)
-            wavePath.cubicTo(w * 0.72f, h * 0.32f, w * 0.88f, h * 0.12f, w, h * 0.45f)
-            wavePath.lineTo(w, 0f)
-            wavePath.close()
-            canvas.drawPath(wavePath, wavePaint)
-
-            wavePaint.color = Color.argb(45, 99, 102, 241)
-            wavePath.reset()
-            wavePath.moveTo(0f, h * 0.55f)
-            wavePath.cubicTo(w * 0.18f, h * 0.85f, w * 0.32f, h * 0.72f, w * 0.45f, h)
-            wavePath.lineTo(0f, h)
-            wavePath.close()
-            canvas.drawPath(wavePath, wavePaint)
-
-            canvas.restore()
-
-            strokePaint.strokeWidth = 1.1f * d
-            strokePaint.color = Color.argb(90, 125, 211, 252)
-            canvas.drawRoundRect(rect, rad, rad, strokePaint)
-        }
-    }
-
-    // 4. 5-Bar Cyan Voice Waveform Icon (for the Thumb-Arc Dock)
-    private class WaveformIconView(context: Context) : View(context) {
-        private val barPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            strokeCap = Paint.Cap.ROUND
-            color = Color.parseColor("#38BDF8")
-        }
-        override fun onDraw(canvas: Canvas) {
-            super.onDraw(canvas)
-            val w = width.toFloat()
-            val h = height.toFloat()
-            val d = resources.displayMetrics.density
-            barPaint.strokeWidth = 2.4f * d
-            val heights = floatArrayOf(0.24f, 0.48f, 0.72f, 0.44f, 0.26f)
-            val startX = w * 0.2f
-            val stepX = (w * 0.6f) / 4f
-            for (i in heights.indices) {
-                val x = startX + i * stepX
-                val bh = h * heights[i] / 2f
-                canvas.drawLine(x, h / 2f - bh, x, h / 2f + bh, barPaint)
-            }
-        }
     }
 }
