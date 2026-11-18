@@ -75,10 +75,12 @@ class PuyalCoreService : Service() {
                 val scale = 1.0f + 0.08f * kotlin.math.sin(pulsePhase)
                 bubbleView?.scaleX = scale
                 bubbleView?.scaleY = scale
+                bubbleView?.rotation = ((bubbleView?.rotation ?: 0f) + 2.5f) % 360f
                 choreographer.postFrameCallback(this)
             } else {
                 bubbleView?.scaleX = 1.0f
                 bubbleView?.scaleY = 1.0f
+                bubbleView?.rotation = 0f
             }
         }
     }
@@ -367,6 +369,7 @@ class PuyalCoreService : Service() {
             choreographer.removeFrameCallback(frameCallback)
             bubbleView?.scaleX = 1.0f
             bubbleView?.scaleY = 1.0f
+            bubbleView?.rotation = 0f
         }
     }
 
