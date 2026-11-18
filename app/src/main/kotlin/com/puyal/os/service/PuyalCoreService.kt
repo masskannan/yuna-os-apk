@@ -25,6 +25,8 @@ import android.os.SystemClock
 import android.provider.Settings
 import android.view.Choreographer
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
+import android.view.ViewConfiguration
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
@@ -292,10 +294,12 @@ class PuyalCoreService : Service() {
         var initialTouchY = 0f
         var isDragging = false
         var longPressTriggered = false
+        val touchSlop = ViewConfiguration.get(this).scaledTouchSlop.coerceAtLeast(24)
 
         val longPressRunnable = Runnable {
             if (!isDragging) {
                 longPressTriggered = true
+                bubble.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                 showTouchMenu()
             }
         }
@@ -315,12 +319,14 @@ class PuyalCoreService : Service() {
                 MotionEvent.ACTION_MOVE -> {
                     val dx = (event.rawX - initialTouchX).toInt()
                     val dy = (event.rawY - initialTouchY).toInt()
-                    if (abs(dx) > 12 || abs(dy) > 12) {
+                    if (isDragging || abs(dx) > touchSlop || abs(dy) > touchSlop) {
                         isDragging = true
                         mainHandler.removeCallbacks(longPressRunnable)
                         hideTouchMenu()
-                        bubbleParams.x = initialX + dx
-                        bubbleParams.y = initialY + dy
+                        val dm = resources.displayMetrics
+                        val bSize = bubble.width.takeIf { it > 0 } ?: (52 * dm.density).toInt()
+                        bubbleParams.x = (initialX + dx).coerceIn(0, (dm.widthPixels - bSize).coerceAtLeast(0))
+                        bubbleParams.y = (initialY + dy).coerceIn(0, (dm.heightPixels - bSize).coerceAtLeast(0))
                         windowManager.updateViewLayout(bubble, bubbleParams)
                     }
                     true
@@ -429,12 +435,22 @@ class PuyalCoreService : Service() {
             menuWidthPx,
             WindowManager.LayoutParams.WRAP_CONTENT,
             overlayType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = menuX
             y = menuY
+        }
+
+        container.setOnTouchListener { _, ev ->
+            if (ev.action == MotionEvent.ACTION_OUTSIDE) {
+                hideTouchMenu()
+                true
+            } else {
+                false
+            }
         }
 
         menuView = container
