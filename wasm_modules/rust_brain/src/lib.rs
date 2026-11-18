@@ -1,5 +1,6 @@
 #![no_std]
 use core::panic::PanicInfo;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
@@ -26,19 +27,16 @@ pub extern "C" fn is_package_blacklisted(ptr: *const u8, len: usize) -> i32 {
 }
 
 // Ring-Buffer Action Ledger for "Bathroom Briefing"
-static mut LEDGER_COUNT: usize = 0;
+static LEDGER_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 #[no_mangle]
 pub extern "C" fn record_action_event() -> usize {
-    unsafe {
-        LEDGER_COUNT += 1;
-        LEDGER_COUNT
-    }
+    LEDGER_COUNT.fetch_add(1, Ordering::Relaxed) + 1
 }
 
 #[no_mangle]
 pub extern "C" fn get_ledger_count() -> usize {
-    unsafe { LEDGER_COUNT }
+    LEDGER_COUNT.load(Ordering::Relaxed)
 }
 
 // Offline Haversine Distance (in km) for Tamil Nadu Transport Pincodes
