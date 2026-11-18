@@ -14,6 +14,9 @@ import android.content.pm.ServiceInfo
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RadialGradient
+import android.graphics.Shader
 import android.graphics.RectF
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
@@ -78,12 +81,12 @@ class PuyalCoreService : Service() {
                 val scale = 1.0f + 0.08f * kotlin.math.sin(pulsePhase)
                 bubbleView?.scaleX = scale
                 bubbleView?.scaleY = scale
-                bubbleView?.rotation = ((bubbleView?.rotation ?: 0f) - 2.8f) % 360f
+                bubbleView?.advanceVortex(2.4f)
                 choreographer.postFrameCallback(this)
             } else {
                 bubbleView?.scaleX = 1.0f
                 bubbleView?.scaleY = 1.0f
-                bubbleView?.rotation = 0f
+                bubbleView?.resetVortex()
             }
         }
     }
@@ -369,7 +372,7 @@ class PuyalCoreService : Service() {
             choreographer.removeFrameCallback(frameCallback)
             bubbleView?.scaleX = 1.0f
             bubbleView?.scaleY = 1.0f
-            bubbleView?.rotation = 0f
+            bubbleView?.resetVortex()
         }
     }
 
@@ -526,7 +529,12 @@ class PuyalCoreService : Service() {
     }
 
     private class PuyalVortexView(context: Context) : View(context) {
-        private var vortexColor = Color.parseColor("#00FF88")
+        private var outerColor = Color.parseColor("#00FF88")
+        private var innerColor = Color.parseColor("#00E5FF")
+        private var outerAngle = 0f
+        private var innerAngle = 0f
+
+        private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val outerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
@@ -534,16 +542,46 @@ class PuyalCoreService : Service() {
         private val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
-            alpha = 190
         }
-        private val eyePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        private val eyeRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+        }
+        private val eyeCorePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
+            color = Color.parseColor("#050807")
         }
-        private val arcRect = RectF()
+        private val spiralPath = Path()
 
         fun setVortexColor(color: Int) {
-            vortexColor = color
+            outerColor = color
+            innerColor = if (color == Color.parseColor("#00E5FF")) Color.parseColor("#00FF88") else Color.parseColor("#00E5FF")
             invalidate()
+        }
+
+        fun advanceVortex(deltaDeg: Float) {
+            outerAngle = (outerAngle - deltaDeg) % 360f
+            innerAngle = (innerAngle - deltaDeg * 1.9f) % 360f
+            invalidate()
+        }
+
+        fun resetVortex() {
+            outerAngle = 0f
+            innerAngle = 0f
+            invalidate()
+        }
+
+        private fun buildLogSpiral(cx: Float, cy: Float, rStart: Float, rEnd: Float, startDeg: Float, sweepDeg: Float) {
+            spiralPath.reset()
+            val steps = 18
+            val ratio = (rEnd / rStart).toDouble()
+            for (i in 0..steps) {
+                val t = i.toDouble() / steps
+                val r = (rStart * Math.pow(ratio, t)).toFloat()
+                val rad = Math.toRadians((startDeg - sweepDeg * t))
+                val x = cx + (r * Math.cos(rad)).toFloat()
+                val y = cy + (r * Math.sin(rad)).toFloat()
+                if (i == 0) spiralPath.moveTo(x, y) else spiralPath.lineTo(x, y)
+            }
         }
 
         override fun onDraw(canvas: Canvas) {
@@ -555,26 +593,40 @@ class PuyalCoreService : Service() {
             val minDim = minOf(w, h)
             val density = resources.displayMetrics.density
 
-            outerPaint.color = vortexColor
-            outerPaint.strokeWidth = 2.4f * density
-            innerPaint.color = vortexColor
-            innerPaint.alpha = 185
-            innerPaint.strokeWidth = 1.7f * density
-            eyePaint.color = vortexColor
+            glowPaint.shader = RadialGradient(
+                cx, cy, minDim * 0.45f,
+                intArrayOf(Color.argb(90, 0, 229, 255), Color.argb(35, 0, 255, 136), Color.TRANSPARENT),
+                floatArrayOf(0f, 0.55f, 1f),
+                Shader.TileMode.CLAMP
+            )
+            canvas.drawCircle(cx, cy, minDim * 0.44f, glowPaint)
 
-            val rOuter = minDim * 0.34f
-            arcRect.set(cx - rOuter, cy - rOuter, cx + rOuter, cy + rOuter)
-            for (i in 0 until 3) {
-                canvas.drawArc(arcRect, i * 120f - 15f, 78f, false, outerPaint)
+            outerPaint.color = outerColor
+            outerPaint.alpha = 235
+            outerPaint.strokeWidth = 2.0f * density
+            canvas.save()
+            canvas.rotate(outerAngle, cx, cy)
+            for (i in 0 until 4) {
+                buildLogSpiral(cx, cy, minDim * 0.40f, minDim * 0.11f, i * 90f, 145f)
+                canvas.drawPath(spiralPath, outerPaint)
             }
+            canvas.restore()
 
-            val rInner = minDim * 0.21f
-            arcRect.set(cx - rInner, cy - rInner, cx + rInner, cy + rInner)
+            innerPaint.color = innerColor
+            innerPaint.alpha = 215
+            innerPaint.strokeWidth = 1.5f * density
+            canvas.save()
+            canvas.rotate(innerAngle, cx, cy)
             for (i in 0 until 3) {
-                canvas.drawArc(arcRect, i * 120f + 25f, 82f, false, innerPaint)
+                buildLogSpiral(cx, cy, minDim * 0.23f, minDim * 0.085f, i * 120f + 30f, 125f)
+                canvas.drawPath(spiralPath, innerPaint)
             }
+            canvas.restore()
 
-            canvas.drawCircle(cx, cy, minDim * 0.065f, eyePaint)
+            eyeRimPaint.color = innerColor
+            eyeRimPaint.strokeWidth = 1.3f * density
+            canvas.drawCircle(cx, cy, minDim * 0.068f, eyeRimPaint)
+            canvas.drawCircle(cx, cy, minDim * 0.042f, eyeCorePaint)
         }
     }
 }
