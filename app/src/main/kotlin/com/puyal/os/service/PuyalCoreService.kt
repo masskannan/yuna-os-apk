@@ -41,6 +41,7 @@ import android.graphics.Outline
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -62,6 +63,8 @@ class PuyalCoreService : Service() {
     }
 
     private lateinit var windowManager: WindowManager
+    private var bubbleContainer: FrameLayout? = null
+    private var ringView: View? = null
     private var bubbleView: TextView? = null
     private var menuView: LinearLayout? = null
     private lateinit var bubbleParams: WindowManager.LayoutParams
@@ -80,7 +83,7 @@ class PuyalCoreService : Service() {
 
     private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
-            if (!isScreenOn || !isRunning || bubbleView == null) {
+            if (!isScreenOn || !isRunning || bubbleView == null || bubbleContainer == null) {
                 return
             }
             val density = resources.displayMetrics.density
@@ -96,6 +99,13 @@ class PuyalCoreService : Service() {
                     bubbleView?.rotationY = ((bubbleView?.rotationY ?: 0f) + 6.5f) % 360f
                     bubbleView?.rotation = 6f * s
                     bubbleView?.translationY = -2f * density * kotlin.math.abs(s)
+                    val ringT = (pulsePhase / (Math.PI.toFloat() * 2f))
+                    ringView?.apply {
+                        visibility = View.VISIBLE
+                        scaleX = 0.85f + 0.35f * ringT
+                        scaleY = 0.85f + 0.35f * ringT
+                        alpha = (1.0f - ringT).coerceIn(0f, 1f)
+                    }
                     choreographer.postFrameCallback(this)
                 }
                 PuyalState.ACTION_BURST -> {
@@ -109,6 +119,13 @@ class PuyalCoreService : Service() {
                     bubbleView?.rotationY = ((bubbleView?.rotationY ?: 0f) + 13f) % 360f
                     bubbleView?.rotation = 8f * s
                     bubbleView?.translationY = -3f * density * kotlin.math.abs(s)
+                    val ringT = (pulsePhase / (Math.PI.toFloat() * 2f))
+                    ringView?.apply {
+                        visibility = View.VISIBLE
+                        scaleX = 0.88f + 0.38f * ringT
+                        scaleY = 0.88f + 0.38f * ringT
+                        alpha = (1.0f - ringT).coerceIn(0f, 1f)
+                    }
                     choreographer.postFrameCallback(this)
                 }
                 PuyalState.PROCESSING -> {
@@ -121,6 +138,13 @@ class PuyalCoreService : Service() {
                     bubbleView?.rotationY = ((bubbleView?.rotationY ?: 0f) + 2.0f) % 360f
                     bubbleView?.rotation = 3f * s
                     bubbleView?.translationY = 0f
+                    ringView?.apply {
+                        visibility = View.VISIBLE
+                        val softScale = 1.0f + 0.12f * kotlin.math.abs(s)
+                        scaleX = softScale
+                        scaleY = softScale
+                        alpha = 0.35f + 0.35f * kotlin.math.abs(s)
+                    }
                     choreographer.postFrameCallback(this)
                 }
                 PuyalState.IDLE -> {
@@ -130,6 +154,7 @@ class PuyalCoreService : Service() {
                     bubbleView?.rotationY = 0f
                     bubbleView?.rotation = 0f
                     bubbleView?.translationY = 0f
+                    ringView?.visibility = View.GONE
                 }
             }
         }
@@ -302,6 +327,18 @@ class PuyalCoreService : Service() {
         val density = resources.displayMetrics.density
         val sizePx = (52 * density).toInt()
 
+        val containerSizePx = (74 * density).toInt()
+        val ringSizePx = (64 * density).toInt()
+
+        val ring = View(this).apply {
+            visibility = View.GONE
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.TRANSPARENT)
+                setStroke((2.2f * density).toInt(), Color.parseColor("#00E5FF"))
+            }
+        }
+
         val bubble = TextView(this).apply {
             text = "🌪️"
             textSize = 24f
@@ -317,6 +354,13 @@ class PuyalCoreService : Service() {
             elevation = 8 * density
         }
 
+        val container = FrameLayout(this).apply {
+            clipChildren = false
+            clipToPadding = false
+            addView(ring, FrameLayout.LayoutParams(ringSizePx, ringSizePx, Gravity.CENTER))
+            addView(bubble, FrameLayout.LayoutParams(sizePx, sizePx, Gravity.CENTER))
+        }
+
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         } else {
@@ -325,21 +369,23 @@ class PuyalCoreService : Service() {
         }
 
         bubbleParams = WindowManager.LayoutParams(
-            sizePx,
-            sizePx,
+            containerSizePx,
+            containerSizePx,
             overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = (16 * density).toInt()
-            y = (260 * density).toInt()
+            x = (10 * density).toInt()
+            y = (250 * density).toInt()
         }
 
-        attachBubbleTouchListener(bubble)
+        attachBubbleTouchListener(container)
+        ringView = ring
         bubbleView = bubble
-        windowManager.addView(bubble, bubbleParams)
+        bubbleContainer = container
+        windowManager.addView(container, bubbleParams)
     }
 
     private fun attachBubbleTouchListener(bubble: View) {
@@ -384,7 +430,7 @@ class PuyalCoreService : Service() {
                         val bSize = bubble.width.takeIf { it > 0 } ?: (52 * dm.density).toInt()
                         bubbleParams.x = (initialX + dx).coerceIn(0, (dm.widthPixels - bSize).coerceAtLeast(0))
                         bubbleParams.y = (initialY + dy).coerceIn(0, (dm.heightPixels - bSize).coerceAtLeast(0))
-                        windowManager.updateViewLayout(bubble, bubbleParams)
+                        windowManager.updateViewLayout(container, bubbleParams)
                     }
                     true
                 }
@@ -432,6 +478,12 @@ class PuyalCoreService : Service() {
             setColor(Color.parseColor("#04070B"))
             setStroke((2.2f * density).toInt(), Color.parseColor(strokeColor))
         }
+        ringView?.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.TRANSPARENT)
+            setStroke((2.2f * density).toInt(), Color.parseColor(strokeColor))
+        }
+        if (state == PuyalState.IDLE) ringView?.visibility = View.GONE
         choreographer.removeFrameCallback(frameCallback)
         if (state != PuyalState.IDLE && isScreenOn) {
             choreographer.postFrameCallback(frameCallback)
@@ -442,6 +494,7 @@ class PuyalCoreService : Service() {
             bubbleView?.rotationY = 0f
             bubbleView?.rotation = 0f
             bubbleView?.translationY = 0f
+            ringView?.visibility = View.GONE
         }
         toastMsg?.let { Toast.makeText(this, it, Toast.LENGTH_SHORT).show() }
     }
@@ -599,14 +652,15 @@ class PuyalCoreService : Service() {
         bubbleView?.apply {
             scaleX = 1.0f
             scaleY = 1.0f
-            visibility = View.GONE
         }
+        ringView?.visibility = View.GONE
+        bubbleContainer?.visibility = View.GONE
         hideTouchMenu()
     }
 
     private fun resumeUiFromFreeze() {
         isScreenOn = true
-        bubbleView?.visibility = View.VISIBLE
+        bubbleContainer?.visibility = View.VISIBLE
         if (currentState != PuyalState.IDLE) {
             choreographer.removeFrameCallback(frameCallback)
             choreographer.postFrameCallback(frameCallback)
@@ -615,12 +669,14 @@ class PuyalCoreService : Service() {
 
     private fun removeOverlayViews() {
         hideTouchMenu()
-        bubbleView?.let {
+        bubbleContainer?.let {
             try {
                 windowManager.removeView(it)
             } catch (_: Exception) {
             }
+            bubbleContainer = null
             bubbleView = null
+            ringView = null
         }
     }
 
