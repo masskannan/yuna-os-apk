@@ -58,6 +58,10 @@ class PuyalCoreService : Service() {
         const val NOTIF_ID = 7001
         const val ACTION_TOGGLE_VOICE = "com.puyal.os.ACTION_TOGGLE_VOICE"
         const val ACTION_STOP_SERVICE = "com.puyal.os.ACTION_STOP_SERVICE"
+        const val ACTION_SET_STATE = "com.puyal.os.ACTION_SET_STATE"
+        const val EXTRA_STATE = "extra_state"
+        @Volatile
+        var currentStateName: String = "IDLE"
         @Volatile
         var isRunning: Boolean = false
     }
@@ -193,6 +197,15 @@ class PuyalCoreService : Service() {
         }
         when (intent?.action) {
             ACTION_TOGGLE_VOICE -> toggleVoiceMode()
+            ACTION_SET_STATE -> {
+                val st = intent.getStringExtra(EXTRA_STATE) ?: "IDLE"
+                when (st) {
+                    "LISTENING" -> setPuyalState(PuyalState.LISTENING, "Puyal Listening (Mic ON)")
+                    "ACTION_BURST" -> triggerActionBurst()
+                    "PROCESSING" -> setPuyalState(PuyalState.PROCESSING, "Background Process Running...")
+                    else -> setPuyalState(PuyalState.IDLE, "Puyal Idle (0-FPS Standby)")
+                }
+            }
             ACTION_STOP_SERVICE -> {
                 isManualStop = true
                 stopSelf()
@@ -466,6 +479,7 @@ class PuyalCoreService : Service() {
 
     private fun setPuyalState(state: PuyalState, toastMsg: String? = null) {
         currentState = state
+        currentStateName = state.name
         val density = resources.displayMetrics.density
         val strokeColor = when (state) {
             PuyalState.LISTENING -> "#00E5FF"
