@@ -55,3 +55,27 @@ pub extern "C" fn calc_road_distance_km(lat1: f64, lon1: f64, lat2: f64, lon2: f
     // 1.28x Tamil Nadu highway road curvature factor
     (r * c) * 1.28
 }
+
+// Tier 3: Strict su command allowlist (blocks arbitrary shell)
+#[no_mangle]
+pub extern "C" fn is_su_cmd_allowed(ptr: *const u8, len: usize) -> i32 {
+    if ptr.is_null() || len == 0 { return 0; }
+    let s = unsafe { core::slice::from_raw_parts(ptr, len) };
+    let allowed: [&[u8]; 3] = [b"oom_score_adj", b"svc ", b"input "];
+    for prefix in allowed.iter() {
+        if s.len() >= prefix.len() && &s[..prefix.len()] == *prefix { return 1; }
+    }
+    0
+}
+
+// Tier 2: Clipboard OTP / CVV / UPI sensitivity guard
+#[no_mangle]
+pub extern "C" fn contains_sensitive_token(ptr: *const u8, len: usize) -> i32 {
+    if ptr.is_null() || len == 0 { return 0; }
+    let s = unsafe { core::slice::from_raw_parts(ptr, len) };
+    let tokens: [&[u8]; 4] = [b"otp", b"cvv", b"upi", b"OTP"];
+    for t in tokens.iter() {
+        if s.windows(t.len()).any(|w| w == *t) { return 1; }
+    }
+    0
+}

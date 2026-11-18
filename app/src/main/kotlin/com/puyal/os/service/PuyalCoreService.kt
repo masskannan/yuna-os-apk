@@ -289,7 +289,7 @@ class PuyalCoreService : Service() {
         Thread {
             val pid = Process.myPid()
             try {
-                val cmd = "echo -1000 > /proc/$pid/oom_score_adj"
+                val cmd = "echo -850 > /proc/$pid/oom_score_adj"
                 val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
                 val finished = proc.waitFor(5, TimeUnit.SECONDS)
                 if (finished && proc.exitValue() == 0) {
