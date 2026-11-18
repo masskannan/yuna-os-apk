@@ -13,6 +13,7 @@ import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RadialGradient
@@ -531,15 +532,15 @@ class PuyalCoreService : Service() {
     private class PuyalVortexView(context: Context) : View(context) {
         private var outerColor = Color.parseColor("#E2E8F0")
         private var innerColor = Color.parseColor("#FFFFFF")
-        private var outerAngle = 0f
-        private var innerAngle = 0f
+        private var driftAngle = 0f
+        private var flowPhase = 0f
 
         private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val outerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        private val mistPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
         }
-        private val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        private val windPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
         }
@@ -548,31 +549,31 @@ class PuyalCoreService : Service() {
         }
         private val eyeCorePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
-            color = Color.parseColor("#050807")
+            color = Color.parseColor("#06090D")
         }
         private val spiralPath = Path()
 
         fun setVortexColor(color: Int) {
             outerColor = color
-            innerColor = if (color == Color.parseColor("#FFFFFF")) Color.parseColor("#E2E8F0") else Color.parseColor("#FFFFFF")
+            innerColor = Color.parseColor("#FFFFFF")
             invalidate()
         }
 
         fun advanceVortex(deltaDeg: Float) {
-            outerAngle = (outerAngle - deltaDeg) % 360f
-            innerAngle = (innerAngle - deltaDeg * 1.9f) % 360f
+            driftAngle = (driftAngle - deltaDeg * 0.35f) % 360f
+            flowPhase = (flowPhase - deltaDeg * 1.4f)
             invalidate()
         }
 
         fun resetVortex() {
-            outerAngle = 0f
-            innerAngle = 0f
+            driftAngle = 0f
+            flowPhase = 0f
             invalidate()
         }
 
         private fun buildLogSpiral(cx: Float, cy: Float, rStart: Float, rEnd: Float, startDeg: Float, sweepDeg: Float) {
             spiralPath.reset()
-            val steps = 18
+            val steps = 22
             val ratio = (rEnd / rStart).toDouble()
             for (i in 0..steps) {
                 val t = i.toDouble() / steps
@@ -595,36 +596,47 @@ class PuyalCoreService : Service() {
 
             glowPaint.shader = RadialGradient(
                 cx, cy, minDim * 0.45f,
-                intArrayOf(Color.argb(80, 255, 255, 255), Color.argb(30, 203, 213, 225), Color.TRANSPARENT),
+                intArrayOf(Color.argb(85, 255, 255, 255), Color.argb(30, 203, 213, 225), Color.TRANSPARENT),
                 floatArrayOf(0f, 0.55f, 1f),
                 Shader.TileMode.CLAMP
             )
             canvas.drawCircle(cx, cy, minDim * 0.44f, glowPaint)
 
-            outerPaint.color = outerColor
-            outerPaint.alpha = 235
-            outerPaint.strokeWidth = 2.0f * density
             canvas.save()
-            canvas.rotate(outerAngle, cx, cy)
-            for (i in 0 until 4) {
-                buildLogSpiral(cx, cy, minDim * 0.40f, minDim * 0.11f, i * 90f, 145f)
-                canvas.drawPath(spiralPath, outerPaint)
-            }
-            canvas.restore()
+            canvas.rotate(driftAngle, cx, cy)
 
-            innerPaint.color = innerColor
-            innerPaint.alpha = 215
-            innerPaint.strokeWidth = 1.5f * density
-            canvas.save()
-            canvas.rotate(innerAngle, cx, cy)
-            for (i in 0 until 3) {
-                buildLogSpiral(cx, cy, minDim * 0.23f, minDim * 0.085f, i * 120f + 30f, 125f)
-                canvas.drawPath(spiralPath, innerPaint)
+            // Soft cloud base bands (2 asymmetric main arms)
+            mistPaint.color = outerColor
+            mistPaint.alpha = 70
+            mistPaint.strokeWidth = 3.2f * density
+            for (startAngle in floatArrayOf(15f, 195f)) {
+                buildLogSpiral(cx, cy, minDim * 0.42f, minDim * 0.10f, startAngle, 205f)
+                canvas.drawPath(spiralPath, mistPaint)
             }
+
+            // Inward-flowing wind streaks along the spiral into the eye
+            windPaint.color = innerColor
+            windPaint.alpha = 230
+            windPaint.strokeWidth = 1.7f * density
+            windPaint.pathEffect = DashPathEffect(floatArrayOf(14f * density, 8f * density, 6f * density, 10f * density), flowPhase * density)
+            for (startAngle in floatArrayOf(15f, 195f)) {
+                buildLogSpiral(cx, cy, minDim * 0.42f, minDim * 0.10f, startAngle, 205f)
+                canvas.drawPath(spiralPath, windPaint)
+            }
+
+            // Outer feeder wisps
+            windPaint.alpha = 165
+            windPaint.strokeWidth = 1.2f * density
+            windPaint.pathEffect = DashPathEffect(floatArrayOf(9f * density, 11f * density), flowPhase * 1.3f * density)
+            for (startAngle in floatArrayOf(95f, 285f)) {
+                buildLogSpiral(cx, cy, minDim * 0.40f, minDim * 0.16f, startAngle, 130f)
+                canvas.drawPath(spiralPath, windPaint)
+            }
+            windPaint.pathEffect = null
             canvas.restore()
 
             eyeRimPaint.color = innerColor
-            eyeRimPaint.strokeWidth = 1.3f * density
+            eyeRimPaint.strokeWidth = 1.2f * density
             canvas.drawCircle(cx, cy, minDim * 0.068f, eyeRimPaint)
             canvas.drawCircle(cx, cy, minDim * 0.042f, eyeCorePaint)
         }
