@@ -23,8 +23,11 @@ import android.os.Process
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
+import android.view.ViewOutlineProvider
+import android.graphics.Outline
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -189,8 +192,8 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, (4 * d).toInt(), 0, (8 * d).toInt())
         }
 
-        yunaOrbView = YunaOrbView(this).apply {
-            layoutParams = LinearLayout.LayoutParams((182 * d).toInt(), (182 * d).toInt())
+        val orbFrame = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams((186 * d).toInt(), (186 * d).toInt())
             setOnClickListener {
                 if (PuyalCoreService.currentStateName == "LISTENING") {
                     triggerServiceState("IDLE")
@@ -199,7 +202,23 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        heroStage.addView(yunaOrbView)
+        yunaOrbView = YunaOrbView(this)
+        orbFrame.addView(yunaOrbView, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+        val orbImg = ImageView(this).apply {
+            setImageResource(R.drawable.yuna_orb)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            clipToOutline = true
+            outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    outline.setOval(0, 0, view.width, view.height)
+                }
+            }
+        }
+        orbFrame.addView(orbImg, FrameLayout.LayoutParams((114 * d).toInt(), (114 * d).toInt(), Gravity.CENTER))
+        heroStage.addView(orbFrame)
 
         heroStage.addView(TextView(this).apply {
             text = "Vanakkam Boss"
@@ -799,14 +818,14 @@ class MainActivity : AppCompatActivity() {
             canvas.drawColor(Color.parseColor("#05070C"))
             p1.shader = RadialGradient(
                 w * 0.85f, h * 0.14f, w * 0.85f,
-                intArrayOf(Color.argb(85, 14, 165, 233), Color.argb(30, 45, 212, 191), Color.TRANSPARENT),
+                intArrayOf(Color.argb(115, 6, 182, 212), Color.argb(30, 45, 212, 191), Color.TRANSPARENT),
                 floatArrayOf(0f, 0.45f, 1f),
                 Shader.TileMode.CLAMP
             )
             canvas.drawRect(0f, 0f, w, h, p1)
             p2.shader = RadialGradient(
                 w * 0.15f, h * 0.46f, w * 0.90f,
-                intArrayOf(Color.argb(72, 99, 102, 241), Color.argb(22, 14, 165, 233), Color.TRANSPARENT),
+                intArrayOf(Color.argb(105, 99, 102, 241), Color.argb(22, 14, 165, 233), Color.TRANSPARENT),
                 floatArrayOf(0f, 0.50f, 1f),
                 Shader.TileMode.CLAMP
             )
@@ -867,31 +886,17 @@ class MainActivity : AppCompatActivity() {
             ringPaint.alpha = if (stateName == "IDLE") 45 else 115
             canvas.drawCircle(cx, cy, r2, ringPaint)
 
-            // Curved orbital telemetry text ("OOM -1000" & "0-FPS")
+            // Curved orbital telemetry text ("OOM -1000" top-left, "0-FPS" bottom right-side-up)
             arcTextPaint.textSize = 8.5f * d
             arcPath.reset()
             arcRect.set(cx - r2, cy - r2, cx + r2, cy + r2)
-            arcPath.addArc(arcRect, -140f, 80f)
+            arcPath.addArc(arcRect, -135f, 90f)
             canvas.drawTextOnPath("OOM $oomLabel", arcPath, 0f, -3f * d, arcTextPaint)
 
             arcPath.reset()
-            arcRect.set(cx - r1, cy - r1, cx + r1, cy + r1)
-            arcPath.addArc(arcRect, -55f, 75f)
-            canvas.drawTextOnPath("0-FPS", arcPath, 0f, -3f * d, arcTextPaint)
-
-            // Multi-stop Liquid-Glass Sphere
-            orbPaint.shader = RadialGradient(
-                cx - r * 0.28f, cy - r * 0.28f, r * 1.25f,
-                intArrayOf(
-                    Color.parseColor("#BAE6FD"),
-                    coreColor,
-                    Color.parseColor("#6366F1"),
-                    Color.parseColor("#080D1C")
-                ),
-                floatArrayOf(0f, 0.35f, 0.72f, 1f),
-                Shader.TileMode.CLAMP
-            )
-            canvas.drawCircle(cx, cy, r, orbPaint)
+            arcRect.set(cx - r2, cy - r2, cx + r2, cy + r2)
+            arcPath.addArc(arcRect, 125f, -70f)
+            canvas.drawTextOnPath("0-FPS", arcPath, 0f, 10f * d, arcTextPaint)
 
             ringPaint.strokeWidth = 1.5f * d
             ringPaint.color = Color.parseColor("#BAE6FD")
