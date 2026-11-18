@@ -4,6 +4,7 @@ plugins {
 }
 
 android {
+    externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }
     namespace = "com.puyal.os"
     compileSdk = 34
 

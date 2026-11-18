@@ -1,0 +1,10 @@
+namespace PuyalIPC;
+enum IntentType : byte { UNKNOWN = 0, VOICE_CMD = 1, UNLOCK_SCREEN = 2, TORCH_TOGGLE = 3, WHATSAPP_REPLY = 4 }
+table IntentPacket {
+  intent: IntentType = UNKNOWN;
+  target_pkg: string;
+  payload: string;
+  confidence: float = 0.0;
+  timestamp_ms: long;
+}
+root_type IntentPacket;
