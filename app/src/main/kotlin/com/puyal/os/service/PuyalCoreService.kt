@@ -1,5 +1,6 @@
 package com.puyal.os.service
 
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -20,6 +21,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import android.os.Process
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.Choreographer
 import android.view.Gravity
@@ -31,6 +33,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.puyal.os.MainActivity
+import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
 class PuyalCoreService : Service() {
@@ -56,6 +59,7 @@ class PuyalCoreService : Service() {
     private var isScreenOn = true
     private var isVoiceActive = false
     private var isTorchOn = false
+    private var isManualStop = false
     private var pulsePhase = 0f
 
     private val frameCallback = object : Choreographer.FrameCallback {
@@ -88,6 +92,7 @@ class PuyalCoreService : Service() {
     override fun onCreate() {
         super.onCreate()
         isRunning = true
+        isManualStop = false
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val pm = getSystemService(POWER_SERVICE) as PowerManager
         isScreenOn = pm.isInteractive
@@ -103,14 +108,33 @@ class PuyalCoreService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (bubbleView == null && Settings.canDrawOverlays(this)) {
+            setupFloatingBubble()
+        }
         when (intent?.action) {
             ACTION_TOGGLE_VOICE -> toggleVoiceMode()
             ACTION_STOP_SERVICE -> {
+                isManualStop = true
                 stopSelf()
                 return START_NOT_STICKY
             }
         }
         return START_STICKY
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (!isManualStop) {
+            val restartIntent = Intent(applicationContext, PuyalCoreService::class.java)
+            val pi = PendingIntent.getService(
+                applicationContext,
+                7002,
+                restartIntent,
+                PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val am = getSystemService(ALARM_SERVICE) as AlarmManager
+            am.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + 1000L, pi)
+        }
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -174,11 +198,13 @@ class PuyalCoreService : Service() {
             try {
                 val cmd = "echo -1000 > /proc/$pid/oom_score_adj"
                 val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
-                val exit = proc.waitFor()
-                if (exit == 0) {
+                val finished = proc.waitFor(5, TimeUnit.SECONDS)
+                if (finished && proc.exitValue() == 0) {
                     mainHandler.post {
                         updateNotification("Active • Root OOM -1000 Locked")
                     }
+                } else if (!finished) {
+                    proc.destroyForcibly()
                 }
             } catch (_: Exception) {
             }
@@ -292,6 +318,7 @@ class PuyalCoreService : Service() {
                     if (abs(dx) > 12 || abs(dy) > 12) {
                         isDragging = true
                         mainHandler.removeCallbacks(longPressRunnable)
+                        hideTouchMenu()
                         bubbleParams.x = initialX + dx
                         bubbleParams.y = initialY + dy
                         windowManager.updateViewLayout(bubble, bubbleParams)
@@ -338,7 +365,8 @@ class PuyalCoreService : Service() {
 
     private fun showTouchMenu() {
         hideTouchMenu()
-        val density = resources.displayMetrics.density
+        val dm = resources.displayMetrics
+        val density = dm.density
         val pad = (12 * density).toInt()
 
         val container = LinearLayout(this).apply {
@@ -360,7 +388,10 @@ class PuyalCoreService : Service() {
                 }
                 startActivity(i)
             },
-            "🛑 Stop Puyal Service" to { stopSelf() },
+            "🛑 Stop Puyal Service" to {
+                isManualStop = true
+                stopSelf()
+            },
             "✕ Close Menu" to { }
         )
 
@@ -385,16 +416,25 @@ class PuyalCoreService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
+        val menuWidthPx = (210 * density).toInt()
+        val openOnLeft = bubbleParams.x > (dm.widthPixels / 2)
+        val menuX = if (openOnLeft) {
+            (bubbleParams.x - menuWidthPx - (6 * density).toInt()).coerceAtLeast(8)
+        } else {
+            bubbleParams.x + (58 * density).toInt()
+        }
+        val menuY = bubbleParams.y.coerceIn(60, (dm.heightPixels - (260 * density).toInt()).coerceAtLeast(60))
+
         menuParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            menuWidthPx,
             WindowManager.LayoutParams.WRAP_CONTENT,
             overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = bubbleParams.x + (58 * density).toInt()
-            y = bubbleParams.y
+            x = menuX
+            y = menuY
         }
 
         menuView = container
