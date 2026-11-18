@@ -71,8 +71,10 @@ class PuyalCoreService : Service() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val choreographer: Choreographer by lazy { Choreographer.getInstance() }
 
+    private enum class PuyalState { IDLE, LISTENING, ACTION_BURST, PROCESSING }
+
     private var isScreenOn = true
-    private var isVoiceActive = false
+    private var currentState = PuyalState.IDLE
     private var isTorchOn = false
     private var isManualStop = false
     private var pulsePhase = 0f
@@ -82,17 +84,42 @@ class PuyalCoreService : Service() {
             if (!isScreenOn || !isRunning || bubbleView == null) {
                 return
             }
-            if (isVoiceActive) {
-                pulsePhase = (pulsePhase + 0.08f) % (Math.PI.toFloat() * 2f)
-                val scale = 1.0f + 0.08f * kotlin.math.sin(pulsePhase)
-                bubbleView?.scaleX = scale
-                bubbleView?.scaleY = scale
-                bubbleView?.rotation = ((bubbleView?.rotation ?: 0f) - 1.8f) % 360f
-                choreographer.postFrameCallback(this)
-            } else {
-                bubbleView?.scaleX = 1.0f
-                bubbleView?.scaleY = 1.0f
-                bubbleView?.rotation = 0f
+            when (currentState) {
+                PuyalState.LISTENING -> {
+                    // Voice-wave breathing + steady fast counter-clockwise swirl
+                    pulsePhase = (pulsePhase + 0.09f) % (Math.PI.toFloat() * 2f)
+                    val scale = 1.0f + 0.08f * kotlin.math.sin(pulsePhase)
+                    bubbleView?.scaleX = scale
+                    bubbleView?.scaleY = scale
+                    bubbleView?.alpha = 1.0f
+                    bubbleView?.rotation = ((bubbleView?.rotation ?: 0f) - 2.5f) % 360f
+                    choreographer.postFrameCallback(this)
+                }
+                PuyalState.ACTION_BURST -> {
+                    // Snappy radar-burst acceleration + crisp kick
+                    pulsePhase = (pulsePhase + 0.18f) % (Math.PI.toFloat() * 2f)
+                    val kick = 1.0f + 0.12f * kotlin.math.abs(kotlin.math.sin(pulsePhase))
+                    val speed = 2.0f + 6.5f * kotlin.math.abs(kotlin.math.sin(pulsePhase))
+                    bubbleView?.scaleX = kick
+                    bubbleView?.scaleY = kick
+                    bubbleView?.alpha = 1.0f
+                    bubbleView?.rotation = ((bubbleView?.rotation ?: 0f) - speed) % 360f
+                    choreographer.postFrameCallback(this)
+                }
+                PuyalState.PROCESSING -> {
+                    // Calm background ebb-flow drift + subtle alpha breathe
+                    pulsePhase = (pulsePhase + 0.04f) % (Math.PI.toFloat() * 2f)
+                    bubbleView?.scaleX = 1.0f
+                    bubbleView?.scaleY = 1.0f
+                    bubbleView?.alpha = 0.82f + 0.18f * kotlin.math.sin(pulsePhase)
+                    bubbleView?.rotation = ((bubbleView?.rotation ?: 0f) - 0.45f) % 360f
+                    choreographer.postFrameCallback(this)
+                }
+                PuyalState.IDLE -> {
+                    bubbleView?.scaleX = 1.0f
+                    bubbleView?.scaleY = 1.0f
+                    bubbleView?.alpha = 1.0f
+                }
             }
         }
     }
@@ -267,6 +294,8 @@ class PuyalCoreService : Service() {
         val bubble = ImageView(this).apply {
             setImageResource(R.drawable.puyal_cyclone)
             scaleType = ImageView.ScaleType.CENTER_CROP
+            val p = (2 * density).toInt()
+            setPadding(p, p, p, p)
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(Color.parseColor("#04070B"))
@@ -313,6 +342,8 @@ class PuyalCoreService : Service() {
         var initialTouchY = 0f
         var isDragging = false
         var longPressTriggered = false
+        var lastTapTime = 0L
+        var singleTapRunnable: Runnable? = null
         val touchSlop = ViewConfiguration.get(this).scaledTouchSlop.coerceAtLeast(24)
 
         val longPressRunnable = Runnable {
@@ -353,7 +384,21 @@ class PuyalCoreService : Service() {
                 MotionEvent.ACTION_UP -> {
                     mainHandler.removeCallbacks(longPressRunnable)
                     if (!isDragging && !longPressTriggered) {
-                        toggleVoiceMode()
+                        val now = SystemClock.uptimeMillis()
+                        if (now - lastTapTime < 260L) {
+                            singleTapRunnable?.let { mainHandler.removeCallbacks(it) }
+                            singleTapRunnable = null
+                            lastTapTime = 0L
+                            triggerActionBurst()
+                        } else {
+                            lastTapTime = now
+                            val r = Runnable {
+                                singleTapRunnable = null
+                                toggleVoiceMode()
+                            }
+                            singleTapRunnable = r
+                            mainHandler.postDelayed(r, 260L)
+                        }
                     }
                     true
                 }
@@ -366,27 +411,52 @@ class PuyalCoreService : Service() {
         }
     }
 
-    private fun toggleVoiceMode() {
-        isVoiceActive = !isVoiceActive
+    private fun setPuyalState(state: PuyalState, toastMsg: String? = null) {
+        currentState = state
         val density = resources.displayMetrics.density
-        bubbleView?.setVortexColor(Color.parseColor(if (isVoiceActive) "#00E5FF" else "#00FF88"))
+        val strokeColor = when (state) {
+            PuyalState.LISTENING -> "#00E5FF"
+            PuyalState.ACTION_BURST -> "#00FF88"
+            PuyalState.PROCESSING -> "#F59E0B"
+            PuyalState.IDLE -> "#94A3B8"
+        }
         bubbleView?.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
-            setColor(Color.parseColor(if (isVoiceActive) "#065F46" else "#0E243D"))
-            setStroke(
-                (2.5f * density).toInt(),
-                Color.parseColor(if (isVoiceActive) "#34D399" else "#10B981")
-            )
+            setColor(Color.parseColor("#04070B"))
+            setStroke((2.2f * density).toInt(), Color.parseColor(strokeColor))
         }
-        if (isVoiceActive && isScreenOn) {
-            choreographer.removeFrameCallback(frameCallback)
+        choreographer.removeFrameCallback(frameCallback)
+        if (state != PuyalState.IDLE && isScreenOn) {
             choreographer.postFrameCallback(frameCallback)
-            Toast.makeText(this, "Puyal Listening (Level 3 STT Ready Hook)", Toast.LENGTH_SHORT).show()
         } else {
-            choreographer.removeFrameCallback(frameCallback)
             bubbleView?.scaleX = 1.0f
             bubbleView?.scaleY = 1.0f
-            bubbleView?.rotation = 0f
+        }
+        toastMsg?.let { Toast.makeText(this, it, Toast.LENGTH_SHORT).show() }
+    }
+
+    private fun toggleVoiceMode() {
+        if (currentState == PuyalState.LISTENING) {
+            setPuyalState(PuyalState.IDLE, "Puyal Idle (0-FPS Standby)")
+        } else {
+            setPuyalState(PuyalState.LISTENING, "Puyal Listening (Mic ON)")
+        }
+    }
+
+    private fun triggerActionBurst() {
+        setPuyalState(PuyalState.ACTION_BURST, "Action Burst • Quick Scan")
+        mainHandler.postDelayed({
+            if (currentState == PuyalState.ACTION_BURST) {
+                setPuyalState(PuyalState.IDLE)
+            }
+        }, 1800L)
+    }
+
+    private fun toggleBackgroundProcessMode() {
+        if (currentState == PuyalState.PROCESSING) {
+            setPuyalState(PuyalState.IDLE, "Background Task Done (0-FPS)")
+        } else {
+            setPuyalState(PuyalState.PROCESSING, "Background Process Running...")
         }
     }
 
@@ -409,6 +479,7 @@ class PuyalCoreService : Service() {
         val items = listOf(
             "🌐 Open Hacker UI (:7777)" to { openHackerUi() },
             "🎙️ Toggle Voice Mode" to { toggleVoiceMode() },
+            "⚙️ Toggle Background Task" to { toggleBackgroundProcessMode() },
             "🔦 Toggle Torch" to { toggleTorch() },
             "⚙️ Open Puyal Dashboard" to {
                 val i = Intent(this, MainActivity::class.java).apply {
@@ -525,7 +596,7 @@ class PuyalCoreService : Service() {
     private fun resumeUiFromFreeze() {
         isScreenOn = true
         bubbleView?.visibility = View.VISIBLE
-        if (isVoiceActive) {
+        if (currentState != PuyalState.IDLE) {
             choreographer.removeFrameCallback(frameCallback)
             choreographer.postFrameCallback(frameCallback)
         }
