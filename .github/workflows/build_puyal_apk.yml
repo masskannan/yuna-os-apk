@@ -1,35 +1,46 @@
-name: Build Puyal Level 1 APK
+name: Build Puyal Sovereign OS APK
+
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
-  build:
+  build-sovereign-apk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Checkout PuyalSovereignOS
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-      - name: Accept Android SDK Licenses
-        run: yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
-      - uses: gradle/actions/setup-gradle@v4
+          cache: 'gradle'
+
+      - name: Setup Android SDK & NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Rust Wasm Target
+        uses: dtolnay/rust-toolchain@stable
         with:
-          gradle-version: '8.7'
-      - name: Build Debug & R8-Shrunk Release APK
+          targets: wasm32-unknown-unknown
+
+      - name: Compile Rust Micro-Brain (.wasm)
         run: |
-          gradle assembleDebug assembleRelease --no-daemon
-          APKSIGNER=$(find "${ANDROID_HOME}/build-tools" -name "apksigner" | sort -V | tail -n 1)
-          keytool -genkeypair -v -keystore /tmp/puyal-test.jks -storepass puyal123 -keypass puyal123 -alias puyal -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=PuyalOS,O=Sovereign,C=IN"
-          "$APKSIGNER" sign --ks /tmp/puyal-test.jks --ks-pass pass:puyal123 --key-pass pass:puyal123 --out app/build/outputs/apk/release/app-release-signed.apk app/build/outputs/apk/release/app-release-unsigned.apk
-          ls -lh app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/release/app-release-signed.apk
-      - uses: actions/upload-artifact@v4
+          cd wasm_modules/rust_brain
+          cargo build --target wasm32-unknown-unknown --release
+          cp target/wasm32-unknown-unknown/release/rust_brain.wasm ../../app/src/main/assets/wasm/
+
+      - name: Build <20MB Release/Debug APK
+        run: |
+          chmod +x gradlew 2>/dev/null || gradle wrapper
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload Puyal Sovereign OS APK
+        uses: actions/upload-artifact@v4
         with:
-          name: puyal-level1-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: puyal-level1-release-signed-apk
-          path: app/build/outputs/apk/release/app-release-signed.apk
+          name: PuyalSovereignOS-APK
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 14
