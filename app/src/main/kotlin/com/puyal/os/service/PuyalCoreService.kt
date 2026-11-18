@@ -47,7 +47,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.puyal.os.MainActivity
-import com.puyal.os.R
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
@@ -63,7 +62,7 @@ class PuyalCoreService : Service() {
     }
 
     private lateinit var windowManager: WindowManager
-    private var bubbleView: ImageView? = null
+    private var bubbleView: TextView? = null
     private var menuView: LinearLayout? = null
     private lateinit var bubbleParams: WindowManager.LayoutParams
     private lateinit var menuParams: WindowManager.LayoutParams
@@ -84,41 +83,53 @@ class PuyalCoreService : Service() {
             if (!isScreenOn || !isRunning || bubbleView == null) {
                 return
             }
+            val density = resources.displayMetrics.density
             when (currentState) {
                 PuyalState.LISTENING -> {
-                    // Voice-wave breathing + steady fast counter-clockwise swirl
-                    pulsePhase = (pulsePhase + 0.09f) % (Math.PI.toFloat() * 2f)
-                    val scale = 1.0f + 0.08f * kotlin.math.sin(pulsePhase)
+                    // 3D vertical Y-axis helical spin + ±6° precession sway + voice pulse
+                    pulsePhase = (pulsePhase + 0.11f) % (Math.PI.toFloat() * 2f)
+                    val s = kotlin.math.sin(pulsePhase)
+                    val scale = 1.0f + 0.07f * s
                     bubbleView?.scaleX = scale
                     bubbleView?.scaleY = scale
                     bubbleView?.alpha = 1.0f
-                    bubbleView?.rotation = ((bubbleView?.rotation ?: 0f) - 2.5f) % 360f
+                    bubbleView?.rotationY = ((bubbleView?.rotationY ?: 0f) + 6.5f) % 360f
+                    bubbleView?.rotation = 6f * s
+                    bubbleView?.translationY = -2f * density * kotlin.math.abs(s)
                     choreographer.postFrameCallback(this)
                 }
                 PuyalState.ACTION_BURST -> {
-                    // Snappy radar-burst acceleration + crisp kick
-                    pulsePhase = (pulsePhase + 0.18f) % (Math.PI.toFloat() * 2f)
-                    val kick = 1.0f + 0.12f * kotlin.math.abs(kotlin.math.sin(pulsePhase))
-                    val speed = 2.0f + 6.5f * kotlin.math.abs(kotlin.math.sin(pulsePhase))
+                    // High-speed helical burst + ±8° sway + updraft lift
+                    pulsePhase = (pulsePhase + 0.20f) % (Math.PI.toFloat() * 2f)
+                    val s = kotlin.math.sin(pulsePhase)
+                    val kick = 1.0f + 0.11f * kotlin.math.abs(s)
                     bubbleView?.scaleX = kick
                     bubbleView?.scaleY = kick
                     bubbleView?.alpha = 1.0f
-                    bubbleView?.rotation = ((bubbleView?.rotation ?: 0f) - speed) % 360f
+                    bubbleView?.rotationY = ((bubbleView?.rotationY ?: 0f) + 13f) % 360f
+                    bubbleView?.rotation = 8f * s
+                    bubbleView?.translationY = -3f * density * kotlin.math.abs(s)
                     choreographer.postFrameCallback(this)
                 }
                 PuyalState.PROCESSING -> {
-                    // Calm background ebb-flow drift + subtle alpha breathe
-                    pulsePhase = (pulsePhase + 0.04f) % (Math.PI.toFloat() * 2f)
+                    // Slow precession drift + gentle ±3° wobble + calm alpha
+                    pulsePhase = (pulsePhase + 0.05f) % (Math.PI.toFloat() * 2f)
+                    val s = kotlin.math.sin(pulsePhase)
                     bubbleView?.scaleX = 1.0f
                     bubbleView?.scaleY = 1.0f
-                    bubbleView?.alpha = 0.82f + 0.18f * kotlin.math.sin(pulsePhase)
-                    bubbleView?.rotation = ((bubbleView?.rotation ?: 0f) - 0.45f) % 360f
+                    bubbleView?.alpha = 0.82f + 0.18f * s
+                    bubbleView?.rotationY = ((bubbleView?.rotationY ?: 0f) + 2.0f) % 360f
+                    bubbleView?.rotation = 3f * s
+                    bubbleView?.translationY = 0f
                     choreographer.postFrameCallback(this)
                 }
                 PuyalState.IDLE -> {
                     bubbleView?.scaleX = 1.0f
                     bubbleView?.scaleY = 1.0f
                     bubbleView?.alpha = 1.0f
+                    bubbleView?.rotationY = 0f
+                    bubbleView?.rotation = 0f
+                    bubbleView?.translationY = 0f
                 }
             }
         }
@@ -291,21 +302,17 @@ class PuyalCoreService : Service() {
         val density = resources.displayMetrics.density
         val sizePx = (52 * density).toInt()
 
-        val bubble = ImageView(this).apply {
-            setImageResource(R.drawable.puyal_cyclone)
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            val p = (2 * density).toInt()
-            setPadding(p, p, p, p)
+        val bubble = TextView(this).apply {
+            text = "🌪️"
+            textSize = 24f
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            setTextColor(Color.WHITE)
+            cameraDistance = 8000f * density
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(Color.parseColor("#04070B"))
-                setStroke((1.5f * density).toInt(), Color.parseColor("#CBD5E1"))
-            }
-            clipToOutline = true
-            outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: Outline) {
-                    outline.setOval(0, 0, view.width, view.height)
-                }
+                setStroke((2.2f * density).toInt(), Color.parseColor("#94A3B8"))
             }
             elevation = 8 * density
         }
@@ -431,6 +438,10 @@ class PuyalCoreService : Service() {
         } else {
             bubbleView?.scaleX = 1.0f
             bubbleView?.scaleY = 1.0f
+            bubbleView?.alpha = 1.0f
+            bubbleView?.rotationY = 0f
+            bubbleView?.rotation = 0f
+            bubbleView?.translationY = 0f
         }
         toastMsg?.let { Toast.makeText(this, it, Toast.LENGTH_SHORT).show() }
     }
