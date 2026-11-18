@@ -19,7 +19,7 @@
     <application
         android:allowBackup="false"
         android:icon="@android:drawable/ic_menu_compass"
-        android:label="Puyal Sovereign OS"
+        android:label="YUNA"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
 
