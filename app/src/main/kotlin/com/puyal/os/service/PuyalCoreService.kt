@@ -261,8 +261,8 @@ class PuyalCoreService : Service() {
         val bubble = PuyalVortexView(this).apply {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#050807"))
-                setStroke((2 * density).toInt(), Color.parseColor("#00FF88"))
+                setColor(Color.parseColor("#06090D"))
+                setStroke((2 * density).toInt(), Color.parseColor("#E2E8F0"))
             }
             elevation = 8 * density
         }
@@ -388,7 +388,7 @@ class PuyalCoreService : Service() {
             background = GradientDrawable().apply {
                 cornerRadius = 16 * density
                 setColor(Color.parseColor("#EE050807"))
-                setStroke((1 * density).toInt(), Color.parseColor("#00FF88"))
+                setStroke((1 * density).toInt(), Color.parseColor("#E2E8F0"))
             }
         }
 
@@ -529,8 +529,8 @@ class PuyalCoreService : Service() {
     }
 
     private class PuyalVortexView(context: Context) : View(context) {
-        private var outerColor = Color.parseColor("#00FF88")
-        private var innerColor = Color.parseColor("#00E5FF")
+        private var outerColor = Color.parseColor("#E2E8F0")
+        private var innerColor = Color.parseColor("#FFFFFF")
         private var outerAngle = 0f
         private var innerAngle = 0f
 
@@ -554,7 +554,7 @@ class PuyalCoreService : Service() {
 
         fun setVortexColor(color: Int) {
             outerColor = color
-            innerColor = if (color == Color.parseColor("#00E5FF")) Color.parseColor("#00FF88") else Color.parseColor("#00E5FF")
+            innerColor = if (color == Color.parseColor("#FFFFFF")) Color.parseColor("#E2E8F0") else Color.parseColor("#FFFFFF")
             invalidate()
         }
 
@@ -595,7 +595,7 @@ class PuyalCoreService : Service() {
 
             glowPaint.shader = RadialGradient(
                 cx, cy, minDim * 0.45f,
-                intArrayOf(Color.argb(90, 0, 229, 255), Color.argb(35, 0, 255, 136), Color.TRANSPARENT),
+                intArrayOf(Color.argb(80, 255, 255, 255), Color.argb(30, 203, 213, 225), Color.TRANSPARENT),
                 floatArrayOf(0f, 0.55f, 1f),
                 Shader.TileMode.CLAMP
             )
