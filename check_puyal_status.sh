@@ -1,0 +1,25 @@
+echo "=================================================="
+echo "   PUYAL SOVEREIGN OS / YUNA - BUILD AUDIT TOOL   "
+echo "=================================================="
+
+echo "[*] Checking Level 1: Core Skeleton & UI..."
+[ -f "app/build.gradle.kts" ] && echo "  [✔] app/build.gradle.kts (Ready)" || echo "  [✘] app/build.gradle.kts (Missing)"
+[ -f "app/src/main/AndroidManifest.xml" ] && echo "  [✔] AndroidManifest.xml (Ready)" || echo "  [✘] AndroidManifest.xml (Missing)"
+[ -f "app/src/main/kotlin/com/puyal/os/service/PuyalCoreService.kt" ] && echo "  [✔] PuyalCoreService.kt (Ready)" || echo "  [✘] PuyalCoreService.kt (Missing)"
+[ -f "app/src/main/kotlin/com/puyal/os/MainActivity.kt" ] && echo "  [✔] MainActivity.kt (UI & Glass Chat - Ready)" || echo "  [✘] MainActivity.kt (Missing)"
+
+echo ""
+echo "[*] Checking Level 2: IPC & Native Bridge..."
+[ -f "schemas/puyal_ipc.fbs" ] && echo "  [✔] puyal_ipc.fbs (FlatBuffers Ready)" || echo "  [✘] puyal_ipc.fbs (Pending)"
+[ -f "app/src/main/cpp/CMakeLists.txt" ] && echo "  [✔] CMakeLists.txt (Ready)" || echo "  [✘] CMakeLists.txt (Missing)"
+[ -f "app/src/main/cpp/flatbuffers_bridge.cpp" ] && echo "  [✔] flatbuffers_bridge.cpp (Ready)" || echo "  [✘] flatbuffers_bridge.cpp (Missing)"
+
+echo ""
+echo "[*] Checking Pending Levels (L3 to L7)..."
+[ -f "app/src/main/cpp/audio_dsp_engine.cpp" ] && echo "  [✔] Level 3: Audio Engine" || echo "  [⏳] Level 3: Audio Engine (Pending)"
+[ -f "wasm_modules/rust_brain/src/lib.rs" ] && echo "  [✔] Level 4: Rust Brain" || echo "  [⏳] Level 4: Rust Brain (Pending)"
+[ -f "wasm_modules/zig_hands/src/main.zig" ] && echo "  [✔] Level 5: Zig Hands" || echo "  [⏳] Level 5: Zig Hands (Pending)"
+[ -f "wasm_modules/nim_loop/loop_engine.nim" ] && echo "  [✔] Level 6: Nim Loop" || echo "  [⏳] Level 6: Nim Loop (Pending)"
+[ -f ".github/workflows/build_puyal_apk.yml" ] && echo "  [✔] Level 7: CI/CD Pipeline" || echo "  [⏳] Level 7: CI/CD Pipeline (Pending)"
+
+echo "=================================================="

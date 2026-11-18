@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
-project("puyal_ffi")
-add_library(puyal_ffi SHARED flatbuffers_bridge.cpp audio_dsp_engine.cpp)
+project("puyal_native")
+add_library(puyal_native SHARED flatbuffers_bridge.cpp audio_dsp_engine.cpp)
 find_library(log-lib log)
-target_link_libraries(puyal_ffi ${log-lib})
+target_link_libraries(puyal_native ${log-lib})
