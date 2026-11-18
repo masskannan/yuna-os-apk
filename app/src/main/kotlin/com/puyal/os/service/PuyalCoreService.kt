@@ -11,6 +11,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.DashPathEffect
@@ -530,38 +531,43 @@ class PuyalCoreService : Service() {
     }
 
     private class PuyalVortexView(context: Context) : View(context) {
-        private var outerColor = Color.parseColor("#E2E8F0")
-        private var innerColor = Color.parseColor("#FFFFFF")
+        private var cloudColor = Color.parseColor("#E2E8F0")
+        private var coreColor = Color.parseColor("#FFFFFF")
         private var driftAngle = 0f
         private var flowPhase = 0f
 
-        private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val mistPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        private val shieldPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val cloudArmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
         }
-        private val windPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        private val windFlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
         }
-        private val eyeRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        private val eyewallPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
         }
         private val eyeCorePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
-            color = Color.parseColor("#06090D")
+            color = Color.parseColor("#04070B")
         }
         private val spiralPath = Path()
+        private var blurInitialized = false
+
+        init {
+            setLayerType(LAYER_TYPE_SOFTWARE, null)
+        }
 
         fun setVortexColor(color: Int) {
-            outerColor = color
-            innerColor = Color.parseColor("#FFFFFF")
+            cloudColor = color
+            coreColor = Color.parseColor("#FFFFFF")
             invalidate()
         }
 
         fun advanceVortex(deltaDeg: Float) {
-            driftAngle = (driftAngle - deltaDeg * 0.35f) % 360f
-            flowPhase = (flowPhase - deltaDeg * 1.4f)
+            driftAngle = (driftAngle - deltaDeg * 0.28f) % 360f
+            flowPhase = (flowPhase - deltaDeg * 1.6f)
             invalidate()
         }
 
@@ -573,7 +579,7 @@ class PuyalCoreService : Service() {
 
         private fun buildLogSpiral(cx: Float, cy: Float, rStart: Float, rEnd: Float, startDeg: Float, sweepDeg: Float) {
             spiralPath.reset()
-            val steps = 22
+            val steps = 26
             val ratio = (rEnd / rStart).toDouble()
             for (i in 0..steps) {
                 val t = i.toDouble() / steps
@@ -594,51 +600,71 @@ class PuyalCoreService : Service() {
             val minDim = minOf(w, h)
             val density = resources.displayMetrics.density
 
-            glowPaint.shader = RadialGradient(
-                cx, cy, minDim * 0.45f,
-                intArrayOf(Color.argb(85, 255, 255, 255), Color.argb(30, 203, 213, 225), Color.TRANSPARENT),
-                floatArrayOf(0f, 0.55f, 1f),
+            if (!blurInitialized) {
+                val blur = BlurMaskFilter(1.4f * density, BlurMaskFilter.Blur.NORMAL)
+                cloudArmPaint.maskFilter = blur
+                eyewallPaint.maskFilter = blur
+                blurInitialized = true
+            }
+
+            // Soft satellite cloud overcast shield
+            shieldPaint.shader = RadialGradient(
+                cx, cy, minDim * 0.46f,
+                intArrayOf(
+                    Color.parseColor("#04070B"),
+                    Color.argb(215, 255, 255, 255),
+                    Color.argb(95, 203, 213, 225),
+                    Color.argb(30, 148, 163, 184),
+                    Color.TRANSPARENT
+                ),
+                floatArrayOf(0f, 0.17f, 0.32f, 0.68f, 1f),
                 Shader.TileMode.CLAMP
             )
-            canvas.drawCircle(cx, cy, minDim * 0.44f, glowPaint)
+            canvas.drawCircle(cx, cy, minDim * 0.45f, shieldPaint)
 
             canvas.save()
             canvas.rotate(driftAngle, cx, cy)
 
-            // Soft cloud base bands (2 asymmetric main arms)
-            mistPaint.color = outerColor
-            mistPaint.alpha = 70
-            mistPaint.strokeWidth = 3.2f * density
-            for (startAngle in floatArrayOf(15f, 195f)) {
-                buildLogSpiral(cx, cy, minDim * 0.42f, minDim * 0.10f, startAngle, 205f)
-                canvas.drawPath(spiralPath, mistPaint)
+            // Soft sweeping satellite cloud bands (2 primary + 2 feeder)
+            cloudArmPaint.color = cloudColor
+            cloudArmPaint.alpha = 115
+            cloudArmPaint.strokeWidth = 3.8f * density
+            for (startAngle in floatArrayOf(10f, 190f)) {
+                buildLogSpiral(cx, cy, minDim * 0.43f, minDim * 0.11f, startAngle, 220f)
+                canvas.drawPath(spiralPath, cloudArmPaint)
+            }
+            cloudArmPaint.alpha = 78
+            cloudArmPaint.strokeWidth = 2.4f * density
+            for (startAngle in floatArrayOf(105f, 285f)) {
+                buildLogSpiral(cx, cy, minDim * 0.40f, minDim * 0.16f, startAngle, 142f)
+                canvas.drawPath(spiralPath, cloudArmPaint)
             }
 
-            // Inward-flowing wind streaks along the spiral into the eye
-            windPaint.color = innerColor
-            windPaint.alpha = 230
-            windPaint.strokeWidth = 1.7f * density
-            windPaint.pathEffect = DashPathEffect(floatArrayOf(14f * density, 8f * density, 6f * density, 10f * density), flowPhase * density)
-            for (startAngle in floatArrayOf(15f, 195f)) {
-                buildLogSpiral(cx, cy, minDim * 0.42f, minDim * 0.10f, startAngle, 205f)
-                canvas.drawPath(spiralPath, windPaint)
+            // Inward-flowing bright cloud wind gusts
+            windFlowPaint.color = coreColor
+            windFlowPaint.alpha = 215
+            windFlowPaint.strokeWidth = 1.4f * density
+            windFlowPaint.pathEffect = DashPathEffect(floatArrayOf(18f * density, 14f * density), flowPhase * density)
+            for (startAngle in floatArrayOf(10f, 190f)) {
+                buildLogSpiral(cx, cy, minDim * 0.43f, minDim * 0.11f, startAngle, 220f)
+                canvas.drawPath(spiralPath, windFlowPaint)
             }
-
-            // Outer feeder wisps
-            windPaint.alpha = 165
-            windPaint.strokeWidth = 1.2f * density
-            windPaint.pathEffect = DashPathEffect(floatArrayOf(9f * density, 11f * density), flowPhase * 1.3f * density)
-            for (startAngle in floatArrayOf(95f, 285f)) {
-                buildLogSpiral(cx, cy, minDim * 0.40f, minDim * 0.16f, startAngle, 130f)
-                canvas.drawPath(spiralPath, windPaint)
+            windFlowPaint.alpha = 155
+            windFlowPaint.strokeWidth = 1.0f * density
+            windFlowPaint.pathEffect = DashPathEffect(floatArrayOf(12f * density, 16f * density), flowPhase * 1.25f * density)
+            for (startAngle in floatArrayOf(105f, 285f)) {
+                buildLogSpiral(cx, cy, minDim * 0.40f, minDim * 0.16f, startAngle, 142f)
+                canvas.drawPath(spiralPath, windFlowPaint)
             }
-            windPaint.pathEffect = null
+            windFlowPaint.pathEffect = null
             canvas.restore()
 
-            eyeRimPaint.color = innerColor
-            eyeRimPaint.strokeWidth = 1.2f * density
-            canvas.drawCircle(cx, cy, minDim * 0.068f, eyeRimPaint)
-            canvas.drawCircle(cx, cy, minDim * 0.042f, eyeCorePaint)
+            // Glowing eyewall ring + deep calm dark Eye
+            eyewallPaint.color = coreColor
+            eyewallPaint.alpha = 225
+            eyewallPaint.strokeWidth = 2.0f * density
+            canvas.drawCircle(cx, cy, minDim * 0.095f, eyewallPaint)
+            canvas.drawCircle(cx, cy, minDim * 0.056f, eyeCorePaint)
         }
     }
 }
