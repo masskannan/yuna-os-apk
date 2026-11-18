@@ -200,10 +200,10 @@ class PuyalCoreService : Service() {
             ACTION_SET_STATE -> {
                 val st = intent.getStringExtra(EXTRA_STATE) ?: "IDLE"
                 when (st) {
-                    "LISTENING" -> setPuyalState(PuyalState.LISTENING, "Puyal Listening (Mic ON)")
+                    "LISTENING" -> setPuyalState(PuyalState.LISTENING, "YUNA Listening (Mic ON)")
                     "ACTION_BURST" -> triggerActionBurst()
                     "PROCESSING" -> setPuyalState(PuyalState.PROCESSING, "Background Process Running...")
-                    else -> setPuyalState(PuyalState.IDLE, "Puyal Idle (0-FPS Standby)")
+                    else -> setPuyalState(PuyalState.IDLE, "YUNA Idle (0-FPS Standby)")
                 }
             }
             ACTION_STOP_SERVICE -> {
@@ -247,7 +247,7 @@ class PuyalCoreService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Puyal Sovereign Core",
+                "YUNA Sovereign Core",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "Persistent offline AI service with 0% idle battery freeze"
@@ -266,7 +266,7 @@ class PuyalCoreService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Puyal Sovereign OS")
+            .setContentTitle("YUNA OS")
             .setContentText("Active • 0-FPS Idle Guard Enabled")
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setOngoing(true)
@@ -313,7 +313,7 @@ class PuyalCoreService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Puyal Sovereign OS")
+            .setContentTitle("YUNA OS")
             .setContentText(statusText)
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setOngoing(true)
@@ -515,9 +515,9 @@ class PuyalCoreService : Service() {
 
     private fun toggleVoiceMode() {
         if (currentState == PuyalState.LISTENING) {
-            setPuyalState(PuyalState.IDLE, "Puyal Idle (0-FPS Standby)")
+            setPuyalState(PuyalState.IDLE, "YUNA Idle (0-FPS Standby)")
         } else {
-            setPuyalState(PuyalState.LISTENING, "Puyal Listening (Mic ON)")
+            setPuyalState(PuyalState.LISTENING, "YUNA Listening (Mic ON)")
         }
     }
 
@@ -559,13 +559,13 @@ class PuyalCoreService : Service() {
             "🎙️ Toggle Voice Mode" to { toggleVoiceMode() },
             "⚙️ Toggle Background Task" to { toggleBackgroundProcessMode() },
             "🔦 Toggle Torch" to { toggleTorch() },
-            "⚙️ Open Puyal Dashboard" to {
+            "⚙️ Open YUNA" to {
                 val i = Intent(this, MainActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 startActivity(i)
             },
-            "🛑 Stop Puyal Service" to {
+            "🛑 Stop YUNA" to {
                 isManualStop = true
                 stopSelf()
             },

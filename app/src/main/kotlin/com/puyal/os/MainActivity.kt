@@ -34,63 +34,62 @@ class MainActivity : AppCompatActivity() {
     private lateinit var rootContainer: LinearLayout
     private lateinit var chatFeed: LinearLayout
     private lateinit var greetingBlock: LinearLayout
-    private lateinit var drawerCard: LinearLayout
+    private lateinit var settingsOverlay: ScrollView
     private lateinit var plusSheet: LinearLayout
-    private lateinit var inputPill: LinearLayout
     private lateinit var inputBox: EditText
 
-    private lateinit var servicePill: TextView
+    private lateinit var nav3Btn: TextView
+    private lateinit var nav2Btn: TextView
+    private lateinit var navGestBtn: TextView
+    private lateinit var svcToggleBtn: TextView
     private lateinit var telemetryText: TextView
-    private lateinit var rootBadge: TextView
     private lateinit var permOverlayBadge: TextView
     private lateinit var permMicBadge: TextView
     private lateinit var permNotifBadge: TextView
     private lateinit var permBatteryBadge: TextView
 
+    private var navMode = "3BTN" // 3BTN, 2BTN, GESTURE
     private var oomScoreValue = "checking..."
-    private var isDrawerOpen = false
 
     private val permLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) {
-        refreshDashboard()
-    }
+    ) { refreshSettings() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Edge-to-edge mounting cleanly above Android's 3-button navigation bar & IME keyboard
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.TRANSPARENT
 
-        buildGeminiCloneUi()
-        applySystemBarAndImeInsets()
+        buildCleanGeminiUi()
+        applyNavAndImeInsets()
         probeRootAndOomAsync()
     }
 
     override fun onResume() {
         super.onResume()
-        refreshDashboard()
+        refreshSettings()
         probeRootAndOomAsync()
     }
 
-    private fun applySystemBarAndImeInsets() {
+    private fun applyNavAndImeInsets() {
         val d = resources.displayMetrics.density
         ViewCompat.setOnApplyWindowInsetsListener(rootContainer) { view, windowInsets ->
             val sysBars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
             val ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime())
-            val bottomInset = maxOf(sysBars.bottom, ime.bottom)
-            view.setPadding(
-                sysBars.left,
-                sysBars.top,
-                sysBars.right,
-                bottomInset + (8 * d).toInt()
-            )
+            val extraNavDp = when (navMode) {
+                "3BTN" -> 8
+                "2BTN" -> 6
+                else -> 4
+            }
+            val bottomInset = maxOf(sysBars.bottom, ime.bottom) + (extraNavDp * d).toInt()
+            view.setPadding(sysBars.left, sysBars.top, sysBars.right, bottomInset)
             windowInsets
         }
+        ViewCompat.requestApplyInsets(rootContainer)
     }
 
-    private fun buildGeminiCloneUi() {
+    private fun buildCleanGeminiUi() {
         val d = resources.displayMetrics.density
 
         rootContainer = LinearLayout(this).apply {
@@ -98,7 +97,7 @@ class MainActivity : AppCompatActivity() {
             setBackgroundColor(Color.parseColor("#0B0F14"))
         }
 
-        // 1. Top Bar (56dp height — exact Gemini mobile header proportions, 100% PUYAL branding)
+        // 1. Clean Top Bar (56dp): [New Chat]  [🌪️ Puyal]  [⚙️ Settings]
         val topBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -109,75 +108,64 @@ class MainActivity : AppCompatActivity() {
             setPadding((14 * d).toInt(), 0, (14 * d).toInt(), 0)
         }
 
-        val menuBtn = TextView(this).apply {
-            text = "☰"
-            textSize = 20f
-            setTextColor(Color.parseColor("#E2E8F0"))
-            setPadding((8 * d).toInt(), (8 * d).toInt(), (12 * d).toInt(), (8 * d).toInt())
+        val newChatBtn = TextView(this).apply {
+            text = "＋"
+            textSize = 22f
+            setTextColor(Color.parseColor("#CBD5E1"))
+            setPadding((8 * d).toInt(), (6 * d).toInt(), (12 * d).toInt(), (6 * d).toInt())
             setOnClickListener {
-                isDrawerOpen = !isDrawerOpen
-                drawerCard.visibility = if (isDrawerOpen) View.VISIBLE else View.GONE
+                chatFeed.removeAllViews()
+                greetingBlock.visibility = View.VISIBLE
+                settingsOverlay.visibility = View.GONE
             }
         }
 
         val brandTitle = TextView(this).apply {
             text = "🌪️ Puyal"
             textSize = 19f
+            gravity = Gravity.CENTER
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.parseColor("#F8FAFC"))
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
-        servicePill = TextView(this).apply {
-            text = "OFFLINE"
-            textSize = 10f
-            typeface = Typeface.MONOSPACE
-            setTypeface(typeface, Typeface.BOLD)
-            setPadding((10 * d).toInt(), (5 * d).toInt(), (10 * d).toInt(), (5 * d).toInt())
-            background = pillDrawable("#161D26", "#334155", 99 * d)
-            setTextColor(Color.parseColor("#94A3B8"))
+        val settingsBtn = TextView(this).apply {
+            text = "⚙️"
+            textSize = 20f
+            setPadding((10 * d).toInt(), (6 * d).toInt(), (8 * d).toInt(), (6 * d).toInt())
             setOnClickListener {
-                if (PuyalCoreService.isRunning) {
-                    startService(Intent(this@MainActivity, PuyalCoreService::class.java).apply {
-                        action = PuyalCoreService.ACTION_STOP_SERVICE
-                    })
-                } else {
-                    ContextCompat.startForegroundService(
-                        this@MainActivity,
-                        Intent(this@MainActivity, PuyalCoreService::class.java)
-                    )
+                val show = settingsOverlay.visibility != View.VISIBLE
+                settingsOverlay.visibility = if (show) View.VISIBLE else View.GONE
+                if (show) {
+                    refreshSettings()
+                    probeRootAndOomAsync()
                 }
-                topBar.postDelayed({ refreshDashboard(); probeRootAndOomAsync() }, 350)
             }
         }
 
-        topBar.addView(menuBtn)
+        topBar.addView(newChatBtn)
         topBar.addView(brandTitle)
-        topBar.addView(servicePill)
+        topBar.addView(settingsBtn)
         rootContainer.addView(topBar)
 
-        // 2. Collapsible System & Permission Drawer (Sovereign OS Controls)
-        drawerCard = buildSystemDrawer(d)
-        drawerCard.visibility = View.GONE
-        rootContainer.addView(drawerCard)
+        // 2. Settings Sheet (Hidden by default — all technical & nav-mode controls live here)
+        settingsOverlay = buildSettingsSheet(d)
+        settingsOverlay.visibility = View.GONE
+        rootContainer.addView(settingsOverlay)
 
-        // 3. Center Scrollable Stage (Greeting + Chips + Live Responses)
+        // 3. Clean Center Chat Stage
         val scroll = ScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            )
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
             isFillViewport = true
         }
         val stage = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding((18 * d).toInt(), (12 * d).toInt(), (18 * d).toInt(), (12 * d).toInt())
+            setPadding((20 * d).toInt(), (10 * d).toInt(), (20 * d).toInt(), (10 * d).toInt())
         }
 
         greetingBlock = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, (36 * d).toInt(), 0, (16 * d).toInt())
+            setPadding(0, (42 * d).toInt(), 0, (16 * d).toInt())
         }
         greetingBlock.addView(TextView(this).apply {
             text = "வணக்கம் பாஸ்"
@@ -187,62 +175,49 @@ class MainActivity : AppCompatActivity() {
         })
         greetingBlock.addView(TextView(this).apply {
             text = "என்ன உதவி செய்யணும்?"
-            textSize = 24f
+            textSize = 23f
             setTextColor(Color.parseColor("#64748B"))
-            setPadding(0, (4 * d).toInt(), 0, (22 * d).toInt())
+            setPadding(0, (4 * d).toInt(), 0, (24 * d).toInt())
         })
 
-        // 2x2 Quick Action Chips (matching Gemini pill-card proportions)
-        val chipRow1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        chipRow1.addView(makeSuggestionCard("🚀 Start Immortal Core", 0) {
-            ContextCompat.startForegroundService(this, Intent(this, PuyalCoreService::class.java))
-            appendMessage("user", "Start Puyal Immortal Core")
-            appendMessage("puyal", "Immortal Core active! 3D 🌪️ bubble launched with 0-FPS screen-off guard.")
-            topBar.postDelayed({ refreshDashboard(); probeRootAndOomAsync() }, 350)
-        })
-        chipRow1.addView(makeSuggestionCard("🎙️ Test 3D Mic Swirl", (10 * d).toInt()) {
-            triggerServiceState("LISTENING")
-            appendMessage("puyal", "Mic Listening ON — 3D 🌪️ helical spin + Cyan sonar ring active.")
-        })
+        // Clean user-facing prompt suggestions (no dev/test clutter)
+        val row1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        row1.addView(makePromptChip("👁️ Screen-la enna irukku?", 0) { submitPrompt("Screen-la enna irukku?") })
+        row1.addView(makePromptChip("🔦 Torch ON pannu", (10 * d).toInt()) { submitPrompt("Torch ON pannu") })
 
-        val chipRow2 = LinearLayout(this).apply {
+        val row2 = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = (10 * d).toInt() }
         }
-        chipRow2.addView(makeSuggestionCard("💬 Open :7777 UI", 0) {
-            openUrl("http://127.0.0.1:7777")
-        })
-        chipRow2.addView(makeSuggestionCard("⚙️ System & Perms", (10 * d).toInt()) {
-            isDrawerOpen = true
-            drawerCard.visibility = View.VISIBLE
-        })
+        row2.addView(makePromptChip("💬 WhatsApp check pannu", 0) { submitPrompt("WhatsApp check pannu") })
+        row2.addView(makePromptChip("📋 Today summary kodu", (10 * d).toInt()) { submitPrompt("Today summary kodu") })
 
-        greetingBlock.addView(chipRow1)
-        greetingBlock.addView(chipRow2)
+        greetingBlock.addView(row1)
+        greetingBlock.addView(row2)
         stage.addView(greetingBlock)
 
         chatFeed = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         stage.addView(chatFeed)
-
         scroll.addView(stage)
         rootContainer.addView(scroll)
 
-        // 4. Plus Attachment/Tool Sheet (hidden above input pill)
+        // 4. Clean ＋ Input Sheet (strictly Camera, Photo, File, Screen Scan)
         plusSheet = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             visibility = View.GONE
-            setPadding((14 * d).toInt(), (8 * d).toInt(), (14 * d).toInt(), (8 * d).toInt())
+            setPadding((14 * d).toInt(), (6 * d).toInt(), (14 * d).toInt(), (6 * d).toInt())
         }
-        plusSheet.addView(makeMiniTool("📦 :7778 Store") { openUrl("http://127.0.0.1:7778") })
-        plusSheet.addView(makeMiniTool("⚡ EXEC Burst") { triggerServiceState("ACTION_BURST") })
-        plusSheet.addView(makeMiniTool("🟠 BG Drift") { triggerServiceState("PROCESSING") })
+        plusSheet.addView(makeInputTool("📷 Camera") { toastInfo("Camera Vision ready in Level 5") })
+        plusSheet.addView(makeInputTool("🖼️ Photo") { toastInfo("Photo picker ready in Level 5") })
+        plusSheet.addView(makeInputTool("📁 File") { toastInfo("File attach ready in Level 2") })
+        plusSheet.addView(makeInputTool("👁️ Scan") { submitPrompt("Screen-la enna irukku?") })
         rootContainer.addView(plusSheet)
 
-        // 5. Bottom Floating Pill Input Bar (28dp corner radius, ~58dp height, mounted cleanly above 3-button nav bar)
-        inputPill = LinearLayout(this).apply {
+        // 5. Floating Pill Input Bar (58dp height, 28dp radius, cleanly above 3-button/2-button/gesture nav)
+        val inputPill = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             minimumHeight = (58 * d).toInt()
@@ -255,7 +230,6 @@ class MainActivity : AppCompatActivity() {
                 leftMargin = (14 * d).toInt()
                 rightMargin = (14 * d).toInt()
                 topMargin = (6 * d).toInt()
-                bottomMargin = (4 * d).toInt()
             }
         }
 
@@ -288,7 +262,7 @@ class MainActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams((40 * d).toInt(), (40 * d).toInt())
             setOnClickListener {
                 triggerServiceState("LISTENING")
-                appendMessage("puyal", "Voice Mic Hook ON — Level 3 Sherpa-ONNX ready.")
+                appendMessage("puyal", "Mic Listening ON — 3D 🌪️ active (Level 3 Tamil STT hook).")
             }
         }
 
@@ -304,12 +278,9 @@ class MainActivity : AppCompatActivity() {
                 val q = inputBox.text.toString().trim()
                 if (q.isNotEmpty()) {
                     inputBox.setText("")
-                    appendMessage("user", q)
-                    triggerServiceState("ACTION_BURST")
-                    appendMessage("puyal", "Received: \"$q\" — Local Rust/Wasm Brain connects in Level 2 & 4.")
+                    submitPrompt(q)
                 } else {
                     triggerServiceState("IDLE")
-                    Toast.makeText(this@MainActivity, "Puyal Idle (0-FPS)", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -323,61 +294,84 @@ class MainActivity : AppCompatActivity() {
         setContentView(rootContainer)
     }
 
-    private fun buildSystemDrawer(d: Float): LinearLayout {
-        val card = LinearLayout(this).apply {
+    private fun buildSettingsSheet(d: Float): ScrollView {
+        val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding((14 * d).toInt(), (12 * d).toInt(), (14 * d).toInt(), (12 * d).toInt())
+            setPadding((16 * d).toInt(), (12 * d).toInt(), (16 * d).toInt(), (16 * d).toInt())
             background = pillDrawable("#11171F", "#263344", 18 * d)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                leftMargin = (14 * d).toInt()
-                rightMargin = (14 * d).toInt()
-                bottomMargin = (8 * d).toInt()
-            }
         }
 
-        val hdr = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        hdr.addView(TextView(this).apply {
-            text = "SOVEREIGN KERNEL & PERMS"
-            textSize = 11f
+        box.addView(TextView(this).apply {
+            text = "⚙️ PUYAL SETTINGS"
+            textSize = 13f
             typeface = Typeface.MONOSPACE
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.parseColor("#38BDF8"))
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setPadding(0, 0, 0, (10 * d).toInt())
         })
-        rootBadge = TextView(this).apply {
-            text = "SU: ..."
-            textSize = 10f
-            typeface = Typeface.MONOSPACE
-            setTextColor(Color.parseColor("#F59E0B"))
+
+        // 1. Navigation Bar Mode Selector (3-Button / 2-Button / Gesture)
+        box.addView(settingsLabel("Navigation Bar Clearance"))
+        val navRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (12 * d).toInt() }
         }
-        hdr.addView(rootBadge)
-        card.addView(hdr)
+        nav3Btn = makeNavChip("3-Button", 0) { setNavMode("3BTN") }
+        nav2Btn = makeNavChip("2-Button", (6 * d).toInt()) { setNavMode("2BTN") }
+        navGestBtn = makeNavChip("Gesture", (6 * d).toInt()) { setNavMode("GESTURE") }
+        navRow.addView(nav3Btn)
+        navRow.addView(nav2Btn)
+        navRow.addView(navGestBtn)
+        box.addView(navRow)
+
+        // 2. Immortal Floating Bubble Service
+        box.addView(settingsLabel("Immortal Core & Bubble"))
+        svcToggleBtn = TextView(this).apply {
+            textSize = 12f
+            gravity = Gravity.CENTER
+            typeface = Typeface.MONOSPACE
+            setTypeface(typeface, Typeface.BOLD)
+            setPadding((12 * d).toInt(), (11 * d).toInt(), (12 * d).toInt(), (11 * d).toInt())
+            setOnClickListener {
+                if (PuyalCoreService.isRunning) {
+                    startService(Intent(this@MainActivity, PuyalCoreService::class.java).apply {
+                        action = PuyalCoreService.ACTION_STOP_SERVICE
+                    })
+                } else {
+                    ContextCompat.startForegroundService(this@MainActivity, Intent(this@MainActivity, PuyalCoreService::class.java))
+                }
+                postDelayed({ refreshSettings(); probeRootAndOomAsync() }, 350)
+            }
+        }
+        box.addView(svcToggleBtn)
 
         telemetryText = TextView(this).apply {
             textSize = 11f
             typeface = Typeface.MONOSPACE
-            setTextColor(Color.parseColor("#CBD5E1"))
-            setPadding(0, (6 * d).toInt(), 0, (8 * d).toInt())
+            setTextColor(Color.parseColor("#94A3B8"))
+            setPadding(0, (8 * d).toInt(), 0, (12 * d).toInt())
         }
-        card.addView(telemetryText)
+        box.addView(telemetryText)
 
-        permOverlayBadge = addPermRow(card, "Overlay Bubble (Draw Over Apps)") {
+        // 3. Permissions
+        box.addView(settingsLabel("Permissions (Tap to Grant)"))
+        permOverlayBadge = addPermRow(box, "Overlay Bubble") {
             if (!Settings.canDrawOverlays(this)) {
                 startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
             }
         }
-        permMicBadge = addPermRow(card, "Mic & Camera") {
+        permMicBadge = addPermRow(box, "Microphone & Camera") {
             permLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA))
         }
-        permNotifBadge = addPermRow(card, "Foreground Notification") {
+        permNotifBadge = addPermRow(box, "Notifications") {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 permLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
             }
         }
-        permBatteryBadge = addPermRow(card, "Battery Unrestricted") {
+        permBatteryBadge = addPermRow(box, "Battery Unrestricted") {
             val pm = getSystemService(POWER_SERVICE) as PowerManager
             if (!pm.isIgnoringBatteryOptimizations(packageName)) {
                 startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
@@ -385,7 +379,57 @@ class MainActivity : AppCompatActivity() {
                 })
             }
         }
-        return card
+
+        // 4. Local Ports (Isolated from 9999/8888/49321)
+        box.addView(settingsLabel("Local Consoles"))
+        val portRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        portRow.addView(makeNavChip(":7777 Web UI", 0) { openUrl("http://127.0.0.1:7777") })
+        portRow.addView(makeNavChip(":7778 App Store", (6 * d).toInt()) { openUrl("http://127.0.0.1:7778") })
+        box.addView(portRow)
+
+        return ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (380 * d).toInt()
+            ).apply {
+                leftMargin = (14 * d).toInt()
+                rightMargin = (14 * d).toInt()
+                bottomMargin = (6 * d).toInt()
+            }
+            addView(box)
+        }
+    }
+
+    private fun setNavMode(mode: String) {
+        navMode = mode
+        applyNavAndImeInsets()
+        refreshSettings()
+    }
+
+    private fun settingsLabel(title: String): TextView {
+        val d = resources.displayMetrics.density
+        return TextView(this).apply {
+            text = title
+            textSize = 11f
+            setTextColor(Color.parseColor("#64748B"))
+            setPadding(0, (4 * d).toInt(), 0, (6 * d).toInt())
+        }
+    }
+
+    private fun makeNavChip(label: String, leftMarginPx: Int, onClick: () -> Unit): TextView {
+        val d = resources.displayMetrics.density
+        return TextView(this).apply {
+            text = label
+            textSize = 11f
+            gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#E2E8F0"))
+            setPadding((8 * d).toInt(), (9 * d).toInt(), (8 * d).toInt(), (9 * d).toInt())
+            background = pillDrawable("#161D26", "#334155", 10 * d)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                leftMargin = leftMarginPx
+            }
+            setOnClickListener { onClick() }
+        }
     }
 
     private fun addPermRow(parent: LinearLayout, label: String, onClick: () -> Unit): TextView {
@@ -413,7 +457,7 @@ class MainActivity : AppCompatActivity() {
         return b
     }
 
-    private fun makeSuggestionCard(label: String, leftMarginPx: Int, onClick: () -> Unit): TextView {
+    private fun makePromptChip(label: String, leftMarginPx: Int, onClick: () -> Unit): TextView {
         val d = resources.displayMetrics.density
         return TextView(this).apply {
             text = label
@@ -428,20 +472,31 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun makeMiniTool(label: String, onClick: () -> Unit): TextView {
+    private fun makeInputTool(label: String, onClick: () -> Unit): TextView {
         val d = resources.displayMetrics.density
         return TextView(this).apply {
             text = label
             textSize = 11f
             setTextColor(Color.parseColor("#CBD5E1"))
-            setPadding((12 * d).toInt(), (8 * d).toInt(), (12 * d).toInt(), (8 * d).toInt())
+            setPadding((11 * d).toInt(), (7 * d).toInt(), (11 * d).toInt(), (7 * d).toInt())
             background = pillDrawable("#161D26", "#334155", 99 * d)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { rightMargin = (8 * d).toInt() }
-            setOnClickListener { onClick() }
+            setOnClickListener {
+                plusSheet.visibility = View.GONE
+                onClick()
+            }
         }
+    }
+
+    private fun submitPrompt(q: String) {
+        plusSheet.visibility = View.GONE
+        settingsOverlay.visibility = View.GONE
+        appendMessage("user", q)
+        triggerServiceState("ACTION_BURST")
+        appendMessage("puyal", "Command queued: \"$q\" (Rust/Wasm Brain links in Level 2 & 4).")
     }
 
     private fun appendMessage(role: String, text: String) {
@@ -476,7 +531,6 @@ class MainActivity : AppCompatActivity() {
             action = PuyalCoreService.ACTION_SET_STATE
             putExtra(PuyalCoreService.EXTRA_STATE, stateName)
         })
-        telemetryText.postDelayed({ refreshDashboard() }, 200)
     }
 
     private fun pillDrawable(bgHex: String, strokeHex: String, radiusPx: Float): GradientDrawable {
@@ -492,18 +546,28 @@ class MainActivity : AppCompatActivity() {
         try {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         } catch (e: Exception) {
-            Toast.makeText(this, "Browser error: ${e.message}", Toast.LENGTH_SHORT).show()
+            toastInfo("Browser error: ${e.message}")
         }
     }
 
-    private fun styleBadge(badge: TextView, ok: Boolean, okText: String = "READY", badText: String = "FIX") {
+    private fun toastInfo(msg: String) {
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun stylePerm(badge: TextView, ok: Boolean) {
         val d = resources.displayMetrics.density
-        badge.text = if (ok) okText else badText
+        badge.text = if (ok) "READY" else "GRANT"
         badge.setTextColor(Color.parseColor(if (ok) "#00FF88" else "#F59E0B"))
         badge.background = pillDrawable(if (ok) "#071E14" else "#1F1607", if (ok) "#00FF88" else "#F59E0B", 99 * d)
     }
 
-    private fun refreshDashboard() {
+    private fun styleNavChip(chip: TextView, active: Boolean) {
+        val d = resources.displayMetrics.density
+        chip.setTextColor(Color.parseColor(if (active) "#00FF88" else "#94A3B8"))
+        chip.background = pillDrawable(if (active) "#071E14" else "#161D26", if (active) "#00FF88" else "#334155", 10 * d)
+    }
+
+    private fun refreshSettings() {
         val overlayOk = Settings.canDrawOverlays(this)
         val micOk = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         val notifOk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -513,18 +577,22 @@ class MainActivity : AppCompatActivity() {
         val batteryOk = pm.isIgnoringBatteryOptimizations(packageName)
         val svcOk = PuyalCoreService.isRunning
 
-        styleBadge(permOverlayBadge, overlayOk)
-        styleBadge(permMicBadge, micOk)
-        styleBadge(permNotifBadge, notifOk)
-        styleBadge(permBatteryBadge, batteryOk, "OK", "FIX")
+        stylePerm(permOverlayBadge, overlayOk)
+        stylePerm(permMicBadge, micOk)
+        stylePerm(permNotifBadge, notifOk)
+        stylePerm(permBatteryBadge, batteryOk)
+
+        styleNavChip(nav3Btn, navMode == "3BTN")
+        styleNavChip(nav2Btn, navMode == "2BTN")
+        styleNavChip(navGestBtn, navMode == "GESTURE")
 
         val d = resources.displayMetrics.density
-        servicePill.text = if (svcOk) "● IMMORTAL" else "OFFLINE"
-        servicePill.setTextColor(Color.parseColor(if (svcOk) "#00FF88" else "#94A3B8"))
-        servicePill.background = pillDrawable(if (svcOk) "#071E14" else "#161D26", if (svcOk) "#00FF88" else "#334155", 99 * d)
+        svcToggleBtn.text = if (svcOk) "🟢 FLOATING 🌪️ BUBBLE ACTIVE (TAP TO STOP)" else "🚀 START FLOATING 🌪️ BUBBLE"
+        svcToggleBtn.setTextColor(Color.parseColor(if (svcOk) "#00FF88" else "#04110A"))
+        svcToggleBtn.background = pillDrawable(if (svcOk) "#071E14" else "#00FF88", "#00FF88", 12 * d)
 
         val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"
-        telemetryText.text = "PID ${Process.myPid()} ($abi) • OOM: $oomScoreValue • Bubble: ${PuyalCoreService.currentStateName}"
+        telemetryText.text = "PID ${Process.myPid()} ($abi) • OOM: $oomScoreValue • State: ${PuyalCoreService.currentStateName}"
     }
 
     private fun probeRootAndOomAsync() {
@@ -543,11 +611,7 @@ class MainActivity : AppCompatActivity() {
                 if (rootOk) "-1000" else "0"
             }
             oomScoreValue = oom
-            runOnUiThread {
-                rootBadge.text = if (rootOk) "SU: GRANTED" else "SU: NO ROOT"
-                rootBadge.setTextColor(Color.parseColor(if (rootOk) "#00FF88" else "#F59E0B"))
-                refreshDashboard()
-            }
+            runOnUiThread { refreshSettings() }
         }.start()
     }
 }
