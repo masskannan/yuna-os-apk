@@ -1,8 +1,8 @@
 -keep class com.puyal.os.** { *; }
-
-# YUNA Native JNI & FlatBuffers Keep Rules (#78)
--keepclasseswithmembers class * {
+-keepclasseswithmembernames class * {
     native <methods>;
 }
--keep class com.puyal.os.audio.** { *; }
--keep class com.puyal.os.guard.** { *; }
+-keepattributes *Annotation*,Signature,InnerClasses
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
