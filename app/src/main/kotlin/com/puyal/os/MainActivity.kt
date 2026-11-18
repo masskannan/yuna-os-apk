@@ -1,11 +1,17 @@
 package com.puyal.os
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RadialGradient
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.hardware.camera2.CameraManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -36,14 +42,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var mainCol: LinearLayout
     private lateinit var chatFeed: LinearLayout
     private lateinit var heroStage: LinearLayout
+    private lateinit var yunaOrbView: YunaOrbView
     private lateinit var drawerOverlay: FrameLayout
-    private lateinit var overflowMenu: LinearLayout
     private lateinit var settingsModal: FrameLayout
     private lateinit var plusSheet: LinearLayout
     private lateinit var inputBox: EditText
 
-    private lateinit var modePill: TextView
-    private lateinit var telemetryPill: TextView
+    private lateinit var orbStatusLabel: TextView
     private lateinit var nav3Btn: TextView
     private lateinit var nav2Btn: TextView
     private lateinit var navGestBtn: TextView
@@ -54,11 +59,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var permNotifBadge: TextView
     private lateinit var permBatteryBadge: TextView
 
-    private val modes = listOf("RUST_CORE", "EVERYDAY", "SCREEN_OP")
-    private var modeIdx = 0
     private var navMode = "3BTN"
     private var oomScoreValue = "checking"
     private var isRootGranted = false
+    private var isTorchOn = false
 
     private val permLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -70,7 +74,7 @@ class MainActivity : AppCompatActivity() {
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.TRANSPARENT
 
-        buildYunaStealthUi()
+        buildYunaOriginalUi()
         applyNavAndImeInsets()
         probeRootAndOomAsync()
     }
@@ -98,37 +102,40 @@ class MainActivity : AppCompatActivity() {
         ViewCompat.requestApplyInsets(mainCol)
     }
 
-    private fun buildYunaStealthUi() {
+    private fun buildYunaOriginalUi() {
         val d = resources.displayMetrics.density
         rootFrame = FrameLayout(this).apply {
-            setBackgroundColor(Color.parseColor("#06080A"))
+            setBackgroundColor(Color.parseColor("#05070C"))
         }
 
         mainCol = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#06080A"))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TR_BL,
+                intArrayOf(
+                    Color.parseColor("#0C1E2E"),
+                    Color.parseColor("#080B18"),
+                    Color.parseColor("#05070C")
+                )
+            )
         }
 
-        // 1. Stealth Top Bar (56dp): [☰]   [YUNA] [RUST_CORE ▾]   [⋮]
+        // 1. Minimal Top Bar: [☰]   YUNA [20MB • LOCAL]   [⚙️]
         val topBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                (56 * d).toInt()
-            )
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (56 * d).toInt())
             setPadding((14 * d).toInt(), 0, (14 * d).toInt(), 0)
         }
 
         val menuBtn = TextView(this).apply {
             text = "☰"
-            textSize = 20f
+            textSize = 19f
+            gravity = Gravity.CENTER
             setTextColor(Color.parseColor("#CBD5E1"))
-            setPadding((8 * d).toInt(), (8 * d).toInt(), (12 * d).toInt(), (8 * d).toInt())
-            setOnClickListener {
-                overflowMenu.visibility = View.GONE
-                drawerOverlay.visibility = View.VISIBLE
-            }
+            background = glassPill("#101726", "#26354D", 12 * d)
+            layoutParams = LinearLayout.LayoutParams((38 * d).toInt(), (38 * d).toInt())
+            setOnClickListener { drawerOverlay.visibility = View.VISIBLE }
         }
 
         val centerWrap = LinearLayout(this).apply {
@@ -136,136 +143,125 @@ class MainActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
-        val brandTxt = TextView(this).apply {
+        centerWrap.addView(TextView(this).apply {
             text = "YUNA"
             textSize = 19f
-            letterSpacing = 0.14f
+            letterSpacing = 0.16f
             setTypeface(Typeface.SANS_SERIF, Typeface.BOLD)
             setTextColor(Color.parseColor("#F8FAFC"))
             setPadding(0, 0, (10 * d).toInt(), 0)
-        }
-        modePill = TextView(this).apply {
-            text = "● ${modes[modeIdx]} ▾"
+        })
+        centerWrap.addView(TextView(this).apply {
+            text = "20MB • LOCAL"
             textSize = 10f
             typeface = Typeface.MONOSPACE
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#00E5FF"))
-            setPadding((10 * d).toInt(), (5 * d).toInt(), (10 * d).toInt(), (5 * d).toInt())
-            background = glassDrawable("#0D1217", "#2A3844", 99 * d)
-            setOnClickListener {
-                modeIdx = (modeIdx + 1) % modes.size
-                text = "● ${modes[modeIdx]} ▾"
-                toastInfo("Mode: ${modes[modeIdx]}")
-            }
-        }
-        centerWrap.addView(brandTxt)
-        centerWrap.addView(modePill)
+            setTextColor(Color.parseColor("#94A3B8"))
+            setPadding((10 * d).toInt(), (4 * d).toInt(), (10 * d).toInt(), (4 * d).toInt())
+            background = glassPill("#0D1320", "#26354D", 99 * d)
+        })
 
-        val overflowBtn = TextView(this).apply {
-            text = "⋮"
-            textSize = 21f
-            setTextColor(Color.parseColor("#CBD5E1"))
-            setPadding((12 * d).toInt(), (8 * d).toInt(), (8 * d).toInt(), (8 * d).toInt())
-            setOnClickListener {
-                overflowMenu.visibility = if (overflowMenu.visibility == View.VISIBLE) View.GONE else View.VISIBLE
-            }
+        val settingsBtn = TextView(this).apply {
+            text = "⚙️"
+            textSize = 18f
+            gravity = Gravity.CENTER
+            background = glassPill("#101726", "#26354D", 12 * d)
+            layoutParams = LinearLayout.LayoutParams((38 * d).toInt(), (38 * d).toInt())
+            setOnClickListener { openSettingsModal() }
         }
 
         topBar.addView(menuBtn)
         topBar.addView(centerWrap)
-        topBar.addView(overflowBtn)
+        topBar.addView(settingsBtn)
         mainCol.addView(topBar)
 
-        // 2. Center Scroll Stage (Volumetric Storm Mist Hero + 2x2 Specular Bento Grid)
+        // 2. Center Scroll Stage (0-FPS Kinetic Orb + Asymmetric Tool Layout)
         val scroll = ScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
             isFillViewport = true
         }
         val stage = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding((18 * d).toInt(), (10 * d).toInt(), (18 * d).toInt(), (10 * d).toInt())
+            setPadding((18 * d).toInt(), (8 * d).toInt(), (18 * d).toInt(), (10 * d).toInt())
         }
 
         heroStage = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, (24 * d).toInt(), 0, (16 * d).toInt())
+            setPadding(0, (10 * d).toInt(), 0, (10 * d).toInt())
         }
 
-        // Volumetric subtle glow behind greeting
-        val heroGlow = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding((16 * d).toInt(), (24 * d).toInt(), (16 * d).toInt(), (20 * d).toInt())
-            background = GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(
-                    Color.argb(42, 0, 229, 255),
-                    Color.argb(14, 203, 213, 225),
-                    Color.TRANSPARENT
-                )
-            ).apply { cornerRadius = 28 * d }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
+        // Center YUNA Orb (0-FPS Static in Idle to save 100% battery!)
+        yunaOrbView = YunaOrbView(this).apply {
+            layoutParams = LinearLayout.LayoutParams((164 * d).toInt(), (164 * d).toInt())
+            setOnClickListener {
+                if (PuyalCoreService.currentStateName == "LISTENING") {
+                    triggerServiceState("IDLE")
+                } else {
+                    triggerServiceState("LISTENING")
+                }
+            }
         }
+        heroStage.addView(yunaOrbView)
 
-        heroGlow.addView(TextView(this).apply {
+        heroStage.addView(TextView(this).apply {
             text = "Vanakkam Boss"
-            textSize = 27f
+            textSize = 24f
             gravity = Gravity.CENTER
             setTypeface(Typeface.SANS_SERIF, Typeface.BOLD)
-            setTextColor(Color.parseColor("#E2F8FE"))
+            setTextColor(Color.parseColor("#F8FAFC"))
+            setPadding(0, (6 * d).toInt(), 0, (4 * d).toInt())
         })
 
-        telemetryPill = TextView(this).apply {
-            text = "ARM64 • OOM -1000 • 0-FPS"
+        orbStatusLabel = TextView(this).apply {
+            text = "OOM -1000 • 0-FPS IDLE (TAP ORB FOR MIC)"
             textSize = 10f
             typeface = Typeface.MONOSPACE
             gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#38BDF8"))
+            setPadding(0, 0, 0, (16 * d).toInt())
+        }
+        heroStage.addView(orbStatusLabel)
+
+        // Asymmetric Hero Action Card: Screen Vision & Scan
+        val visionCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((18 * d).toInt(), (18 * d).toInt(), (18 * d).toInt(), (18 * d).toInt())
+            background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(Color.parseColor("#102235"), Color.parseColor("#13172B"))
+            ).apply {
+                cornerRadius = 20 * d
+                setStroke((1 * d).toInt(), Color.parseColor("#2E4A68"))
+            }
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            setOnClickListener { submitPrompt("Screen Vision & Scan") }
+        }
+        visionCard.addView(TextView(this).apply {
+            text = "⛶  Screen Vision & Scan"
+            textSize = 16f
+            setTypeface(Typeface.SANS_SERIF, Typeface.BOLD)
+            setTextColor(Color.parseColor("#F8FAFC"))
+        })
+        visionCard.addView(TextView(this).apply {
+            text = "Read active app DOM, OCR & extract actions locally"
+            textSize = 12f
             setTextColor(Color.parseColor("#94A3B8"))
-            setPadding((12 * d).toInt(), (5 * d).toInt(), (12 * d).toInt(), (5 * d).toInt())
-            background = glassDrawable("#0C1116", "#22303C", 99 * d)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = (10 * d).toInt() }
-        }
-        heroGlow.addView(telemetryPill)
-        heroStage.addView(heroGlow)
+            setPadding(0, (4 * d).toInt(), 0, 0)
+        })
+        heroStage.addView(visionCard)
 
-        // 2x2 Specular Bento Grid
-        val bentoRow1 = LinearLayout(this).apply {
+        // 3-Pill Quick Rail: [WA Intel] [Root Shield] [Tools]
+        val rail = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = (14 * d).toInt() }
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = (12 * d).toInt()
+            }
         }
-        bentoRow1.addView(makeBentoCard("⛶", "Scan Screen", 0) {
-            submitPrompt("Screen-la enna irukku?")
-        })
-        bentoRow1.addView(makeBentoCard("💬", "WA Intel", (12 * d).toInt()) {
-            submitPrompt("WhatsApp VIP check pannu")
-        })
+        rail.addView(makeRailPill("WA Intel", 0) { submitPrompt("WhatsApp VIP Intel check") })
+        rail.addView(makeRailPill("Root Shield", (8 * d).toInt()) { openSettingsModal() })
+        rail.addView(makeRailPill("Torch", (8 * d).toInt()) { toggleTorchLocal() })
+        heroStage.addView(rail)
 
-        val bentoRow2 = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = (12 * d).toInt() }
-        }
-        bentoRow2.addView(makeBentoCard("🛡️", "Kernel Shield", 0) {
-            openSettingsModal()
-        })
-        bentoRow2.addView(makeBentoCard("🎛️", "Quick Tools", (12 * d).toInt()) {
-            submitPrompt("Torch light ON pannu")
-        })
-
-        heroStage.addView(bentoRow1)
-        heroStage.addView(bentoRow2)
         stage.addView(heroStage)
 
         chatFeed = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -282,20 +278,17 @@ class MainActivity : AppCompatActivity() {
         plusSheet.addView(makeInputTool("📷 Camera") { toastInfo("Camera Vision ready in Level 5") })
         plusSheet.addView(makeInputTool("🖼️ Photo") { toastInfo("Photo picker ready in Level 5") })
         plusSheet.addView(makeInputTool("📁 File") { toastInfo("File attach ready in Level 2") })
-        plusSheet.addView(makeInputTool("👁️ Scan") { submitPrompt("Screen-la enna irukku?") })
+        plusSheet.addView(makeInputTool("👁️ Scan") { submitPrompt("Screen Vision & Scan") })
         mainCol.addView(plusSheet)
 
-        // 4. Smoked-Glass 28dp Floating Input Capsule (Cleanly above 3-Button Nav Bar)
+        // 4. Thumb-Arc Command Dock (28dp radius, cleanly above 3-Button / 2-Button / Gesture Nav Bar)
         val inputPill = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             minimumHeight = (58 * d).toInt()
             setPadding((10 * d).toInt(), (6 * d).toInt(), (8 * d).toInt(), (6 * d).toInt())
-            background = glassDrawable("#0E1419", "#243442", 28 * d)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
+            background = glassPill("#0E1422", "#283B54", 28 * d)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                 leftMargin = (14 * d).toInt()
                 rightMargin = (14 * d).toInt()
                 topMargin = (6 * d).toInt()
@@ -314,7 +307,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         inputBox = EditText(this).apply {
-            hint = "Yuna kitta kelunga..."
+            hint = "Yuna kitta sollunga..."
             setHintTextColor(Color.parseColor("#64748B"))
             setTextColor(Color.parseColor("#F8FAFC"))
             textSize = 15f
@@ -331,15 +324,18 @@ class MainActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams((38 * d).toInt(), (38 * d).toInt())
             setOnClickListener {
                 triggerServiceState("LISTENING")
-                appendMessage("yuna", "Yuna Listening ON — 3D 🌪️ helical spin active.")
+                appendMessage("yuna", "Yuna Listening ON — Level 3 Sherpa-ONNX Tamil STT hook.")
             }
         }
 
-        val vortexSendBtn = TextView(this).apply {
+        val orbSendBtn = TextView(this).apply {
             text = "🌪️"
             textSize = 19f
             gravity = Gravity.CENTER
-            background = glassDrawable("#0A2C38", "#00E5FF", 99 * d)
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.parseColor("#0EA5E9"), Color.parseColor("#6366F1"))
+            ).apply { shape = GradientDrawable.OVAL }
             layoutParams = LinearLayout.LayoutParams((42 * d).toInt(), (42 * d).toInt()).apply {
                 leftMargin = (6 * d).toInt()
             }
@@ -357,22 +353,17 @@ class MainActivity : AppCompatActivity() {
         inputPill.addView(plusBtn)
         inputPill.addView(inputBox)
         inputPill.addView(micBtn)
-        inputPill.addView(vortexSendBtn)
+        inputPill.addView(orbSendBtn)
         mainCol.addView(inputPill)
 
         rootFrame.addView(mainCol)
 
-        // 5. Slide-Out Left Drawer (New Chat, Files, Skills, Schedules, Customize, ALL CHATS)
+        // 5. Left Slide Drawer (New Chat, Files, Skills, Schedules, Customize, ALL CHATS)
         drawerOverlay = buildLeftDrawer(d)
         drawerOverlay.visibility = View.GONE
         rootFrame.addView(drawerOverlay)
 
-        // 6. Top-Right Overflow Menu (⋮)
-        overflowMenu = buildOverflowMenu(d)
-        overflowMenu.visibility = View.GONE
-        rootFrame.addView(overflowMenu)
-
-        // 7. Settings Modal (3-Btn / 2-Btn / Gesture + Immortal Core + Perms + Local Ports)
+        // 6. Settings Modal (3-Btn / 2-Btn / Gesture + Immortal Core + Perms + Local Consoles)
         settingsModal = buildSettingsModal(d)
         settingsModal.visibility = View.GONE
         rootFrame.addView(settingsModal)
@@ -382,23 +373,23 @@ class MainActivity : AppCompatActivity() {
 
     private fun buildLeftDrawer(d: Float): FrameLayout {
         val scrim = FrameLayout(this).apply {
-            setBackgroundColor(Color.argb(175, 0, 0, 0))
+            setBackgroundColor(Color.argb(180, 0, 0, 0))
             setOnClickListener { visibility = View.GONE }
         }
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#0B0F14"))
+            setBackgroundColor(Color.parseColor("#080B14"))
             setPadding((18 * d).toInt(), (46 * d).toInt(), (18 * d).toInt(), (24 * d).toInt())
-            layoutParams = FrameLayout.LayoutParams((280 * d).toInt(), FrameLayout.LayoutParams.MATCH_PARENT, Gravity.START)
+            layoutParams = FrameLayout.LayoutParams((275 * d).toInt(), FrameLayout.LayoutParams.MATCH_PARENT, Gravity.START)
             setOnClickListener { }
         }
 
         panel.addView(TextView(this).apply {
-            text = "🌪️ YUNA"
-            textSize = 18f
-            letterSpacing = 0.12f
+            text = "YUNA • LOCAL OS"
+            textSize = 17f
+            letterSpacing = 0.14f
             setTypeface(Typeface.SANS_SERIF, Typeface.BOLD)
-            setTextColor(Color.parseColor("#00E5FF"))
+            setTextColor(Color.parseColor("#38BDF8"))
             setPadding(0, 0, 0, (16 * d).toInt())
         })
 
@@ -408,9 +399,9 @@ class MainActivity : AppCompatActivity() {
             scrim.visibility = View.GONE
         })
         panel.addView(makeDrawerItem("📁  Files & Vault") { openUrl("http://127.0.0.1:7778"); scrim.visibility = View.GONE })
-        panel.addView(makeDrawerItem("⚡  Skills (Wasm/Rust)") { toastInfo("Wasm Skills unlock in Level 2 & 4"); scrim.visibility = View.GONE })
-        panel.addView(makeDrawerItem("🕒  Schedules") { toastInfo("Autonomous Loop unlocks in Level 6"); scrim.visibility = View.GONE })
-        panel.addView(makeDrawerItem("⚙️  Customize & Settings") { scrim.visibility = View.GONE; openSettingsModal() })
+        panel.addView(makeDrawerItem("⚡  Wasm Skills") { toastInfo("Level 2 & 4 Wasm Brain"); scrim.visibility = View.GONE })
+        panel.addView(makeDrawerItem("🕒  Schedules") { toastInfo("Level 6 Autonomous Loop"); scrim.visibility = View.GONE })
+        panel.addView(makeDrawerItem("⚙️  Settings") { scrim.visibility = View.GONE; openSettingsModal() })
 
         panel.addView(TextView(this).apply {
             text = "ALL CHATS"
@@ -419,41 +410,12 @@ class MainActivity : AppCompatActivity() {
             setTextColor(Color.parseColor("#64748B"))
             setPadding(0, (18 * d).toInt(), 0, (8 * d).toInt())
         })
-
         panel.addView(makeStatusRow("●", "#00FF88", "READY", "OOM -1000 Immortal Core"))
-        panel.addView(makeStatusRow("▲", "#F59E0B", "NEEDS ACTION", "Level 1 Smoke Verification"))
-        panel.addView(makeStatusRow("◌", "#00E5FF", "PROCESSING", "0-FPS Screen-Off Guard"))
+        panel.addView(makeStatusRow("▲", "#F59E0B", "NEEDS ACTION", "Level 1 Phone Test"))
+        panel.addView(makeStatusRow("◌", "#38BDF8", "PROCESSING", "0-FPS Idle Guard"))
 
         scrim.addView(panel)
         return scrim
-    }
-
-    private fun buildOverflowMenu(d: Float): LinearLayout {
-        val menu = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding((10 * d).toInt(), (8 * d).toInt(), (10 * d).toInt(), (8 * d).toInt())
-            background = glassDrawable("#0E1419", "#2A3844", 14 * d)
-            layoutParams = FrameLayout.LayoutParams((185 * d).toInt(), FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.END).apply {
-                topMargin = (84 * d).toInt()
-                rightMargin = (14 * d).toInt()
-            }
-        }
-        val items = listOf(
-            "📌 Pin Chat" to { toastInfo("Pinned to Yuna Vault") },
-            "✏️ Rename" to { toastInfo("Rename ready in Level 2") },
-            "🗑️ Clear Chat" to { chatFeed.removeAllViews(); heroStage.visibility = View.VISIBLE },
-            "⚙️ Settings" to { openSettingsModal() }
-        )
-        items.forEach { (lbl, act) ->
-            menu.addView(TextView(this).apply {
-                text = lbl
-                textSize = 13f
-                setTextColor(Color.parseColor("#E2E8F0"))
-                setPadding((10 * d).toInt(), (10 * d).toInt(), (10 * d).toInt(), (10 * d).toInt())
-                setOnClickListener { menu.visibility = View.GONE; act() }
-            })
-        }
-        return menu
     }
 
     private fun buildSettingsModal(d: Float): FrameLayout {
@@ -464,7 +426,7 @@ class MainActivity : AppCompatActivity() {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding((18 * d).toInt(), (16 * d).toInt(), (18 * d).toInt(), (18 * d).toInt())
-            background = glassDrawable("#0D1217", "#2A3844", 20 * d)
+            background = glassPill("#0B101B", "#283B54", 20 * d)
             setOnClickListener { }
         }
 
@@ -474,7 +436,7 @@ class MainActivity : AppCompatActivity() {
             textSize = 14f
             typeface = Typeface.MONOSPACE
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#00E5FF"))
+            setTextColor(Color.parseColor("#38BDF8"))
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         })
         hdr.addView(TextView(this).apply {
@@ -542,9 +504,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        card.addView(settingsLabel("Termux Local Consoles"))
+        card.addView(settingsLabel("Local Consoles"))
         val portRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        portRow.addView(makeNavChip(":7777 Terminal", 0) { openUrl("http://127.0.0.1:7777") })
+        portRow.addView(makeNavChip(":7777 Web UI", 0) { openUrl("http://127.0.0.1:7777") })
         portRow.addView(makeNavChip(":7778 App Store", (6 * d).toInt()) { openUrl("http://127.0.0.1:7778") })
         card.addView(portRow)
 
@@ -565,29 +527,18 @@ class MainActivity : AppCompatActivity() {
         settingsModal.visibility = View.VISIBLE
     }
 
-    private fun makeBentoCard(icon: String, label: String, leftMarginPx: Int, onClick: () -> Unit): LinearLayout {
+    private fun makeRailPill(label: String, leftMarginPx: Int, onClick: () -> Unit): TextView {
         val d = resources.displayMetrics.density
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        return TextView(this).apply {
+            text = label
+            textSize = 12f
             gravity = Gravity.CENTER
-            setPadding((14 * d).toInt(), (20 * d).toInt(), (14 * d).toInt(), (20 * d).toInt())
-            background = glassDrawable("#0D1217", "#23303C", 16 * d)
+            setTextColor(Color.parseColor("#E2E8F0"))
+            setPadding((10 * d).toInt(), (11 * d).toInt(), (10 * d).toInt(), (11 * d).toInt())
+            background = glassPill("#0E1422", "#26354D", 99 * d)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                 leftMargin = leftMarginPx
             }
-            addView(TextView(this@MainActivity).apply {
-                text = icon
-                textSize = 22f
-                gravity = Gravity.CENTER
-                setTextColor(Color.parseColor("#CBD5E1"))
-            })
-            addView(TextView(this@MainActivity).apply {
-                text = label
-                textSize = 13f
-                gravity = Gravity.CENTER
-                setTextColor(Color.parseColor("#E2E8F0"))
-                setPadding(0, (8 * d).toInt(), 0, 0)
-            })
             setOnClickListener { onClick() }
         }
     }
@@ -648,7 +599,7 @@ class MainActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor("#E2E8F0"))
             setPadding((8 * d).toInt(), (9 * d).toInt(), (8 * d).toInt(), (9 * d).toInt())
-            background = glassDrawable("#121920", "#2A3844", 10 * d)
+            background = glassPill("#111726", "#26354D", 10 * d)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                 leftMargin = leftMarginPx
             }
@@ -688,7 +639,7 @@ class MainActivity : AppCompatActivity() {
             textSize = 11f
             setTextColor(Color.parseColor("#CBD5E1"))
             setPadding((11 * d).toInt(), (7 * d).toInt(), (11 * d).toInt(), (7 * d).toInt())
-            background = glassDrawable("#0E1419", "#2A3844", 99 * d)
+            background = glassPill("#0E1422", "#283B54", 99 * d)
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                 rightMargin = (8 * d).toInt()
             }
@@ -696,11 +647,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun toggleTorchLocal() {
+        try {
+            val cm = getSystemService(CAMERA_SERVICE) as CameraManager
+            val id = cm.cameraIdList.firstOrNull() ?: return
+            isTorchOn = !isTorchOn
+            cm.setTorchMode(id, isTorchOn)
+            toastInfo(if (isTorchOn) "Torch ON" else "Torch OFF")
+        } catch (e: Exception) {
+            toastInfo("Torch error: ${e.message}")
+        }
+    }
+
     private fun submitPrompt(q: String) {
         plusSheet.visibility = View.GONE
         appendMessage("user", q)
         triggerServiceState("ACTION_BURST")
-        appendMessage("yuna", "Queued on ${modes[modeIdx]}: \"$q\" (Rust/Wasm Brain connects in Level 2 & 4).")
+        appendMessage("yuna", "Queued locally: \"$q\" (Rust/Wasm Brain links in Level 2 & 4).")
     }
 
     private fun appendMessage(role: String, text: String) {
@@ -712,9 +675,9 @@ class MainActivity : AppCompatActivity() {
             setTextColor(Color.parseColor("#F1F5F9"))
             setPadding((14 * d).toInt(), (11 * d).toInt(), (14 * d).toInt(), (11 * d).toInt())
             background = if (role == "user") {
-                glassDrawable("#16202A", "#2A3844", 18 * d)
+                glassPill("#162336", "#2D4666", 18 * d)
             } else {
-                glassDrawable("#0D1217", "#1F2B35", 18 * d)
+                glassPill("#0D1320", "#223044", 18 * d)
             }
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                 gravity = if (role == "user") Gravity.END else Gravity.START
@@ -732,9 +695,11 @@ class MainActivity : AppCompatActivity() {
             action = PuyalCoreService.ACTION_SET_STATE
             putExtra(PuyalCoreService.EXTRA_STATE, stateName)
         })
+        yunaOrbView.setActive(stateName != "IDLE", stateName)
+        orbStatusLabel.postDelayed({ refreshSettings() }, 180)
     }
 
-    private fun glassDrawable(bgHex: String, strokeHex: String, radiusPx: Float): GradientDrawable {
+    private fun glassPill(bgHex: String, strokeHex: String, radiusPx: Float): GradientDrawable {
         val d = resources.displayMetrics.density
         return GradientDrawable().apply {
             cornerRadius = radiusPx
@@ -753,13 +718,13 @@ class MainActivity : AppCompatActivity() {
         val d = resources.displayMetrics.density
         badge.text = if (ok) "READY" else "GRANT"
         badge.setTextColor(Color.parseColor(if (ok) "#00FF88" else "#F59E0B"))
-        badge.background = glassDrawable(if (ok) "#071E14" else "#1F1607", if (ok) "#00FF88" else "#F59E0B", 99 * d)
+        badge.background = glassPill(if (ok) "#071E14" else "#1F1607", if (ok) "#00FF88" else "#F59E0B", 99 * d)
     }
 
     private fun styleNavChip(chip: TextView, active: Boolean) {
         val d = resources.displayMetrics.density
-        chip.setTextColor(Color.parseColor(if (active) "#00E5FF" else "#94A3B8"))
-        chip.background = glassDrawable(if (active) "#071B22" else "#121920", if (active) "#00E5FF" else "#2A3844", 10 * d)
+        chip.setTextColor(Color.parseColor(if (active) "#38BDF8" else "#94A3B8"))
+        chip.background = glassPill(if (active) "#0D2436" else "#111726", if (active) "#38BDF8" else "#26354D", 10 * d)
     }
 
     private fun refreshSettings() {
@@ -784,12 +749,13 @@ class MainActivity : AppCompatActivity() {
         val d = resources.displayMetrics.density
         svcToggleBtn.text = if (svcOk) "🟢 YUNA FLOATING 🌪️ ACTIVE (STOP)" else "🚀 START YUNA FLOATING 🌪️ BUBBLE"
         svcToggleBtn.setTextColor(Color.parseColor(if (svcOk) "#00FF88" else "#04110A"))
-        svcToggleBtn.background = glassDrawable(if (svcOk) "#071E14" else "#00FF88", "#00FF88", 12 * d)
+        svcToggleBtn.background = glassPill(if (svcOk) "#071E14" else "#00FF88", "#00FF88", 12 * d)
 
         val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"
-        val fpsLabel = if (svcOk) "0-FPS" else "STANDBY"
-        telemetryPill.text = "ARM64 • OOM $oomScoreValue • $fpsLabel"
-        settingsTeleText.text = "PID ${Process.myPid()} ($abi) • SU: ${if (isRootGranted) "OK" else "NO"} • State: ${PuyalCoreService.currentStateName}"
+        val st = PuyalCoreService.currentStateName
+        yunaOrbView.setActive(st != "IDLE", st)
+        orbStatusLabel.text = "OOM $oomScoreValue • ${if (st == "IDLE") "0-FPS IDLE (TAP ORB)" else st}"
+        settingsTeleText.text = "PID ${Process.myPid()} ($abi) • SU: ${if (isRootGranted) "OK" else "NO"} • State: $st"
     }
 
     private fun probeRootAndOomAsync() {
@@ -807,5 +773,60 @@ class MainActivity : AppCompatActivity() {
             oomScoreValue = oom
             runOnUiThread { refreshSettings() }
         }.start()
+    }
+
+    // Lightweight 0-FPS Idle-Safe Kinetic Orb View (draws static in IDLE, zero continuous CPU/GPU drain!)
+    private class YunaOrbView(context: Context) : View(context) {
+        private val orbPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+        }
+        private var stateName = "IDLE"
+
+        fun setActive(active: Boolean, mode: String) {
+            stateName = if (active) mode else "IDLE"
+            invalidate()
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val cx = width / 2f
+            val cy = height / 2f
+            val r = minOf(width, height) * 0.31f
+            val d = resources.displayMetrics.density
+
+            val coreColor = when (stateName) {
+                "LISTENING" -> Color.parseColor("#00E5FF")
+                "ACTION_BURST" -> Color.parseColor("#00FF88")
+                "PROCESSING" -> Color.parseColor("#F59E0B")
+                else -> Color.parseColor("#38BDF8")
+            }
+
+            // Concentric orbital telemetry arcs
+            ringPaint.strokeWidth = 1.1f * d
+            ringPaint.color = coreColor
+            ringPaint.alpha = if (stateName == "IDLE") 65 else 155
+            canvas.drawCircle(cx, cy, r * 1.38f, ringPaint)
+            ringPaint.alpha = if (stateName == "IDLE") 40 else 110
+            canvas.drawCircle(cx, cy, r * 1.62f, ringPaint)
+
+            // Liquid-Glass Sphere Gradient
+            orbPaint.shader = RadialGradient(
+                cx - r * 0.25f, cy - r * 0.25f, r * 1.2f,
+                intArrayOf(
+                    coreColor,
+                    Color.parseColor("#6366F1"),
+                    Color.parseColor("#0B1020")
+                ),
+                floatArrayOf(0f, 0.55f, 1f),
+                Shader.TileMode.CLAMP
+            )
+            canvas.drawCircle(cx, cy, r, orbPaint)
+
+            // Crisp rim highlight
+            ringPaint.strokeWidth = 1.6f * d
+            ringPaint.alpha = if (stateName == "IDLE") 140 else 230
+            canvas.drawCircle(cx, cy, r, ringPaint)
+        }
     }
 }
