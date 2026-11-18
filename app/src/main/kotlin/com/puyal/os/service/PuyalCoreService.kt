@@ -15,6 +15,7 @@ import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.hardware.camera2.CameraManager
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -256,8 +257,8 @@ class PuyalCoreService : Service() {
             setTextColor(Color.WHITE)
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#0E243D"))
-                setStroke((2 * density).toInt(), Color.parseColor("#10B981"))
+                setColor(Color.parseColor("#050807"))
+                setStroke((2 * density).toInt(), Color.parseColor("#00FF88"))
             }
             elevation = 8 * density
         }
@@ -380,12 +381,13 @@ class PuyalCoreService : Service() {
             setPadding(pad, pad, pad, pad)
             background = GradientDrawable().apply {
                 cornerRadius = 16 * density
-                setColor(Color.parseColor("#EE0E243D"))
-                setStroke((1 * density).toInt(), Color.parseColor("#334155"))
+                setColor(Color.parseColor("#EE050807"))
+                setStroke((1 * density).toInt(), Color.parseColor("#00FF88"))
             }
         }
 
         val items = listOf(
+            "🌐 Open Hacker UI (:7777)" to { openHackerUi() },
             "🎙️ Toggle Voice Mode" to { toggleVoiceMode() },
             "🔦 Toggle Torch" to { toggleTorch() },
             "⚙️ Open Puyal Dashboard" to {
@@ -464,6 +466,17 @@ class PuyalCoreService : Service() {
             } catch (_: Exception) {
             }
             menuView = null
+        }
+    }
+
+    private fun openHackerUi() {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("http://127.0.0.1:7777")).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Browser error: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 

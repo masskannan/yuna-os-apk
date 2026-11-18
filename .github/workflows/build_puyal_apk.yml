@@ -18,9 +18,18 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-      - name: Build Debug APK
-        run: gradle assembleDebug --no-daemon
+      - name: Build Debug & R8-Shrunk Release APK
+        run: |
+          gradle assembleDebug assembleRelease --no-daemon
+          APKSIGNER=$(find "${ANDROID_HOME}/build-tools" -name "apksigner" | sort -V | tail -n 1)
+          keytool -genkeypair -v -keystore /tmp/puyal-test.jks -storepass puyal123 -keypass puyal123 -alias puyal -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=PuyalOS,O=Sovereign,C=IN"
+          "$APKSIGNER" sign --ks /tmp/puyal-test.jks --ks-pass pass:puyal123 --key-pass pass:puyal123 --out app/build/outputs/apk/release/app-release-signed.apk app/build/outputs/apk/release/app-release-unsigned.apk
+          ls -lh app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/release/app-release-signed.apk
       - uses: actions/upload-artifact@v4
         with:
           name: puyal-level1-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: puyal-level1-release-signed-apk
+          path: app/build/outputs/apk/release/app-release-signed.apk
