@@ -11,7 +11,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.hardware.camera2.CameraManager
@@ -51,7 +54,7 @@ class PuyalCoreService : Service() {
     }
 
     private lateinit var windowManager: WindowManager
-    private var bubbleView: TextView? = null
+    private var bubbleView: PuyalVortexView? = null
     private var menuView: LinearLayout? = null
     private lateinit var bubbleParams: WindowManager.LayoutParams
     private lateinit var menuParams: WindowManager.LayoutParams
@@ -75,7 +78,7 @@ class PuyalCoreService : Service() {
                 val scale = 1.0f + 0.08f * kotlin.math.sin(pulsePhase)
                 bubbleView?.scaleX = scale
                 bubbleView?.scaleY = scale
-                bubbleView?.rotation = ((bubbleView?.rotation ?: 0f) + 2.5f) % 360f
+                bubbleView?.rotation = ((bubbleView?.rotation ?: 0f) - 2.8f) % 360f
                 choreographer.postFrameCallback(this)
             } else {
                 bubbleView?.scaleX = 1.0f
@@ -252,11 +255,7 @@ class PuyalCoreService : Service() {
         val density = resources.displayMetrics.density
         val sizePx = (52 * density).toInt()
 
-        val bubble = TextView(this).apply {
-            text = "🌪️"
-            textSize = 22f
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
+        val bubble = PuyalVortexView(this).apply {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(Color.parseColor("#050807"))
@@ -353,6 +352,7 @@ class PuyalCoreService : Service() {
     private fun toggleVoiceMode() {
         isVoiceActive = !isVoiceActive
         val density = resources.displayMetrics.density
+        bubbleView?.setVortexColor(Color.parseColor(if (isVoiceActive) "#00E5FF" else "#00FF88"))
         bubbleView?.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.parseColor(if (isVoiceActive) "#065F46" else "#0E243D"))
@@ -522,6 +522,59 @@ class PuyalCoreService : Service() {
             } catch (_: Exception) {
             }
             bubbleView = null
+        }
+    }
+
+    private class PuyalVortexView(context: Context) : View(context) {
+        private var vortexColor = Color.parseColor("#00FF88")
+        private val outerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+        }
+        private val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            alpha = 190
+        }
+        private val eyePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+        }
+        private val arcRect = RectF()
+
+        fun setVortexColor(color: Int) {
+            vortexColor = color
+            invalidate()
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val w = width.toFloat()
+            val h = height.toFloat()
+            val cx = w / 2f
+            val cy = h / 2f
+            val minDim = minOf(w, h)
+            val density = resources.displayMetrics.density
+
+            outerPaint.color = vortexColor
+            outerPaint.strokeWidth = 2.4f * density
+            innerPaint.color = vortexColor
+            innerPaint.alpha = 185
+            innerPaint.strokeWidth = 1.7f * density
+            eyePaint.color = vortexColor
+
+            val rOuter = minDim * 0.34f
+            arcRect.set(cx - rOuter, cy - rOuter, cx + rOuter, cy + rOuter)
+            for (i in 0 until 3) {
+                canvas.drawArc(arcRect, i * 120f - 15f, 78f, false, outerPaint)
+            }
+
+            val rInner = minDim * 0.21f
+            arcRect.set(cx - rInner, cy - rInner, cx + rInner, cy + rInner)
+            for (i in 0 until 3) {
+                canvas.drawArc(arcRect, i * 120f + 25f, 82f, false, innerPaint)
+            }
+
+            canvas.drawCircle(cx, cy, minDim * 0.065f, eyePaint)
         }
     }
 }
