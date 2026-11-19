@@ -1,37 +1,69 @@
 package com.puyal.os.service
 
 import android.app.Notification
+import android.app.RemoteInput
+import android.content.Intent
+import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import com.puyal.os.nativebridge.YunaNative
-import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ConcurrentHashMap
 
 class PuyalNotifService : NotificationListenerService() {
     companion object {
-        private val waQueue = CopyOnWriteArrayList<Pair<String, String>>()
-        private val WA_PKGS = setOf("com.whatsapp", "com.whatsapp.w4b")
+        val waMessages = ConcurrentHashMap<String, String>()
+        @Volatile var lastWaReplyAction: Notification.Action? = null
+        @Volatile var lastWaSender: String = ""
 
         fun getSummary(): String {
-            if (waQueue.isEmpty()) return "WhatsApp unread notifications எதுவும் pending இல்ல பாஸ்."
-            return "Unread WhatsApp:\n" + waQueue.takeLast(5).joinToString("\n") { it.second }
+            if (waMessages.isEmpty()) return "படிக்காத வாட்ஸ்அப் செய்திகள் எதுவும் இல்லை."
+            return waMessages.entries.joinToString("\n") { "${it.key}: ${it.value}" }
+        }
+
+        fun replyToLastWa(ctx: android.content.Context, msg: String): String {
+            if (msg.isBlank()) return "அனுப்ப வேண்டிய பதில் உரையைச் சொல்லுங்கள்."
+            val action = lastWaReplyAction ?: return "பதில் அனுப்பத் தகுந்த வாட்ஸ்அப் அறிவிப்பு இல்லை."
+            val ri = action.remoteInputs?.firstOrNull() ?: return "இந்த அறிவிப்பில் நேரடிப் பதில் வசதி இல்லை."
+            return try {
+                val intent = Intent()
+                val bundle = Bundle()
+                bundle.putCharSequence(ri.resultKey, msg)
+                RemoteInput.addResultsToIntent(arrayOf(ri), intent, bundle)
+                action.actionIntent.send(ctx, 0, intent)
+                "வாட்ஸ்அப் வழியாக ${lastWaSender.ifBlank { "பயனர்" }}-க்கு பதில் அனுப்பப்பட்டது: $msg"
+            } catch (e: Exception) {
+                "வாட்ஸ்அப் பதில் அனுப்புவதில் பிழை: ${e.message}"
+            }
         }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
-        val pkg = sbn?.packageName ?: return
-        if (pkg !in WA_PKGS) return
-        val extras = sbn.notification?.extras ?: return
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim() ?: return
-        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim() ?: return
-        val safeText = if (YunaNative.hasSensitiveToken(text)) "[REDACTED OTP/PIN]" else text
-        val key = sbn.key ?: title
-        waQueue.removeAll { it.first == key }
-        if (waQueue.size >= 15) waQueue.removeAt(0)
-        waQueue.add(key to "• $title: $safeText")
+        sbn ?: return
+        val pkg = sbn.packageName ?: return
+        if (pkg == "com.whatsapp" || pkg == "com.whatsapp.w4b") {
+            val notif = sbn.notification ?: return
+            if ((notif.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return
+            val extras = notif.extras ?: return
+            val title = extras.getCharSequence("android.title")?.toString() ?: "WhatsApp"
+            val text = extras.getCharSequence("android.text")?.toString() ?: return
+            if (!text.contains("new messages", ignoreCase = true) && !title.equals("WhatsApp", ignoreCase = true)) {
+                waMessages[title] = text
+                lastWaSender = title
+            }
+            notif.actions?.firstOrNull { !it.remoteInputs.isNullOrEmpty() }?.let {
+                lastWaReplyAction = it
+            }
+        }
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
-        val key = sbn?.key ?: return
-        waQueue.removeAll { it.first == key }
+        sbn ?: return
+        if (sbn.packageName == "com.whatsapp" || sbn.packageName == "com.whatsapp.w4b") {
+            val title = sbn.notification?.extras?.getCharSequence("android.title")?.toString() ?: return
+            waMessages.remove(title)
+            if (title == lastWaSender) {
+                lastWaReplyAction = null
+                lastWaSender = ""
+            }
+        }
     }
 }

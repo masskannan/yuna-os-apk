@@ -1,216 +1,418 @@
 package com.puyal.os.bridge
 
+import android.Manifest
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.net.Uri
+import android.os.BatteryManager
 import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.provider.AlarmClock
+import android.provider.ContactsContract
 import android.provider.MediaStore
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.view.KeyEvent
 import android.webkit.JavascriptInterface
 import androidx.core.content.ContextCompat
-import com.puyal.os.cloud.YunaCloudWorker
-import com.puyal.os.guard.YunaTierGuards
-import com.puyal.os.nativebridge.YunaNative
 import com.puyal.os.service.PuyalAccessService
 import com.puyal.os.service.PuyalNotifService
+import org.json.JSONObject
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
-class YunaBridge(private val ctx: Context, private val onVoiceReq: (String) -> Unit) {
+class YunaBridge(
+    private val ctx: Context,
+    private val onVoiceReq: (String) -> Unit,
+    private val onStopVoiceReq: () -> Unit = {},
+    private val onBiometricReq: () -> Unit = {},
+    private val onTtsDone: () -> Unit = {}
+) {
     private val mainH = Handler(Looper.getMainLooper())
-    @Volatile private var torchOn = false
+    private var torchState = false
     private var tts: TextToSpeech? = null
-    @Volatile private var ttsReady = false
+    private var ttsReady = false
+    private var isTamilTts = false
+    private val audioMgr = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private var focusReq: AudioFocusRequest? = null
 
     init {
+        val cm = ctx.getSystemService(Context.CAMERA_SERVICE) as CameraManager
         try {
-            val cm = ctx.getSystemService(Context.CAMERA_SERVICE) as CameraManager
             cm.registerTorchCallback(object : CameraManager.TorchCallback() {
-                override fun onTorchModeChanged(cameraId: String, enabled: Boolean) { torchOn = enabled }
+                override fun onTorchModeChanged(cameraId: String, enabled: Boolean) { torchState = enabled }
             }, mainH)
         } catch (_: Exception) {}
         try {
             tts = TextToSpeech(ctx.applicationContext) { st ->
                 if (st == TextToSpeech.SUCCESS) {
                     val res = tts?.setLanguage(Locale("ta", "IN"))
-                    if (res == TextToSpeech.LANG_MISSING_DATA || res == TextToSpeech.LANG_NOT_SUPPORTED) {
-                        tts?.setLanguage(Locale("en", "IN"))
+                    isTamilTts = (res != TextToSpeech.LANG_MISSING_DATA && res != TextToSpeech.LANG_NOT_SUPPORTED)
+                    if (isTamilTts) {
+                        ttsReady = true
+                        try {
+                            val offlineFemale = tts?.voices?.firstOrNull {
+                                it.locale.language == "ta" && !it.isNetworkConnectionRequired &&
+                                    (it.name.contains("taf", true) || it.name.contains("female", true) || it.name.contains("local", true))
+                            }
+                            if (offlineFemale != null) tts?.voice = offlineFemale
+                        } catch (_: Exception) {}
+                    } else {
+                        val enRes = tts?.setLanguage(Locale("en", "IN"))
+                        ttsReady = (enRes != TextToSpeech.LANG_MISSING_DATA && enRes != TextToSpeech.LANG_NOT_SUPPORTED)
                     }
-                    ttsReady = true
+                    tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String?) {}
+                        override fun onDone(utteranceId: String?) {
+                            if (utteranceId == "yuna_end") {
+                                abandonDuckFocus()
+                                mainH.post { onTtsDone() }
+                            }
+                        }
+                        override fun onError(utteranceId: String?) {
+                            abandonDuckFocus()
+                            mainH.post { onTtsDone() }
+                        }
+                        override fun onStop(utteranceId: String?, interrupted: Boolean) {
+                            abandonDuckFocus()
+                            mainH.post { onTtsDone() }
+                        }
+                    })
                 }
             }
         } catch (_: Exception) {}
     }
 
-    private fun speakShort(msg: String) {
-        if (ttsReady) {
-            try { tts?.speak(msg, TextToSpeech.QUEUE_FLUSH, null, "yuna_tts") } catch (_: Exception) {}
+    private fun requestDuckFocus() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                    .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                    .build()
+                focusReq = req
+                audioMgr.requestAudioFocus(req)
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun abandonDuckFocus() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                focusReq?.let { audioMgr.abandonAudioFocusRequest(it) }
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun cleanForTts(raw: String): String {
+        var s = raw.replace(Regex("[*_`~#⚡•●▶⏸➤]"), " ")
+        if (isTamilTts) {
+            val map = listOf(
+                "YouTube" to "யூடியூப்", "Wi-Fi" to "வைஃபை", "WiFi" to "வைஃபை",
+                "WhatsApp" to "வாட்ஸ்அப்", "Bluetooth" to "புளூடூத்", "Hotspot" to "ஹாட்ஸ்பாட்",
+                "Camera" to "கேமரா", "Battery" to "பேட்டரி", "Alarm" to "அலாரம்",
+                "Timer" to "டைமர்", "Accessibility" to "அணுகல்தன்மை", "Chrome" to "குரோம்",
+                "Torch" to "டார்ச்", "Local" to "லோக்கல்", "Volume" to "வால்யூம்", "Brightness" to "பிரைட்னஸ்"
+            )
+            for ((k, v) in map) {
+                s = s.replace(k, v, ignoreCase = true)
+            }
+        }
+        return s.replace(Regex("\\s+"), " ").trim()
+    }
+
+    @JavascriptInterface
+    fun speakPersona(text: String, persona: String) {
+        if (!ttsReady || persona.equals("SILENT", true) || text.isBlank()) {
+            mainH.post { onTtsDone() }
+            return
+        }
+        val clean = cleanForTts(text)
+        if (clean.isBlank()) { mainH.post { onTtsDone() }; return }
+        mainH.post {
+            try {
+                requestDuckFocus()
+                if (persona.equals("PUYAL", true)) {
+                    tts?.setPitch(0.82f)
+                    tts?.setSpeechRate(0.95f)
+                } else {
+                    tts?.setPitch(1.08f)
+                    tts?.setSpeechRate(0.98f)
+                }
+                tts?.playSilentUtterance(120L, TextToSpeech.QUEUE_FLUSH, "yuna_warmup")
+                val chunks = clean.split(Regex("(?<=[.!?।\\n])\\s+")).filter { it.isNotBlank() }
+                val list = if (chunks.isEmpty()) listOf(clean) else chunks
+                list.forEachIndexed { idx, part ->
+                    val uid = if (idx == list.lastIndex) "yuna_end" else "yuna_$idx"
+                    tts?.speak(part, TextToSpeech.QUEUE_ADD, null, uid)
+                }
+            } catch (_: Exception) {
+                abandonDuckFocus()
+                onTtsDone()
+            }
         }
     }
 
-    private fun startOnMain(intent: Intent): Boolean {
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        mainH.post { try { ctx.startActivity(intent) } catch (_: Exception) {} }
-        return true
-    }
-
-    private fun findFlashCameraId(cm: CameraManager): String? {
-        for (id in cm.cameraIdList) {
-            val hasFlash = cm.getCameraCharacteristics(id).get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
-            if (hasFlash) return id
+    @JavascriptInterface
+    fun stopSpeaking() {
+        mainH.post {
+            try { tts?.stop() } catch (_: Exception) {}
+            abandonDuckFocus()
+            onTtsDone()
         }
-        return cm.cameraIdList.firstOrNull()
     }
 
-    @JavascriptInterface fun scanScreen(): String = PuyalAccessService.instance?.scanNow()?.ifBlank { "No readable text" } ?: "Enable YUNA Accessibility"
-    @JavascriptInterface fun getWaSummary(): String = PuyalNotifService.getSummary()
-    @JavascriptInterface fun clickOnScreen(label: String): String = PuyalAccessService.instance?.clickByText(label) ?: "Enable YUNA Accessibility"
-    @JavascriptInterface fun checkSensitive(txt: String): Boolean = YunaNative.hasSensitiveToken(txt)
     @JavascriptInterface fun startVoice(lang: String) { mainH.post { onVoiceReq(lang.ifBlank { "ta-IN" }) } }
-    @JavascriptInterface fun enqueueCloudTask(prompt: String): String { YunaCloudWorker.enqueue(ctx, prompt); return "Queued" }
-    @JavascriptInterface fun startBluetoothMic(): String = com.puyal.os.audio.PuyalAudioGuardian.enableBluetoothSco(ctx)
+    @JavascriptInterface fun stopVoice() { mainH.post { onStopVoiceReq() } }
+    @JavascriptInterface fun startBluetoothMic() {}
+    @JavascriptInterface fun scanScreen(): String = PuyalAccessService.instance?.scanScreenText() ?: "திரையைப் படிக்க அணுகல்தன்மை (Accessibility) அனுமதியை இயக்கவும்."
+    @JavascriptInterface fun clickOnScreen(target: String): String = PuyalAccessService.instance?.clickByText(target) ?: "அணுகல்தன்மை (Accessibility) அனுமதியை இயக்கவும்."
+    @JavascriptInterface fun getWaSummary(): String = PuyalNotifService.getSummary()
+    @JavascriptInterface fun replyLastWa(msg: String): String = PuyalNotifService.replyToLastWa(ctx, msg)
+    @JavascriptInterface fun verifyOwnerBiometric() { mainH.post { onBiometricReq() } }
 
     @JavascriptInterface
-    fun verifyOwnerBiometric() {
-        val act = ctx as? androidx.fragment.app.FragmentActivity ?: return
-        act.runOnUiThread {
-            val exec = ContextCompat.getMainExecutor(ctx)
-            val prompt = androidx.biometric.BiometricPrompt(act, exec, object : androidx.biometric.BiometricPrompt.AuthenticationCallback() {})
-            val info = androidx.biometric.BiometricPrompt.PromptInfo.Builder()
-                .setTitle("YUNA Voice Shield")
-                .setSubtitle("Verify Kannan identity")
-                .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK or androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL)
-                .build()
-            prompt.authenticate(info)
+    fun lookupContact(name: String): String {
+        val q = name.trim()
+        if (q.isEmpty()) return "பெயர் காலியாக உள்ளது."
+        return try {
+            val cr = ctx.contentResolver
+            val cur = cr.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.NUMBER),
+                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?",
+                arrayOf("%$q%"),
+                null
+            )
+            cur?.use {
+                if (it.moveToFirst()) {
+                    val dn = it.getString(0) ?: q
+                    val num = it.getString(1)?.replace(Regex("[^0-9+]"), "") ?: ""
+                    if (num.isNotEmpty()) return "FOUND:$dn:$num"
+                }
+            }
+            "தொடர்புகளில் '$q' என்ற பெயர் கிடைக்கவில்லை."
+        } catch (_: SecurityException) {
+            "தொடர்புகளைப் படிக்க Contacts அனுமதி தேவை."
+        } catch (e: Exception) {
+            "தொடர்பு தேடலில் பிழை: ${e.message}"
         }
     }
 
     @JavascriptInterface
-    fun saveObsidianNote(title: String, body: String): String {
+    fun requestBatteryOptimizationExemption(): String {
         return try {
-            val dir = File(ctx.filesDir, "obsidian_vault").apply { mkdirs() }
-            val safe = title.replace(Regex("[^A-Za-z0-9_\\-]"), "_").ifBlank { "YUNA_Note" }
-            File(dir, "$safe.md").writeText(body)
-            "Saved: $safe.md"
-        } catch (e: Exception) { "Save err: ${e.message}" }
-    }
-
-    @JavascriptInterface
-    fun getCrashLog(): String {
-        val f = File(ctx.filesDir, "crash_log.txt")
-        return if (f.exists()) f.readText().takeLast(1500) else "No crashes recorded"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                mainH.post {
+                    val i = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${ctx.packageName}"))
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    ctx.startActivity(i)
+                }
+            }
+            "பேட்டரி சேமிப்பு விலக்கு அமைப்பு திறக்கப்பட்டது."
+        } catch (e: Exception) { "அமைப்பைத் திறக்க முடியவில்லை: ${e.message}" }
     }
 
     @JavascriptInterface
     fun getPermissionStatus(): String {
+        val overlay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(ctx) else true
+        val writeSet = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.System.canWrite(ctx) else true
         val acc = PuyalAccessService.instance != null
-        val ovl = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(ctx) else true
-        val mic = ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        val cam = ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        val wr = Settings.System.canWrite(ctx)
-        val nls = Settings.Secure.getString(ctx.contentResolver, "enabled_notification_listeners")?.contains(ctx.packageName) == true
-        return "{\"accessibility\":$acc,\"overlay\":$ovl,\"mic\":$mic,\"camera\":$cam,\"writeSettings\":$wr,\"notifListener\":$nls}"
+        return JSONObject().apply { put("overlay", overlay); put("accessibility", acc); put("writeSettings", writeSet) }.toString()
+    }
+
+    @JavascriptInterface
+    fun getCrashLog(): String {
+        val f = File(ctx.filesDir, "yuna_crash.log")
+        return if (f.exists()) f.readText().takeLast(3000) else "பிழைப் பதிவுகள் எதுவும் இல்லை."
+    }
+
+    @JavascriptInterface
+    fun saveObsidianNote(title: String, md: String): String {
+        return try {
+            val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "Second_Brain/YUNA_Notes")
+            if (!dir.exists()) dir.mkdirs()
+            val safe = title.replace(Regex("[^a-zA-Z0-9_-]"), "_").take(50)
+            File(dir, "$safe.md").writeText(md)
+            "குறிப்பு சேமிக்கப்பட்டது: $safe.md"
+        } catch (e: Exception) { "சேமிப்புப் பிழை: ${e.message}" }
     }
 
     @JavascriptInterface
     fun executeAction(action: String, target: String): String {
-        if (YunaTierGuards.emergencyKilled) return "Blocked: Emergency Kill-Switch active"
         val acc = PuyalAccessService.instance
-        val out = when (action) {
-            "GLOBAL_BACK" -> if (acc?.runNav(AccessibilityService.GLOBAL_ACTION_BACK) == true) "Back OK" else "Enable YUNA Accessibility"
-            "GLOBAL_HOME" -> if (acc?.runNav(AccessibilityService.GLOBAL_ACTION_HOME) == true) "Home OK" else "Enable YUNA Accessibility"
-            "GLOBAL_RECENTS" -> if (acc?.runNav(AccessibilityService.GLOBAL_ACTION_RECENTS) == true) "Recents OK" else "Enable YUNA Accessibility"
-            "CLEAR_RECENTS" -> acc?.clearAllRecents() ?: "Enable YUNA Accessibility"
-            "GLOBAL_NOTIFICATIONS" -> if (acc?.runNav(AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS) == true) "Notifications Pulled" else "Enable YUNA Accessibility"
-            "GLOBAL_QUICK_SETTINGS" -> if (acc?.runNav(AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS) == true) "Quick Settings Pulled" else "Enable YUNA Accessibility"
-            "TOGGLE_WIFI" -> acc?.pullQuickSettingsAndTap(listOf("wi-fi", "wifi", "internet", "wlan")) ?: "Enable YUNA Accessibility"
-            "TOGGLE_DATA" -> acc?.pullQuickSettingsAndTap(listOf("mobile data", "internet", "data")) ?: "Enable YUNA Accessibility"
-            "TOGGLE_BT" -> acc?.pullQuickSettingsAndTap(listOf("bluetooth")) ?: "Enable YUNA Accessibility"
-            "LOCK_SCREEN" -> acc?.lockScreenNow() ?: "Enable YUNA Accessibility"
-            "SCREENSHOT" -> acc?.takeScreenshotNow() ?: "Enable YUNA Accessibility"
-            "SCROLL_DOWN" -> acc?.scrollDirection(true) ?: "Enable YUNA Accessibility"
-            "SCROLL_UP" -> acc?.scrollDirection(false) ?: "Enable YUNA Accessibility"
-            "TYPE_SEARCH" -> acc?.typeAndSearch(target) ?: "Enable YUNA Accessibility"
-            "OPEN_CAMERA" -> {
-                startOnMain(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
-                "Camera Opened"
+        return when (action.uppercase()) {
+            "TORCH", "TORCH_ON", "TORCH_OFF" -> toggleTorch(action.uppercase())
+            "OPEN_CAMERA" -> launchMain {
+                ctx.startActivity(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                "கேமரா திறக்கப்பட்டது."
             }
-            "OPEN_APP" -> {
-                val pkgs = if (target == "com.whatsapp") listOf("com.whatsapp", "com.whatsapp.w4b") else listOf(target)
-                var opened = false
-                for (p in pkgs) {
-                    if (acc?.launchAppFromService(p) == true) { opened = true; break }
-                    val i = ctx.packageManager.getLaunchIntentForPackage(p)
-                    if (i != null) { i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED); startOnMain(i); opened = true; break }
+            "CAMERA_SHUTTER" -> acc?.tapCameraShutter() ?: "கேமரா ஷட்டருக்கு அணுகல்தன்மை (Accessibility) தேவை."
+            "OPEN_APP" -> openAppPkg(target)
+            "OPEN_MAPS_NAV" -> launchMain {
+                val i = Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=" + Uri.encode(target))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                ctx.startActivity(i)
+                "$target-க்கு Google Maps வழிசெலுத்தல் திறக்கப்பட்டது."
+            }
+            "DEEP_LINK_SEARCH" -> launchMain {
+                val q = target.removePrefix("youtube:").trim()
+                val i = Intent(Intent.ACTION_SEARCH).setPackage("com.google.android.youtube")
+                    .putExtra("query", q).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                try { ctx.startActivity(i) } catch (_: Exception) {
+                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query=" + Uri.encode(q))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }
-                if (!opened && target == "com.google.android.youtube") {
-                    startOnMain(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com")))
-                    opened = true
-                }
-                if (opened) "Opened $target" else "App not found: $target"
+                "YouTube-இல் '$q' தேடப்படுகிறது."
             }
-            "DEEP_LINK_SEARCH" -> {
-                val q = target.removePrefix("youtube:")
-                val appUri = "vnd.youtube://results?search_query=" + Uri.encode(q)
-                val webUri = "https://www.youtube.com/results?search_query=" + Uri.encode(q)
-                if (acc?.launchUriFromService(appUri) == true || acc?.launchUriFromService(webUri) == true) "YouTube Search: $q"
-                else { startOnMain(Intent(Intent.ACTION_VIEW, Uri.parse(webUri))); "YouTube Search: $q" }
+            "YT_SKIP_AD" -> acc?.skipYouTubeAd() ?: "YouTube கட்டுப்பாட்டிற்கு அணுகல்தன்மை தேவை."
+            "YT_FIRST_VIDEO" -> acc?.clickFirstYouTubeVideo() ?: "YouTube கட்டுப்பாட்டிற்கு அணுகல்தன்மை தேவை."
+            "YT_FORWARD_10" -> acc?.seekYouTubeForward10() ?: "YouTube கட்டுப்பாட்டிற்கு அணுகல்தன்மை தேவை."
+            "YT_FULLSCREEN" -> acc?.toggleYouTubeFullScreen() ?: "YouTube கட்டுப்பாட்டிற்கு அணுகல்தன்மை தேவை."
+            "GLOBAL_BACK" -> if (acc?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK) == true) "பின்னால் செல்லப்பட்டது." else "அணுகல்தன்மை (Accessibility) இயக்கப்படவில்லை."
+            "GLOBAL_HOME" -> if (acc?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME) == true) "முகப்புத் திரைக்குச் செல்லப்பட்டது." else "அணுகல்தன்மை இயக்கப்படவில்லை."
+            "GLOBAL_RECENTS" -> if (acc?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_RECENTS) == true) "சமீபத்திய செயலிகள் திறக்கப்பட்டன." else "அணுகல்தன்மை இயக்கப்படவில்லை."
+            "CLEAR_RECENTS" -> acc?.clearAllRecents() ?: "அணுகல்தன்மை இயக்கப்படவில்லை."
+            "GLOBAL_NOTIFICATIONS" -> if (acc?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS) == true) "அறிவிப்புப் பட்டை திறக்கப்பட்டது." else "அணுகல்தன்மை இயக்கப்படவில்லை."
+            "GLOBAL_QUICK_SETTINGS" -> if (acc?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS) == true) "விரைவு அமைப்புகள் திறக்கப்பட்டன." else "அணுகல்தன்மை இயக்கப்படவில்லை."
+            "TOGGLE_WIFI" -> acc?.pullQuickSettingsAndTap(listOf("Wi-Fi", "Internet", "WLAN", "வைஃபை"), "Wi-Fi") ?: openSettingsPanel(Settings.Panel.ACTION_WIFI, "Wi-Fi")
+            "TOGGLE_DATA" -> acc?.pullQuickSettingsAndTap(listOf("Mobile data", "Internet", "Cellular", "Data"), "Mobile Data") ?: openSettingsPanel(Settings.Panel.ACTION_INTERNET_CONNECTIVITY, "Mobile Data")
+            "TOGGLE_BT" -> acc?.pullQuickSettingsAndTap(listOf("Bluetooth", "புளூடூத்"), "Bluetooth") ?: "அணுகல்தன்மை இயக்கப்படவில்லை."
+            "TOGGLE_HOTSPOT" -> acc?.pullQuickSettingsAndTap(listOf("Hotspot", "Mobile Hotspot", "Personal hotspot"), "Hotspot") ?: "அணுகல்தன்மை இயக்கப்படவில்லை."
+            "TOGGLE_LOCATION" -> acc?.pullQuickSettingsAndTap(listOf("Location", "GPS"), "Location") ?: "அணுகல்தன்மை இயக்கப்படவில்லை."
+            "TOGGLE_AIRPLANE" -> acc?.pullQuickSettingsAndTap(listOf("Airplane mode", "Flight mode"), "Airplane Mode") ?: "அணுகல்தன்மை இயக்கப்படவில்லை."
+            "TOGGLE_ROTATE" -> acc?.pullQuickSettingsAndTap(listOf("Auto-rotate", "Portrait", "Rotation"), "Auto-Rotate") ?: "அணுகல்தன்மை இயக்கப்படவில்லை."
+            "TOGGLE_DND" -> acc?.pullQuickSettingsAndTap(listOf("Do Not Disturb", "DND"), "Do Not Disturb") ?: "அணுகல்தன்மை இயக்கப்படவில்லை."
+            "NET_PANEL" -> openSettingsPanel(Settings.Panel.ACTION_INTERNET_CONNECTIVITY, "Internet Panel")
+            "LOCK_SCREEN" -> acc?.lockScreenNow() ?: "அணுகல்தன்மை இயக்கப்படவில்லை."
+            "SCREENSHOT" -> acc?.takeScreenshotNow() ?: "அணுகல்தன்மை இயக்கப்படவில்லை."
+            "SCROLL_DOWN" -> acc?.scrollDirection(true) ?: "அணுகல்தன்மை இயக்கப்படவில்லை."
+            "SCROLL_UP" -> acc?.scrollDirection(false) ?: "அணுகல்தன்மை இயக்கப்படவில்லை."
+            "TYPE_SEARCH" -> acc?.typeAndSearch(target) ?: "அணுகல்தன்மை இயக்கப்படவில்லை."
+            "VOLUME_UP" -> { audioMgr.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI); "ஒலி அளவு கூட்டப்பட்டது." }
+            "VOLUME_DOWN" -> { audioMgr.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI); "ஒலி அளவு குறைக்கப்பட்டது." }
+            "VOLUME_MUTE" -> { audioMgr.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, AudioManager.FLAG_SHOW_UI); "ஒலி அமைதி நிலை மாற்றப்பட்டது." }
+            "MEDIA_NEXT" -> { sendMediaKey(KeyEvent.KEYCODE_MEDIA_NEXT); "அடுத்த பாடலுக்கு மாற்றப்பட்டது." }
+            "MEDIA_PLAY_PAUSE" -> { sendMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE); "இசை Play/Pause செய்யப்பட்டது." }
+            "BRIGHTNESS_UP" -> adjustBrightness(true)
+            "BRIGHTNESS_DOWN" -> adjustBrightness(false)
+            "SET_ALARM" -> setAlarm(target)
+            "SET_TIMER" -> setTimer(target)
+            "GET_BATTERY_TIME" -> getBatteryAndTime()
+            "DIAL" -> launchMain {
+                val num = target.replace(Regex("[^0-9+*#]"), "")
+                val hasCallPerm = ContextCompat.checkSelfPermission(ctx, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED
+                val act = if (hasCallPerm) Intent.ACTION_CALL else Intent.ACTION_DIAL
+                ctx.startActivity(Intent(act, Uri.parse("tel:$num")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                if (hasCallPerm) "$num எண்ணுக்கு நேரடி அழைப்பு விடப்படுகிறது." else "$num எண்ணுக்கு அழைப்புப் பக்கம் திறக்கப்பட்டது."
             }
-            "TORCH", "TORCH_ON", "TORCH_OFF" -> {
-                try {
-                    val cm = ctx.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-                    val id = findFlashCameraId(cm) ?: return "No flash hardware"
-                    val next = when (action) { "TORCH_ON" -> true; "TORCH_OFF" -> false; else -> !torchOn }
-                    cm.setTorchMode(id, next)
-                    torchOn = next
-                    if (next) "Torch ON" else "Torch OFF"
-                } catch (e: Exception) { "Torch err: ${e.message}" }
-            }
-            "BRIGHTNESS_UP", "BRIGHTNESS_DOWN" -> {
-                if (!Settings.System.canWrite(ctx)) {
-                    startOnMain(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${ctx.packageName}")))
-                    return "Grant Write Settings permission"
-                }
-                try { Settings.System.putInt(ctx.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL) } catch (_: Exception) {}
-                val cur = Settings.System.getInt(ctx.contentResolver, Settings.System.SCREEN_BRIGHTNESS, 128)
-                val next = if (action == "BRIGHTNESS_UP") minOf(255, cur + 55) else maxOf(20, cur - 55)
-                Settings.System.putInt(ctx.contentResolver, Settings.System.SCREEN_BRIGHTNESS, next)
-                "Brightness: ${(next * 100) / 255}%"
-            }
-            "VOLUME_UP", "VOLUME_DOWN", "VOLUME_MUTE" -> {
-                val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                val dir = when (action) { "VOLUME_UP" -> AudioManager.ADJUST_RAISE; "VOLUME_DOWN" -> AudioManager.ADJUST_LOWER; else -> AudioManager.ADJUST_TOGGLE_MUTE }
-                am.adjustStreamVolume(AudioManager.STREAM_MUSIC, dir, AudioManager.FLAG_SHOW_UI)
-                "Volume updated"
-            }
-            "MEDIA_NEXT", "MEDIA_PLAY_PAUSE" -> {
-                val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                val kc = if (action == "MEDIA_NEXT") KeyEvent.KEYCODE_MEDIA_NEXT else KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
-                am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, kc))
-                am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, kc))
-                if (action == "MEDIA_NEXT") "Next track/video" else "Media Play/Pause"
-            }
-            "NET_PANEL" -> {
-                val act = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) Settings.Panel.ACTION_INTERNET_CONNECTIVITY else Settings.ACTION_WIFI_SETTINGS
-                startOnMain(Intent(act))
-                "Net Panel Opened"
-            }
-            "DIAL" -> {
-                startOnMain(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(target)}")))
-                "Dialer Opened"
-            }
-            else -> "Unknown action: $action"
+            else -> "தெரியாத கட்டளை: $action"
         }
-        speakShort(out)
-        return out
+    }
+
+    private fun setAlarm(timeStr: String): String = launchMain {
+        val parts = timeStr.split(":")
+        val h = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: 6
+        val m = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: 0
+        val i = Intent(AlarmClock.ACTION_SET_ALARM).apply {
+            putExtra(AlarmClock.EXTRA_HOUR, h)
+            putExtra(AlarmClock.EXTRA_MINUTES, m)
+            putExtra(AlarmClock.EXTRA_MESSAGE, "YUNA Alarm")
+            putExtra(AlarmClock.EXTRA_SKIP_UI, false)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        ctx.startActivity(i)
+        "${String.format(Locale.US, "%02d:%02d", h, m)}-க்கு அலாரம் அமைக்கப்பட்டது."
+    }
+
+    private fun setTimer(secsStr: String): String = launchMain {
+        val secs = secsStr.toIntOrNull()?.coerceIn(5, 86400) ?: 300
+        val i = Intent(AlarmClock.ACTION_SET_TIMER).apply {
+            putExtra(AlarmClock.EXTRA_LENGTH, secs)
+            putExtra(AlarmClock.EXTRA_MESSAGE, "YUNA Timer")
+            putExtra(AlarmClock.EXTRA_SKIP_UI, false)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        ctx.startActivity(i)
+        "${secs} வினாடிகளுக்கு டைமர் அமைக்கப்பட்டது."
+    }
+
+    private fun getBatteryAndTime(): String {
+        val bm = ctx.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val level = bm?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = bm?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
+        val pct = if (level >= 0 && scale > 0) (level * 100) / scale else -1
+        val status = bm?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+        val now = SimpleDateFormat("hh:mm a", Locale.US).format(Date())
+        val batText = if (pct >= 0) "பேட்டரி $pct%${if (charging) " (சார்ஜ் ஏறுகிறது)" else ""}" else "பேட்டரி நிலை தெரியவில்லை"
+        return "தற்போதைய நேரம் $now. $batText."
+    }
+
+    private fun launchMain(block: () -> String): String {
+        return try { block() } catch (e: Exception) { "செயல் தோல்வி: ${e.message}" }
+    }
+
+    private fun toggleTorch(mode: String): String {
+        return try {
+            val cm = ctx.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            val id = cm.cameraIdList.firstOrNull {
+                cm.getCameraCharacteristics(it).get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+            } ?: return "இந்த சாதனத்தில் ஃபிளாஷ் விளக்கு இல்லை."
+            val next = when (mode) { "TORCH_ON" -> true; "TORCH_OFF" -> false; else -> !torchState }
+            cm.setTorchMode(id, next)
+            torchState = next
+            if (next) "டார்ச் ஆன் செய்யப்பட்டது." else "டார்ச் அணைக்கப்பட்டது."
+        } catch (e: Exception) { "டார்ச் பிழை: ${e.message}" }
+    }
+
+    private fun openAppPkg(pkg: String): String = launchMain {
+        val pm = ctx.packageManager
+        val i = pm.getLaunchIntentForPackage(pkg)?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            ?: return@launchMain "செயலி நிறுவப்படவில்லை ($pkg)."
+        ctx.startActivity(i)
+        "செயலி திறக்கப்பட்டது."
+    }
+
+    private fun openSettingsPanel(action: String, label: String): String = launchMain {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ctx.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            "$label அமைப்புப் பக்கம் திறக்கப்பட்டது."
+        } else "அணுகல்தன்மை (Accessibility) இயக்கவும்."
+    }
+
+    private fun sendMediaKey(code: Int) {
+        audioMgr.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+        audioMgr.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+    }
+
+    private fun adjustBrightness(up: Boolean): String {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.System.canWrite(ctx)) {
+            mainH.post {
+                ctx.startActivity(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${ctx.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+            return "பிரகாசத்தை மாற்ற Write Settings அனுமதியை இயக்கவும்."
+        }
+        return try {
+            mainH.post {
+                try {
+                    Settings.System.putInt(ctx.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
+                    val cur = Settings.System.getInt(ctx.contentResolver, Settings.System.SCREEN_BRIGHTNESS, 128)
+                    val next = (cur + if (up) 48 else -48).coerceIn(15, 255)
+                    Settings.System.putInt(ctx.contentResolver, Settings.System.SCREEN_BRIGHTNESS, next)
+                } catch (_: Exception) {}
+            }
+            if (up) "திரை பிரகாசம் கூட்டப்பட்டது." else "திரை பிரகாசம் குறைக்கப்பட்டது."
+        } catch (e: Exception) { "பிரகாசப் பிழை: ${e.message}" }
     }
 }

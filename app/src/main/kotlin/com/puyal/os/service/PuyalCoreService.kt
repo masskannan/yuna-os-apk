@@ -53,6 +53,17 @@ import kotlin.math.abs
 
 class PuyalCoreService : Service() {
     private var bubbleViewRef: android.view.View? = null
+    
+    private fun launchQuickVoiceOverlay() {
+        try {
+            val i = android.content.Intent(this, com.puyal.os.MainActivity::class.java).apply {
+                action = "com.puyal.os.ACTION_QUICK_VOICE"
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            startActivity(i)
+        } catch (_: Exception) {}
+    }
+
     private val fgReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) {
             android.os.Handler(android.os.Looper.getMainLooper()).post {

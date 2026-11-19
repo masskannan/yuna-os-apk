@@ -39,10 +39,12 @@
   /* iOS Liquid Glass Header (True 3-Column Center) */
   header#topHeader {
     position: fixed; top: 0; left: 0; right: 0; z-index: 50; max-width: 480px; margin: 0 auto;
-    display: grid; grid-template-columns: 78px 1fr 78px; align-items: center;
-    padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
-    background: linear-gradient(to bottom, rgba(4, 9, 24, 0.48) 45%, transparent);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: calc(10px + env(safe-area-inset-top)) 14px 14px;
+    background: linear-gradient(to bottom, rgba(4, 9, 24, 0.84) 55%, rgba(4, 9, 24, 0.32) 82%, transparent);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   }
+  .header-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .circle-glass-btn {
     width: 40px; height: 40px; border-radius: 999px;
     background: var(--glass); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
@@ -195,7 +197,7 @@
 
   /* Gemini-Proportioned Liquid Glass Dock */
   .dock-wrap { position: fixed; left: 0; right: 0; bottom: calc(14px + env(safe-area-inset-bottom)); padding: 0 16px; pointer-events: none; z-index: 40; max-width: 480px; margin: 0 auto; transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1); }
-  .dock-wrap::before { content: ""; position: fixed; left: 0; right: 0; bottom: 0; height: 82px; background: linear-gradient(to top, rgba(4, 8, 20, 0.72), transparent); pointer-events: none; z-index: -1; }
+  .dock-wrap::before { content: ""; position: fixed; left: 0; right: 0; bottom: 0; height: 96px; background: linear-gradient(to top, rgba(4, 8, 20, 0.90) 40%, rgba(4, 8, 20, 0.45) 75%, transparent); pointer-events: none; z-index: -1; }
   .dock-wrap > * { pointer-events: auto; }
   #scrollDownBtn { width: 36px; height: 36px; border-radius: 999px; margin: 0 auto 10px; background: var(--glass); backdrop-filter: blur(16px); border: 1px solid color-mix(in srgb, var(--accent-a) 45%, transparent); box-shadow: var(--specular); color: #E0F2FE; display: none; align-items: center; justify-content: center; cursor: pointer; }
   #scrollDownBtn.show { display: flex; }
@@ -209,7 +211,7 @@
   #attCancel { background: rgba(255,255,255,0.14); border: none; color: #fff; width: 22px; height: 22px; border-radius: 999px; font-size: 12px; cursor: pointer; }
 
   .dock {
-    display: flex; align-items: center; gap: 10px; min-height: 58px; border-radius: 28px; padding: 9px 10px 9px 12px;
+    display: flex; align-items: center; gap: 10px; min-height: 68px; border-radius: 32px; padding: 11px 12px 11px 14px;
     background: linear-gradient(135deg, rgba(16, 30, 58, 0.72), rgba(24, 18, 56, 0.78));
     backdrop-filter: blur(22px) saturate(145%); -webkit-backdrop-filter: blur(22px) saturate(145%);
     border: 1px solid color-mix(in srgb, var(--accent-a) 34%, rgba(186, 230, 253, 0.26));
@@ -222,8 +224,12 @@
   .wave-btn { width: 40px; height: 40px; border-radius: 999px; flex-shrink: 0; cursor: pointer; background: rgba(20, 38, 72, 0.62); border: 1px solid color-mix(in srgb, var(--accent-a) 36%, transparent); box-shadow: var(--specular); display: flex; align-items: center; justify-content: center; }
   .dock.has-text .wave-btn { display: none; }
   .send-orb { width: 40px; height: 40px; border-radius: 999px; cursor: pointer; flex-shrink: 0; border: 1.5px solid color-mix(in srgb, var(--accent-a) 80%, #fff); background: linear-gradient(135deg, var(--mint), var(--accent-a), var(--accent-b)); box-shadow: 0 0 18px color-mix(in srgb, var(--accent-a) 44%, transparent); display: none; align-items: center; justify-content: center; }
-  .dock.has-text .send-orb { display: flex; }
+  .dock.has-text .send-orb, .dock.mic-on .send-orb { display: flex; }
   .send-orb.locked { opacity: 0.55; pointer-events: none; }
+  .voice-pause-btn { width: 36px; height: 36px; border-radius: 999px; flex-shrink: 0; border: 1px solid rgba(186,230,253,0.28); background: rgba(30,48,86,0.72); color: #E0F2FE; display: none; align-items: center; justify-content: center; cursor: pointer; }
+  .dock.mic-on .voice-pause-btn { display: flex; }
+  @media (max-width: 390px) { .yuna-logo-svg { height: 15px; } .tag-pill { padding: 4px 7px; font-size: 9px; } .voice-persona-pill { padding: 3px 6px; font-size: 8.5px; } }
+  .voice-persona-pill { font-family: ui-monospace, monospace; font-size: 9.5px; font-weight: 600; color: #BAE6FD; background: rgba(15, 28, 58, 0.72); border: 1px solid rgba(125,211,252,0.32); padding: 4px 8px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
 
   /* Frosted Rain-Glass Drawer */
   #drawerScrim { position: fixed; inset: 0; height: 100dvh; background: rgba(3, 7, 18, 0.58); backdrop-filter: blur(8px); z-index: 80; display: none; }
@@ -303,10 +309,11 @@
 </div>
 
 <header id="topHeader">
-  <button class="circle-glass-btn" onclick="openDrawer()" aria-label="Menu">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E2E8F0" stroke-width="1.85" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
-  </button>
-  <div class="brand-row">
+  <div class="header-left">
+    <button class="circle-glass-btn" onclick="openDrawer()" aria-label="Menu">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E2E8F0" stroke-width="1.85" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+    </button>
+    <div class="brand-row" style="padding:4px 4px;">
     <svg class="yuna-logo-svg" viewBox="0 0 132 28" fill="none" aria-label="YUNA">
       <defs><linearGradient id="yunaDual" x1="0" y1="0" x2="132" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#7CE8F5"/><stop offset="42%" stop-color="#B8EEF9"/><stop offset="72%" stop-color="#E2ECFA"/><stop offset="100%" stop-color="#FFFFFF"/></linearGradient></defs>
       <path d="M4 3 L12.2 12.6" stroke="url(#yunaDual)" stroke-width="2.7"/><path d="M24 3 L14.5 15.2 V25" stroke="url(#yunaDual)" stroke-width="2.7"/>
@@ -315,6 +322,8 @@
       <path d="M101 25 L112.5 3 L124 25" stroke="url(#yunaDual)" stroke-width="2.7"/>
     </svg>
     <button class="tag-pill" id="modeBadge" onclick="toggleBrainMode()"><span class="live-dot"></span><span id="modeTxt">LOCAL ▾</span></button>
+      <button class="voice-persona-pill" id="voicePersonaBtn" onclick="cycleVoicePersona()" title="Voice Persona">YUNA ♀</button>
+    </div>
   </div>
   <div class="top-right-pill">
     <button onclick="resetHome()" title="New Chat" aria-label="New Chat">
@@ -409,6 +418,7 @@
     <div class="set-item" onclick="cycleTheme()"><span>Theme Accent</span><span class="set-pill" id="themePill">CYAN-VIOLET</span></div>
     <div class="set-item" onclick="toggleNightDim()"><span>Night-Eye Auto Dim</span><span class="set-pill" id="nightPill">OFF</span></div>
     <div class="set-item" onclick="exportToObsidian()"><span>Export to Obsidian</span><span class="set-pill">EXPORT</span></div>
+        <div class="set-item" onclick="if(window.YunaBridge&&window.YunaBridge.requestBatteryOptimizationExemption){showToast(window.YunaBridge.requestBatteryOptimizationExemption());}else{showToast('APK-இல் மட்டும்');}"><span>Battery Optimization Exempt</span><span class="set-pill">ALLOW</span></div>
     <div class="set-item" onclick="showPermStatus()"><span>Permissions Check</span><span class="set-pill" id="permPill">CHECK</span></div>
     <div class="set-item" onclick="showCrashLog()"><span>Diagnostics / Crash Log</span><span class="set-pill">VIEW</span></div>
     <div class="set-item" onclick="clearSavedHistory()"><span style="color:#FCA5A5;">Clear Chat History</span><span class="set-pill" style="border-color:rgba(248,113,113,0.45);color:#FCA5A5;">CLEAR</span></div>
@@ -506,6 +516,7 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E2E8F0" stroke-width="1.85" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     </button>
     <textarea id="inp" rows="1" placeholder="Ask YUNA..." oninput="syncInputMode(); autoGrowInp()" onkeyup="syncInputMode()" oncompositionend="syncInputMode(); autoGrowInp()" onchange="syncInputMode()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send();}"></textarea>
+    <button class="voice-pause-btn" id="voicePauseBtn" onpointerdown="event.preventDefault()" onclick="pauseOrResumeVoice()" title="Pause / Resume Voice" aria-label="Pause Voice">⏸</button>
     <button class="wave-btn" id="micBtn" onpointerdown="event.preventDefault()" onclick="toggleVoice()" title="Mic ON / OFF" aria-label="Voice Mic">
       <svg width="22" height="20" viewBox="0 0 28 24" aria-hidden="true">
         <line x1="3" y1="10" x2="3" y2="14" stroke="#2DD4BF" stroke-width="2" stroke-linecap="round"/>
@@ -582,6 +593,9 @@ function setOrbState(next, label) {
 
 let micStream = null, audioCtx = null, micRaf = null, speechRec = null;
 function stopMicHardware() {
+  voicePaused = false;
+  const pb = document.getElementById('voicePauseBtn'); if (pb) pb.textContent = '⏸';
+  if (window.YunaBridge && window.YunaBridge.stopVoice) { try { window.YunaBridge.stopVoice(); } catch (_) {} }
   if (micRaf) { cancelAnimationFrame(micRaf); micRaf = null; }
   if (speechRec) { try { speechRec.stop(); } catch (_) {} speechRec = null; }
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
@@ -632,14 +646,74 @@ async function toggleVoice() {
       inp.value = res[0].transcript; syncInputMode(); autoGrowInp();
       if (res.isFinal) send();
     };
-    speechRec.onerror = () => { if (state === 'LISTENING') toggleVoice(); };
+    speechRec.onerror = () => { if (state === 'LISTENING' || voicePaused || dockBar.classList.contains('mic-on')) { stopMicHardware(); setOrbState('IDLE', 'Ready • Tap orb to speak'); dockBar.classList.remove('mic-on'); micBtn.classList.remove('active'); const vs=document.getElementById('voiceSetState'); if(vs)vs.textContent='OFF'; } };
     try { speechRec.start(); } catch (_) {}
   }
 }
 
-window.onYunaVoicePartial = function(text) { if (text) { inp.value = text; syncInputMode(); autoGrowInp(); } };
+let voicePersona = localStorage.getItem('yuna_voice_persona') || 'YUNA';
+let voicePaused = false, pendingConfirmAction = null;
+function cycleVoicePersona() {
+  const order = ['YUNA', 'PUYAL', 'SILENT'];
+  voicePersona = order[(order.indexOf(voicePersona) + 1) % order.length];
+  localStorage.setItem('yuna_voice_persona', voicePersona);
+  const b = document.getElementById('voicePersonaBtn');
+  if (b) b.textContent = voicePersona === 'YUNA' ? 'YUNA ♀' : (voicePersona === 'PUYAL' ? 'PUYAL ♂' : 'SILENT');
+  showToast('Voice: ' + voicePersona);
+}
+function stopAnySpeaking() {
+  if (window.YunaBridge && window.YunaBridge.stopSpeaking) { try { window.YunaBridge.stopSpeaking(); } catch (_) {} }
+  if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch (_) {} }
+}
+function speakOutput(txt) {
+  if (!txt || voicePersona === 'SILENT') return;
+  if (window.YunaBridge && window.YunaBridge.speakPersona) {
+    try { window.YunaBridge.speakPersona(txt, voicePersona); return; } catch (_) {}
+  }
+}
+function pauseOrResumeVoice() {
+  const pb = document.getElementById('voicePauseBtn');
+  if (!voicePaused) {
+    voicePaused = true;
+    if (window.YunaBridge && window.YunaBridge.stopVoice) { try { window.YunaBridge.stopVoice(); } catch (_) {} }
+    if (pb) pb.textContent = '▶';
+    setOrbState('IDLE', 'Voice Paused • Tap ▶ or ➤');
+  } else {
+    voicePaused = false;
+    if (window.YunaBridge && window.YunaBridge.startVoice) { try { window.YunaBridge.startVoice(voiceLang); } catch (_) {} }
+    if (pb) pb.textContent = '⏸';
+    setOrbState('LISTENING', 'Listening • Speak Tamil / English');
+  }
+}
+window.onYunaMicLevel = function(rmsDb) {
+  const norm = Math.max(0.25, Math.min(1.85, (Number(rmsDb) + 2) / 7.5));
+  const bars = document.querySelectorAll('#micBtn line');
+  bars.forEach((b, i) => {
+    const wave = norm * (0.72 + ((i % 3) * 0.18));
+    b.style.transformOrigin = 'center';
+    b.style.transform = 'scaleY(' + wave.toFixed(2) + ')';
+  });
+};
+window.onYunaVoiceEnded = function() {
+  if (state === 'LISTENING' && !voicePaused) {
+    setOrbState('IDLE', 'Ready • Tap orb to speak');
+    dockBar.classList.remove('mic-on'); micBtn.classList.remove('active');
+    inp.placeholder = 'Ask YUNA...';
+    const vs = document.getElementById('voiceSetState'); if (vs) vs.textContent = 'OFF';
+    document.querySelectorAll('#micBtn line').forEach(l => l.style.transform = '');
+  }
+};
+window.onYunaVoicePartial = function(text) {
+  if (text) {
+    const low = text.toLowerCase();
+    if (low.includes('நிறுத்து') || low === 'stop') stopAnySpeaking();
+    inp.value = text; syncInputMode(); autoGrowInp();
+  }
+};
 window.onYunaVoiceResult = function(text) {
-  if (!text) return;
+  if (!text) { window.onYunaVoiceEnded(); return; }
+  voicePaused = false;
+  const pb = document.getElementById('voicePauseBtn'); if (pb) pb.textContent = '⏸';
   inp.value = text; syncInputMode(); autoGrowInp(); send();
 };
 
@@ -651,7 +725,7 @@ window.addEventListener('pagehide', () => { if (state === 'LISTENING') stopMicHa
 
 function syncInputMode() { dockBar.classList.toggle('has-text', (inp.value && inp.value.trim().length > 0) || pickedFile !== ''); }
 function autoGrowInp() { inp.style.height = 'auto'; inp.style.height = Math.min(inp.scrollHeight, 104) + 'px'; }
-function sendOrLive() { if (!sendLock) { if ((inp.value && inp.value.trim().length > 0) || pickedFile) send(); else toggleVoice(); } }
+function sendOrLive() { if (!sendLock) { if ((inp.value && inp.value.trim().length > 0) || pickedFile || state === 'LISTENING') { if (state === 'LISTENING' && !inp.value.trim()) { toggleVoice(); } else send(); } else toggleVoice(); } }
 
 function syncModalLock() {
   const sOpen = settingsPage.classList.contains('open');
@@ -843,7 +917,7 @@ function send(overrideText) {
   if (activeReplyTimeout) clearTimeout(activeReplyTimeout);
   activeReplyTimeout = setTimeout(async () => {
     let res = null;
-    if (brainMode === 'CLOUD') res = await callPuyalCloud(fullQ);
+    if (brainMode === 'CLOUD') { res = await callPuyalCloud(fullQ); if (res && res.reply) speakOutput(res.reply); }
     if (!res) res = routeYunaPersona(fullQ);
     typingWrap.remove(); sendLock = false; actionOrb.classList.remove('locked');
     setOrbState(res.stranger ? 'STRANGER' : 'IDLE', res.statusLabel);
@@ -908,8 +982,17 @@ function shareFullChat() {
   const msgs = Array.from(document.querySelectorAll('.msg-user, .msg-yuna-wrap')).map(el => el.classList.contains('msg-user') ? 'Kannan: ' + el.textContent : 'YUNA: ' + (el.dataset.replyText || '')).join('\n\n');
   if (navigator.share) navigator.share({ title: 'YUNA Chat', text: msgs }).catch(() => {}); else fallbackCopy(msgs, { textContent: '' });
 }
+let activeListenSpan = null;
+window.onYunaTtsDone = function() { if (activeListenSpan) { activeListenSpan.textContent = 'Listen'; activeListenSpan = null; } };
 function speakText(btn) {
   const txt = btn.closest('.msg-yuna-wrap')?.dataset.replyText || ''; const s = btn.querySelector('span');
+  if (window.YunaBridge && window.YunaBridge.speakPersona) {
+    if (s.textContent === 'Stop') { stopAnySpeaking(); s.textContent = 'Listen'; activeListenSpan = null; return; }
+    if (activeListenSpan) activeListenSpan.textContent = 'Listen';
+    activeListenSpan = s; s.textContent = 'Stop';
+    window.YunaBridge.speakPersona(txt, voicePersona === 'SILENT' ? 'YUNA' : voicePersona);
+    return;
+  }
   if (!('speechSynthesis' in window)) { showToast('TTS unavailable'); return; }
   if (window.speechSynthesis.speaking) { window.speechSynthesis.cancel(); s.textContent = 'Listen'; return; }
   const chunks = txt.match(/[^.!?।\n]+[.!?।\n]?/g) || [txt]; let ci = 0; s.textContent = 'Stop';
@@ -939,17 +1022,108 @@ function routeYunaPersona(q) {
   const low = q.toLowerCase().trim();
   if (low.includes('stranger')) return { stranger: true, title: 'YUNA • SHIELD', reply: 'ஏய்! இது எங்க அண்ணன் கண்ணன் போன், எடுக்காதீங்க!', meta: 'VOICEPRINT GUARD', statusLabel: 'STRANGER BLOCKED', step: 'Voice Shield' };
 
+  // Barge-in Stop
+  if (low === 'நிறுத்து' || low === 'stop' || low === 'போதும்' || low === 'அமைதி') {
+    stopAnySpeaking();
+    return { title: 'YUNA • VOICE', reply: 'சரி, நிறுத்திவிட்டேன்.', meta: 'BARGE-IN STOP', statusLabel: 'Ready • Tap orb to speak', step: 'Stop Voice' };
+  }
+
+  // Safety Gate confirmation handler (#20)
+  if (pendingConfirmAction && (low === 'ஆம்' || low === 'சரி' || low === 'yes' || low === 'confirm' || low === 'ஓகே')) {
+    const act = pendingConfirmAction; pendingConfirmAction = null;
+    const res = execLocalOsAction(act.cmd, act.tgt);
+    speakOutput(res);
+    return { title: 'YUNA • CONFIRMED', reply: res, meta: 'SAFETY GATE PASSED', statusLabel: 'Ready • Tap orb to speak', step: act.step };
+  }
+  if (pendingConfirmAction && (low === 'வேண்டாம்' || low === 'இல்லை' || low === 'no' || low === 'cancel')) {
+    pendingConfirmAction = null;
+    return { title: 'YUNA • CANCELLED', reply: 'சரி, செயல் ரத்து செய்யப்பட்டது.', meta: 'SAFETY GATE', statusLabel: 'Ready • Tap orb to speak', step: 'Cancelled' };
+  }
+  pendingConfirmAction = null; // Clear stale Safety Gate on any new command
+
+  // 2-Step Command Chaining with App Context (#13)
+  const chainMatch = q.match(/(.+?)\s+(?:ஆன் பண்ணி|திறந்து|அப்புறம்|and then|then)\s+(.+)/i);
+  if (chainMatch) {
+    const s1Txt = chainMatch[1].trim(), s2Txt = chainMatch[2].trim();
+    const step1 = routeSingleCommand(s1Txt, '');
+    const ctxApp = /youtube|யூடியூப்|யூட்யூப்/i.test(s1Txt) ? 'youtube' : (/whatsapp|வாட்ஸ்அப்/i.test(s1Txt) ? 'whatsapp' : '');
+    setTimeout(() => {
+      const step2 = routeSingleCommand(s2Txt, ctxApp);
+      addYunaStream('YUNA • CHAIN STEP 2', step2.reply, step2.meta, step2.step, false, null);
+      speakOutput(step2.reply);
+    }, 1500);
+    speakOutput(step1.reply);
+    return { title: 'YUNA • CHAIN STEP 1', reply: step1.reply + ' (அடுத்த கட்டளை 1.5 வினாடியில் இயங்கும்)', meta: '2-STEP CHAIN', statusLabel: 'Chaining Step 2...', step: step1.step + ' → Step 2' };
+  }
+
+  const out = routeSingleCommand(q);
+  speakOutput(out.reply);
+  return out;
+}
+
+function routeSingleCommand(q, ctxApp) {
+  const low = q.toLowerCase().trim();
   const run = (act, tgt, meta, step) => {
     const res = execLocalOsAction(act, tgt || '');
     return { title: 'YUNA • LOCAL OS', reply: res, meta: meta || 'REAL-TIME OS', statusLabel: 'Ready • Tap orb to speak', step: step || act };
   };
 
-  // Hardware: Torch / Camera / Brightness / Volume / Lock / Screenshot
+  // Contacts Smart Dial + Safety Gate (#14, #20)
+  if (low.includes('கால்') || low.includes('அழை') || low.startsWith('call ')) {
+    const name = q.replace(/கால்|பண்ணு|அழை|அழைப்பு|call|க்கு|வுக்கு/gi, '').trim();
+    if (!name) return { title: 'YUNA • DIAL', reply: 'யாருக்கு அழைக்க வேண்டும் என்று பெயரைச் சொல்லுங்கள்.', meta: 'CONTACTS', statusLabel: 'Ready', step: 'Contacts' };
+    if (window.YunaBridge && window.YunaBridge.lookupContact) {
+      try {
+        const info = window.YunaBridge.lookupContact(name);
+        if (info && info.startsWith('FOUND:')) {
+          const parts = info.split(':');
+          const cName = parts[1] || name, cNum = parts[2] || '';
+          pendingConfirmAction = { cmd: 'DIAL', tgt: cNum, step: 'Call ' + cName };
+          return { title: 'YUNA • SAFETY GATE', reply: cName + ' (' + cNum + ') எண்ணுக்கு அழைக்கலாமா? "ஆம்" அல்லது "வேண்டாம்" எனக் கூறவும்.', meta: 'CONFIRM CALL', statusLabel: 'Awaiting Confirmation', step: 'Safety Gate' };
+        }
+        return { title: 'YUNA • CONTACTS', reply: info || 'தொடர்பு கிடைக்கவில்லை.', meta: 'CONTACTS', statusLabel: 'Ready', step: 'Contacts' };
+      } catch (_) {}
+    }
+    return run('DIAL', name, 'CONTACTS', 'Dial');
+  }
+
+  // WhatsApp RemoteInput Reply (#15)
+  if (low.includes('பதில் அனுப்பு') || low.startsWith('reply ')) {
+    const msg = q.replace(/வாட்ஸ்அப்|பதில் அனுப்பு|பதில்|reply/gi, '').trim();
+    if (window.YunaBridge && window.YunaBridge.replyLastWa) {
+      try { return { title: 'YUNA • WA REPLY', reply: window.YunaBridge.replyLastWa(msg), meta: 'REMOTE INPUT', statusLabel: 'Ready', step: 'WA Reply' }; } catch (_) {}
+    }
+  }
+
+  // YouTube Micro-Actions (#16)
+  if (low.includes('skip ad') || low.includes('விளம்பரம்') || low.includes('ஸ்கிப்')) return run('YT_SKIP_AD', '', 'YOUTUBE • MICRO', 'Skip Ad');
+  if (low.includes('முதல் வீடியோ') || low.includes('first video')) return run('YT_FIRST_VIDEO', '', 'YOUTUBE • MICRO', 'First Video');
+  if (low.includes('+10') || low.includes('முன்னாடி போ') || low.includes('forward')) return run('YT_FORWARD_10', '', 'YOUTUBE • MICRO', '+10s');
+  if (low.includes('full screen') || low.includes('முழு திரை') || low.includes('ஃபுல் ஸ்கிரீன்')) return run('YT_FULLSCREEN', '', 'YOUTUBE • MICRO', 'Full Screen');
+
+  // Camera Shutter & Open (#18)
+  if (low.includes('புகைப்படம் எடு') || low.includes('take photo') || low.includes('shutter') || low.includes('போட்டோ எடு')) return run('CAMERA_SHUTTER', '', 'CAMERA • SHUTTER', 'Capture Photo');
+  if (low.includes('camera') || low.includes('கேமரா')) return run('OPEN_CAMERA', '', 'HARDWARE • CAMERA', 'Camera');
+
+  // Alarm, Timer, Battery, Time (#17)
+  if (low.includes('அலாரம்') || low.includes('alarm')) {
+    const m = q.match(/(\d{1,2})(?::(\d{2}))?/);
+    return run('SET_ALARM', m ? (m[1] + ':' + (m[2] || '00')) : '06:00', 'OS • ALARM', 'Set Alarm');
+  }
+  if (low.includes('டைமர்') || low.includes('timer')) {
+    const m = q.match(/(\d+)/);
+    const secs = m ? (low.includes('மணி') || low.includes('hour') ? Number(m[1]) * 3600 : (low.includes('வினாடி') || low.includes('sec') ? Number(m[1]) : Number(m[1]) * 60)) : 300;
+    return run('SET_TIMER', String(secs), 'OS • TIMER', 'Set Timer');
+  }
+  if (low.includes('பேட்டரி') || low.includes('battery') || low.includes('மணி என்ன') || low.includes('what time')) {
+    return run('GET_BATTERY_TIME', '', 'OS • STATUS', 'Battery & Time');
+  }
+
+  // Hardware: Torch / Brightness / Volume / Lock / Screenshot
   if (low.includes('torch') || low.includes('flash') || low.includes('டார்ச்') || low.includes('லைட்') || low.includes('ஃபிளாஷ்')) {
     const act = (low.includes('off') || low.includes('ஆஃப்') || low.includes('நிறுத்து')) ? 'TORCH_OFF' : ((low.includes('on') || low.includes('ஆன்') || low.includes('போடு')) ? 'TORCH_ON' : 'TORCH');
     return run(act, '', 'HARDWARE • TORCH', 'Torch');
   }
-  if (low.includes('camera') || low.includes('கேமரா')) return run('OPEN_CAMERA', '', 'HARDWARE • CAMERA', 'Camera');
   if (low.includes('brightness') || low.includes('பிரைட்னஸ்')) {
     const up = low.includes('கூட்டு') || low.includes('up') || low.includes('high') || low.includes('அதிகம்');
     return run(up ? 'BRIGHTNESS_UP' : 'BRIGHTNESS_DOWN', '', 'HARDWARE • DISPLAY', 'Brightness');
@@ -968,7 +1142,12 @@ function routeYunaPersona(q) {
   if (low.includes('back') || low.includes('பேக்')) return run('GLOBAL_BACK', '', 'OS • NAV', 'Back');
   if (low.includes('home') || low.includes('ஹோம்')) return run('GLOBAL_HOME', '', 'OS • NAV', 'Home');
 
-  // Notification Shade (1 pull / 2 pulls) & Quick Settings Tiles (Wi-Fi / Mobile Data / BT)
+  // Quick Settings Tiles (#17)
+  if (low.includes('hotspot') || low.includes('ஹாட்ஸ்பாட்')) return run('TOGGLE_HOTSPOT', '', 'QUICK SETTINGS • HOTSPOT', 'Hotspot');
+  if (low.includes('location') || low.includes('gps') || low.includes('லொகேஷன்')) return run('TOGGLE_LOCATION', '', 'QUICK SETTINGS • GPS', 'Location');
+  if (low.includes('airplane') || low.includes('ஃபிளைட்') || low.includes('விமான')) return run('TOGGLE_AIRPLANE', '', 'QUICK SETTINGS • AIRPLANE', 'Airplane');
+  if (low.includes('rotate') || low.includes('ரொட்டேட்')) return run('TOGGLE_ROTATE', '', 'QUICK SETTINGS • ROTATE', 'Auto-Rotate');
+  if (low.includes('dnd') || low.includes('do not disturb') || low.includes('தொந்தரவு')) return run('TOGGLE_DND', '', 'QUICK SETTINGS • DND', 'DND');
   if (low.includes('wifi') || low.includes('wi-fi') || low.includes('வைஃபை')) return run('TOGGLE_WIFI', '', 'QUICK SETTINGS • WIFI', 'Wi-Fi');
   if (low.includes('mobile data') || low.includes('நெட் ஆன்') || low.includes('நெட் ஆஃப்') || low.includes('net on') || low.includes('data on')) return run('TOGGLE_DATA', '', 'QUICK SETTINGS • DATA', 'Mobile Data');
   if (low.includes('net') || low.includes('நெட்')) return run('NET_PANEL', '', 'OS • NETWORK', 'Net Panel');
@@ -978,7 +1157,7 @@ function routeYunaPersona(q) {
 
   // Media & Scroll & Auto-Type
   if (low.includes('next video') || low.includes('next song') || low.includes('அடுத்த வீடியோ')) return run('MEDIA_NEXT', '', 'MEDIA • NEXT', 'Next');
-  if (low.includes('pause') || low.includes('stop video') || low.includes('நிறுத்து')) return run('MEDIA_PLAY_PAUSE', '', 'MEDIA • PLAY/PAUSE', 'Play/Pause');
+  if (low.includes('pause') || low.includes('stop video')) return run('MEDIA_PLAY_PAUSE', '', 'MEDIA • PLAY/PAUSE', 'Play/Pause');
   if (low.includes('scroll down') || low.includes('கீழே')) return run('SCROLL_DOWN', '', 'ACCESSIBILITY • SCROLL', 'Scroll Down');
   if (low.includes('scroll up') || low.includes('மேலே')) return run('SCROLL_UP', '', 'ACCESSIBILITY • SCROLL', 'Scroll Up');
   if (low.startsWith('type ') || low.startsWith('search ')) {
@@ -986,8 +1165,14 @@ function routeYunaPersona(q) {
     return run('TYPE_SEARCH', qtxt, 'ACCESSIBILITY • AUTO-TYPE', 'Auto-Type Search');
   }
 
-  // Apps: YouTube, WhatsApp, Chrome, Maps
-  if (low.includes('youtube') || low.includes('யூடியூப்') || low.includes('யூட்யூப்')) {
+  // Google Maps Navigation (#15)
+  if (low.includes('வழி காட்டு') || low.includes('வழிகாட்டு') || low.startsWith('navigate to ') || low.startsWith('directions to ')) {
+    const dest = q.replace(/வழி காட்டு|வழிகாட்டு|navigate to|directions to|க்கு|வுக்கு/gi, '').trim();
+    if (dest) return run('OPEN_MAPS_NAV', dest, 'MAPS • NAVIGATION', 'Maps Nav');
+  }
+
+  // Apps: YouTube, WhatsApp, Chrome
+  if (low.includes('youtube') || low.includes('யூடியூப்') || low.includes('யூட்யூப்') || (ctxApp === 'youtube' && (low.includes('போடு') || low.includes('play') || low.includes('தேடு') || low.includes('search')))) {
     if (low.includes('போடு') || low.includes('play') || low.includes('search') || low.includes('சர்ச்') || low.includes('தேடு')) {
       const query = q.replace(/youtube|யூடியூப்|யூட்யூப்|ஓபன்|open|பண்ணு|போடு|play|search|சர்ச்|தேடு|-ல|ல/gi, '').trim() || 'trending tamil';
       return run('DEEP_LINK_SEARCH', 'youtube:' + query, 'YOUTUBE • SEARCH', 'YouTube Search');
@@ -998,7 +1183,7 @@ function routeYunaPersona(q) {
     if (low.includes('unread') || low.includes('message') || low.includes('மெசேஜ்') || low.includes('summary')) {
       let waLive = '';
       if (window.YunaBridge && window.YunaBridge.getWaSummary) { try { waLive = window.YunaBridge.getWaSummary(); } catch (_) {} }
-      return { title: 'YUNA • WA INTEL', reply: waLive || 'WhatsApp unread notifications எதுவும் pending இல்ல பாஸ்.', meta: 'NOTIFICATION LISTENER', statusLabel: 'Ready • Tap orb to speak', step: 'WA Intel' };
+      return { title: 'YUNA • WA INTEL', reply: waLive || 'படிக்காத வாட்ஸ்அப் செய்திகள் எதுவும் இல்லை.', meta: 'NOTIFICATION LISTENER', statusLabel: 'Ready • Tap orb to speak', step: 'WA Intel' };
     }
     return run('OPEN_APP', 'com.whatsapp', 'APP LAUNCH', 'WhatsApp');
   }
@@ -1006,18 +1191,18 @@ function routeYunaPersona(q) {
 
   if (low.includes('screen') || low.includes('vision')) {
     let liveDom = ''; if (window.YunaBridge && window.YunaBridge.scanScreen) { try { liveDom = window.YunaBridge.scanScreen(); } catch (_) {} }
-    return { title: 'YUNA • VISION', reply: liveDom || 'Enable Accessibility to scan screen.', meta: 'DOM VISION', statusLabel: 'Ready • Tap orb to speak', step: 'Screen Reader' };
+    return { title: 'YUNA • VISION', reply: liveDom || 'திரையைப் படிக்க அணுகல்தன்மை (Accessibility) அனுமதியை இயக்கவும்.', meta: 'DOM VISION', statusLabel: 'Ready • Tap orb to speak', step: 'Screen Reader' };
   }
   if (low.startsWith('tap ') || low.startsWith('click ')) {
     const target = q.replace(/^(tap|click)\s+/i, '').trim();
-    let resTap = 'Enable YUNA Accessibility';
+    let resTap = 'அணுகல்தன்மை (Accessibility) அனுமதியை இயக்கவும்.';
     if (window.YunaBridge && window.YunaBridge.clickOnScreen) { try { resTap = window.YunaBridge.clickOnScreen(target); } catch (_) {} }
     return { title: 'YUNA • AUTO-TAP', reply: resTap, meta: 'ACCESSIBILITY CLICK', statusLabel: 'Ready • Tap orb to speak', step: 'Auto-Tap' };
   }
-  if (low.includes('ஹாய்') || low === 'hi' || low.includes('hello') || low.includes('vanakkam')) {
-    return { title: 'YUNA • LOCAL', reply: personaMood === 'COMEDY' ? 'ஹாய் கண்ணன்! சொல்லுங்க பாஸ், எந்த app open பண்ணலாம்?' : 'வணக்கம் கண்ணன்! சொல்லுங்க, என்ன உதவி வேணும்?', meta: 'LOCAL PERSONA • ' + personaMood, statusLabel: 'Ready • Tap orb to speak', step: 'Local Brain' };
+  if (low.includes('ஹாய்') || low === 'hi' || low.includes('hello') || low.includes('vanakkam') || low.includes('வணக்கம்')) {
+    return { title: 'YUNA • LOCAL', reply: 'வணக்கம் கண்ணன்! சொல்லுங்கள், என்ன உதவி வேண்டும்?', meta: 'LOCAL PERSONA • ' + personaMood, statusLabel: 'Ready • Tap orb to speak', step: 'Local Brain' };
   }
-  return { title: 'YUNA • LOCAL', reply: 'Local command puriyala: "' + q + '" (Try: Torch on, Open YouTube, Back, Home, Clear all, Wi-Fi, Camera)', meta: 'LOCAL OS ROUTER', statusLabel: 'Ready • Tap orb to speak', step: 'Local Brain' };
+  return { title: 'YUNA • LOCAL', reply: 'இந்தக் கட்டளை புரியவில்லை: "' + q + '" (எ.கா: டார்ச் ஆன், யூடியூப் திற, பேட்டரி நிலை, அம்மாவுக்கு கால்)', meta: 'LOCAL OS ROUTER', statusLabel: 'Ready • Tap orb to speak', step: 'Local Brain' };
 }
 
 const moods = ['COMEDY', 'PRO', 'FOCUS'];
@@ -1046,6 +1231,7 @@ window.addEventListener('scroll', () => { const farUp = (document.body.scrollHei
   if (mt) mt.textContent = brainMode + ' ▾';
   if (b) b.classList.toggle('mode-cloud', brainMode === 'CLOUD');
   const mp = document.getElementById('moodPill'); if (mp) mp.textContent = personaMood;
+  const vpb = document.getElementById('voicePersonaBtn'); if (vpb) vpb.textContent = voicePersona === 'YUNA' ? 'YUNA ♀' : (voicePersona === 'PUYAL' ? 'PUYAL ♂' : 'SILENT');
   const h = new Date().getHours(); const g = document.querySelector('.greet');
   if (g) g.textContent = h < 12 ? 'Kaalai Vanakkam Boss' : h < 17 ? 'Vanakkam Boss' : 'Maalai Vanakkam Boss';
 })();
