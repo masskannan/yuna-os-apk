@@ -397,6 +397,7 @@
   </div>
   <div class="set-group-title">Voice &amp; Security</div>
   <div class="set-card">
+    <div class="set-item" onclick="verifyOwnerViaBiometric()"><span>Biometric Fingerprint Fallback</span><span class="set-pill">VERIFY</span></div>
     <div class="set-item" onclick="enrollVoiceprint()"><span>Kannan Voiceprint</span><span class="set-status" id="vpStatus">ENROLLED</span></div>
     <div class="set-item" onclick="triggerStrangerGuard(); closeSettings()"><span>Test Stranger Guard</span><span class="set-pill" style="border-color:#F43F5E;color:#FDA4AF;">TEST</span></div>
     <div class="set-item" onclick="toggleVoice(); closeSettings()"><span>Voice Input</span><span class="set-pill" id="voiceSetState">OFF</span></div>
@@ -599,6 +600,7 @@ async function toggleVoice() {
   setOrbState('LISTENING', 'Listening • Speak Tamil / English');
   dockBar.classList.add('mic-on'); micBtn.classList.add('active');
   inp.placeholder = 'Listening... Speak now'; if (vs) vs.textContent = 'ON';
+  if (window.YunaBridge && window.YunaBridge.startBluetoothMic) { try { window.YunaBridge.startBluetoothMic(); } catch (_) {} }
   if (window.YunaBridge && window.YunaBridge.startVoice) { try { window.YunaBridge.startVoice(voiceLang); } catch (_) {} }
   try {
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -1015,6 +1017,14 @@ function showCrashLog() {
     try { alert(window.YunaBridge.getCrashLog()); return; } catch (_) {}
   }
   showToast('No crashes (Browser mode)');
+}
+
+
+function verifyOwnerViaBiometric() {
+  if (window.YunaBridge && window.YunaBridge.verifyOwnerBiometric) {
+    try { window.YunaBridge.verifyOwnerBiometric(); return; } catch (_) {}
+  }
+  showToast('Fingerprint fallback ready in APK');
 }
 
 </script>

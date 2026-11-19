@@ -83,28 +83,4 @@ class YunaBridge(private val ctx: Context, private val onVoiceReq: (String) -> U
             else -> "Done"
         }
     }
-
-    @JavascriptInterface
-    fun enqueueCloudTask(prompt: String): String {
-        com.puyal.os.cloud.YunaCloudWorker.enqueue(ctx, prompt)
-        return "Queued for PUYAL Cloud when online"
-    }
-
-    @JavascriptInterface
-    fun saveObsidianNote(title: String, md: String): String {
-        return try {
-            val dir = java.io.File(ctx.getExternalFilesDir(android.os.Environment.DIRECTORY_DOCUMENTS), "Second_Brain").apply { mkdirs() }
-            val safe = title.replace(Regex("[^a-zA-Z0-9_-]"), "_").ifBlank { "YUNA_Note" }
-            val out = java.io.File(dir, "$safe.md")
-            out.writeText(md)
-            "Saved: ${out.name}"
-        } catch (e: Exception) { "Save err: ${e.message}" }
-    }
-
-    @JavascriptInterface
-    fun getCrashLog(): String {
-        val f = java.io.File(ctx.filesDir, "crash_log.txt")
-        return if (f.exists()) f.readText().takeLast(1200) else "No crashes recorded"
-    }
-
 }
