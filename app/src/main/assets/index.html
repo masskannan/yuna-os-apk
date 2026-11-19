@@ -17,7 +17,8 @@
   body.theme-gold { --cyan: #F59E0B; --accent-a: #F59E0B; --accent-b: #06B6D4; }
   body.theme-emerald { --cyan: #10B981; --accent-a: #10B981; --accent-b: #0EA5E9; }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  html, body { min-height: 100dvh; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Tamil", sans-serif; overflow-x: hidden; overscroll-behavior-y: contain; }
+  html { min-height: 100dvh; background: var(--bg); overscroll-behavior-y: auto; }
+  body { min-height: 100dvh; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Tamil", sans-serif; overflow-x: clip; overscroll-behavior-y: auto; }
   body.modal-open { overflow: hidden; height: 100dvh; }
 
   .aurora-bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: #030712; }
