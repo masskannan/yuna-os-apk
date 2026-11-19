@@ -236,6 +236,7 @@ class PuyalCoreService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        try { unregisterReceiver(fgReceiver) } catch (_: Exception) {}
         isRunning = false
         choreographer.removeFrameCallback(frameCallback)
         try {

@@ -11,6 +11,7 @@ import android.provider.Settings
 import android.speech.RecognizerIntent
 import android.webkit.*
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.webkit.WebViewAssetLoader
@@ -46,6 +47,9 @@ class MainActivity : ComponentActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             micPerm.launch(Manifest.permission.RECORD_AUDIO)
         }
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            micPerm.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
         }
@@ -78,6 +82,20 @@ class MainActivity : ComponentActivity() {
             loadUrl("https://appassets.androidplatform.net/assets/index.html")
         }
         setContentView(webView)
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                webView.evaluateJavascript("!!document.querySelector('#settingsPage.open,#drawerScrim.open,#plusScrim.open,#lightbox.open')") { v ->
+                    if (v == "true") {
+                        webView.evaluateJavascript("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));", null)
+                    } else if (webView.canGoBack()) {
+                        webView.goBack()
+                    } else {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    }
+                }
+            }
+        })
     }
 
     override fun onResume() { super.onResume(); sendBroadcast(Intent("com.puyal.os.ACTION_YUNA_FG").setPackage(packageName)) }

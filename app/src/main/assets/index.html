@@ -408,6 +408,8 @@
     <div class="set-item" onclick="cycleTheme()"><span>Theme Accent</span><span class="set-pill" id="themePill">CYAN-VIOLET</span></div>
     <div class="set-item" onclick="toggleNightDim()"><span>Night-Eye Auto Dim</span><span class="set-pill" id="nightPill">OFF</span></div>
     <div class="set-item" onclick="exportToObsidian()"><span>Export to Obsidian</span><span class="set-pill">EXPORT</span></div>
+    <div class="set-item" onclick="showPermStatus()"><span>Permissions Check</span><span class="set-pill" id="permPill">CHECK</span></div>
+    <div class="set-item" onclick="showCrashLog()"><span>Diagnostics / Crash Log</span><span class="set-pill">VIEW</span></div>
     <div class="set-item" onclick="clearSavedHistory()"><span style="color:#FCA5A5;">Clear Chat History</span><span class="set-pill" style="border-color:rgba(248,113,113,0.45);color:#FCA5A5;">CLEAR</span></div>
   </div>
   <div style="text-align:center;font-family:monospace;font-size:10.5px;color:#64748B;margin-top:16px;">YUNA OS v6 • iOS Liquid Glass</div>
@@ -779,7 +781,8 @@ function ask(q) { inp.value = q; syncInputMode(); send(); }
 
 const SAFE_DELEGATE_ALLOWLIST = new Set(['OPEN_APP','DEEP_LINK_SEARCH','GLOBAL_BACK','GLOBAL_HOME','GLOBAL_RECENTS','GLOBAL_NOTIFICATIONS','GLOBAL_QUICK_SETTINGS','TORCH','BRIGHTNESS_UP','BRIGHTNESS_DOWN','NET_PANEL']);
 function forceRefreshUi() { const u = new URL(window.location.href); u.searchParams.set('v', Date.now().toString()); window.location.replace(u.toString()); }
-function redactSensitiveLocal(txt) { return (txt || '').replace(/\b\d{4,8}\b/g, '[REDACTED_NUM]').replace(/\b(otp|cvv|pin|upi|password|mpin)\b/gi, '[REDACTED_KEY]'); }
+function redactSensitiveLocal(txt) {
+  if (window.YunaBridge && window.YunaBridge.checkSensitive) { try { if (window.YunaBridge.checkSensitive(txt || '')) return '[REDACTED_BY_RUST_SHIELD]'; } catch (_) {} } return (txt || '').replace(/\b\d{4,8}\b/g, '[REDACTED_NUM]').replace(/\b(otp|cvv|pin|upi|password|mpin)\b/gi, '[REDACTED_KEY]'); }
 function execLocalOsAction(action, target) {
   if (!SAFE_DELEGATE_ALLOWLIST.has(action)) return 'Blocked by YunaTierGuards: ' + action;
   if (window.YunaBridge && window.YunaBridge.executeAction) { try { return window.YunaBridge.executeAction(action, target || ''); } catch (_) {} }
@@ -805,7 +808,7 @@ async function callPuyalCloud(promptText) {
       }
     } catch (_) {}
     return { title: 'PUYAL • CLOUD', reply: rawReply, meta: 'CLOUDFLARE WORKER • GROQ', statusLabel: 'PUYAL • CLOUD RESPONSE', step: 'Cloud Gateway' };
-  } catch (_) { clearTimeout(tid); return null; }
+  } catch (_) { clearTimeout(tid); if (window.YunaBridge && window.YunaBridge.enqueueCloudTask) { try { window.YunaBridge.enqueueCloudTask(safePrompt); } catch (_) {} } return null; }
 }
 
 function send(overrideText) {
@@ -976,6 +979,9 @@ function cycleLangSet() { langIdx = (langIdx + 1) % langs.length; voiceLang = la
 function toggleNightDim() { const on = document.body.classList.toggle('night-dim'); document.getElementById('nightPill').textContent = on ? 'ON' : 'OFF'; }
 function exportToObsidian() {
   const txt = sessions.map(s => '# ' + s.title + '\n' + s.msgs.map(m => (m.isUser ? '**Kannan:** ' : '**YUNA:** ') + m.text).join('\n')).join('\n\n');
+  if (window.YunaBridge && window.YunaBridge.saveObsidianNote) {
+    try { showToast(window.YunaBridge.saveObsidianNote('YUNA_Session_' + Date.now(), txt || '# YUNA Empty Session')); return; } catch (_) {}
+  }
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt || '# YUNA Empty Session'], { type: 'text/markdown' })); a.download = 'YUNA_Second_Brain_Export.md'; a.click(); showToast('Exported Obsidian Markdown');
 }
 
@@ -993,6 +999,24 @@ window.addEventListener('scroll', () => { const farUp = (document.body.scrollHei
   const h = new Date().getHours(); const g = document.querySelector('.greet');
   if (g) g.textContent = h < 12 ? 'Kaalai Vanakkam Boss' : h < 17 ? 'Vanakkam Boss' : 'Maalai Vanakkam Boss';
 })();
+
+function showPermStatus() {
+  if (window.YunaBridge && window.YunaBridge.getPermissionStatus) {
+    try {
+      const s = JSON.parse(window.YunaBridge.getPermissionStatus());
+      showToast('Overlay:' + (s.overlay ? 'ON' : 'OFF') + ' Acc:' + (s.accessibility ? 'ON' : 'OFF') + ' Write:' + (s.writeSettings ? 'ON' : 'OFF'));
+      return;
+    } catch (_) {}
+  }
+  showToast('Browser mode (:7777)');
+}
+function showCrashLog() {
+  if (window.YunaBridge && window.YunaBridge.getCrashLog) {
+    try { alert(window.YunaBridge.getCrashLog()); return; } catch (_) {}
+  }
+  showToast('No crashes (Browser mode)');
+}
+
 </script>
 </body>
 </html>
