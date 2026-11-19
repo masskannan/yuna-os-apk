@@ -44,6 +44,15 @@ rust = read("wasm_modules/rust_brain/src/lib.rs")
 if "#![no_std]" in rust or "#[panic_handler]" in rust:
     errors.append("wasm_modules/rust_brain/src/lib.rs still contains #![no_std] or #[panic_handler]")
 
+
+pcs = read("app/src/main/kotlin/com/puyal/os/service/PuyalCoreService.kt")
+if "fgReceiver" in pcs and "val fgReceiver" not in pcs:
+    errors.append("PuyalCoreService.kt references fgReceiver without declaring val fgReceiver")
+if pcs.count("var bubbleViewRef") > 1:
+    errors.append("PuyalCoreService.kt has duplicate bubbleViewRef declaration")
+if not re.search(r"private\s+fun\s+registerScreenReceiver\s*\(\s*\)\s*\{", pcs):
+    errors.append("PuyalCoreService.kt has broken registerScreenReceiver() declaration")
+
 if errors:
     print("PRE-PUSH AUDIT FAILED:")
     for e in errors:

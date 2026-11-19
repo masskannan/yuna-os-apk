@@ -36,3 +36,12 @@
 -keep class com.puyal.os.cloud.** { *; }
 
 -keep class com.puyal.os.service.** { *; }
+
+# YUNA 100% R8 Release Safety Rules
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-dontwarn java.lang.invoke.StringConcatFactory
+-dontwarn org.codehaus.**
+-dontwarn javax.annotation.**

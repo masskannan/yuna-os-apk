@@ -52,6 +52,14 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
 class PuyalCoreService : Service() {
+    private var bubbleViewRef: android.view.View? = null
+    private val fgReceiver = object : BroadcastReceiver() {
+        override fun onReceive(c: Context?, i: Intent?) {
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                bubbleViewRef?.visibility = if (i?.action == "com.puyal.os.ACTION_YUNA_FG") android.view.View.GONE else android.view.View.VISIBLE
+            }
+        }
+    }
 
     companion object {
         const val CHANNEL_ID = "puyal_sovereign_core"
@@ -328,9 +336,7 @@ class PuyalCoreService : Service() {
         nm.notify(NOTIF_ID, notification)
     }
 
-    private fun registerScreenReceiver()
-        val f = android.content.IntentFilter().apply { addAction("com.puyal.os.ACTION_YUNA_FG"); addAction("com.puyal.os.ACTION_YUNA_BG") }
-        if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(fgReceiver, f, RECEIVER_NOT_EXPORTED) else registerReceiver(fgReceiver, f) {
+    private fun registerScreenReceiver() {
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_SCREEN_ON)
@@ -407,7 +413,7 @@ class PuyalCoreService : Service() {
         ringView = ring
         bubbleView = bubble
         bubbleContainer = container
-        windowManager.addView(container, bubbleParams)
+        bubbleViewRef = container; windowManager.addView(container, bubbleParams)
     }
 
     private fun attachBubbleTouchListener(bubble: View) {
