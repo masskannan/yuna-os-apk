@@ -19,6 +19,8 @@ class PuyalAccessService : AccessibilityService() {
         private var instanceRef: WeakReference<PuyalAccessService>? = null
         val instance: PuyalAccessService?
             get() = instanceRef?.get()
+        val isRunning: Boolean
+            get() = instanceRef?.get() != null
     }
 
     private val mainH = Handler(Looper.getMainLooper())
