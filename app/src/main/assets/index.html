@@ -1245,6 +1245,17 @@ function explainClipboard() {
   showToast('APK-இல் மட்டும்');
 }
 
+
+function syncCloudNote(op, text, at) {
+  if (!cloudUrl) return;
+  try {
+    fetch(cloudUrl.replace(/\/+$/, '') + '/notes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op, text: text || '', at: at || '', sessionId: yunaCloudSid })
+    }).catch(() => {});
+  } catch (_) {}
+}
+
 function routeYunaPersona(rawQ) {
   const q = normalizeTamilStt(rawQ);
   const low = q.toLowerCase().trim();
@@ -1369,6 +1380,7 @@ function routeSingleCommand(q, ctxApp, rawQ) {
     if (!list.some(n => n.text.toLowerCase() === note.toLowerCase())) {
       list.unshift({ text: note, at: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) });
       safeSaveJson('yuna_notes_v1', list.slice(0, 40));
+      syncCloudNote('add', note, list[0].at);
     }
     if (window.YunaBridge && window.YunaBridge.saveObsidianNote) { try { window.YunaBridge.saveObsidianNote('YUNA_Quick_Notes', list.map(n => '- [' + n.at + '] ' + n.text).join('\n')); } catch (_) {} }
     return { title: 'YUNA • NOTES', reply: 'குறிப்பு சேமிக்கப்பட்டது: **' + note + '**', meta: 'LOCAL NOTES', statusLabel: 'Ready', step: 'Note Saved' };
@@ -1380,6 +1392,7 @@ function routeSingleCommand(q, ctxApp, rawQ) {
   }
   if (low.includes('நோட்ஸ் அழி') || low.includes('நோட் அழி') || low.includes('லிஸ்ட் கிளியர்') || low.includes('clear notes')) {
     try { localStorage.removeItem('yuna_notes_v1'); } catch (_) {}
+    syncCloudNote('clear');
     return { title: 'YUNA • NOTES', reply: 'அனைத்து விரைவுக் குறிப்புகளும் அழிக்கப்பட்டன.', meta: 'LOCAL NOTES', statusLabel: 'Ready', step: 'Clear Notes' };
   }
 
