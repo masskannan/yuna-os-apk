@@ -26,6 +26,9 @@ import com.puyal.os.MainActivity
 import kotlin.math.abs
 
 class PuyalCoreService : Service() {
+    companion object {
+        @Volatile var isRunning: Boolean = false
+    }
     private var bubbleViewRef: View? = null
     private var menuViewRef: LinearLayout? = null
     private var wm: WindowManager? = null
@@ -47,6 +50,7 @@ class PuyalCoreService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         startForegroundSafe()
         registerScreenReceiver()
         try {
@@ -216,6 +220,7 @@ class PuyalCoreService : Service() {
         try { screenReceiver?.let { unregisterReceiver(it) } } catch (_: Exception) {}
         try { bubbleViewRef?.let { wm?.removeView(it) } } catch (_: Exception) {}
         try { menuViewRef?.let { wm?.removeView(it) } } catch (_: Exception) {}
+        isRunning = false
         super.onDestroy()
     }
 }
