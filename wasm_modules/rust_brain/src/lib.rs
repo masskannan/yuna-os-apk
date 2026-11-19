@@ -176,6 +176,20 @@ pub mod yuna_core {
         String::new()
     }
 
+    
+    pub fn build_explain_prompt(copied_text: &str) -> String {
+        let trimmed: String = copied_text.trim().chars().take(1200).collect();
+        if trimmed.is_empty() {
+            return String::new();
+        }
+        format!("இதைத் தமிழில் சுருக்கமாக விளக்கு: {}", trimmed)
+    }
+
+    pub fn is_clipboard_explain_cmd(raw: &str) -> bool {
+        let low = raw.to_lowercase();
+        low.contains("காப்பி") || low.contains("கிளிப்போர்டு") || low.contains("clipboard")
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;

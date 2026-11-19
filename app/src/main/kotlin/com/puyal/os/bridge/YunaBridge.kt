@@ -306,6 +306,15 @@ class YunaBridge(
         "அனுமதி அமைப்புப் பக்கம் திறக்கப்பட்டது."
     }
 
+
+    @JavascriptInterface
+    fun readClipboard(): String {
+        return try {
+            val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            cm.primaryClip?.getItemAt(0)?.coerceToText(ctx)?.toString()?.trim()?.take(1200) ?: ""
+        } catch (_: Exception) { "" }
+    }
+
     @JavascriptInterface
     fun getPermissionStatus(): String {
         val overlay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(ctx) else true

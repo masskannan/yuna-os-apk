@@ -30,6 +30,7 @@ class MainActivity : ComponentActivity() {
     private var lastRmsMs = 0L
     private var pageLoaded = false
     private var pendingQuickVoice = false
+    private var pendingProcessText: String? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -65,6 +66,7 @@ class MainActivity : ComponentActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 pageLoaded = true
+                pendingProcessText?.let { pt -> pendingProcessText = null; val safe = JSONObject.quote(pt); webView.evaluateJavascript("if(window.onYunaProcessText)window.onYunaProcessText($safe);", null) }
                 if (pendingQuickVoice) {
                     pendingQuickVoice = false
                     webView.evaluateJavascript("if(typeof toggleVoice==='function'&&state!=='LISTENING')toggleVoice();", null)
@@ -94,6 +96,18 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleQuickVoiceIntent(i: Intent?) {
+        if (i?.action == Intent.ACTION_PROCESS_TEXT) {
+            val sel = i.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()?.trim() ?: ""
+            if (sel.isNotEmpty()) {
+                if (pageLoaded) {
+                    val safe = JSONObject.quote(sel)
+                    webView.evaluateJavascript("if(window.onYunaProcessText)window.onYunaProcessText($safe);", null)
+                } else {
+                    pendingProcessText = sel
+                }
+            }
+            return
+        }
         if (i?.action == "com.puyal.os.ACTION_QUICK_VOICE" || i?.action == Intent.ACTION_ASSIST || i?.action == "android.intent.action.VOICE_ASSIST") {
             if (pageLoaded) {
                 webView.evaluateJavascript("if(typeof toggleVoice==='function'&&state!=='LISTENING')toggleVoice();", null)
