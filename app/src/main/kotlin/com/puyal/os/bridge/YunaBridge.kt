@@ -12,7 +12,11 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
+import android.Manifest
+import android.content.pm.PackageManager
 import android.media.AudioManager
+import android.telephony.PhoneStateListener
+import android.telephony.TelephonyManager
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import java.net.HttpURLConnection
@@ -149,14 +153,94 @@ class YunaBridge(
 
     private var mediaPlayer: MediaPlayer? = null
 
+    @Volatile private var lastIncomingNumber: String = ""
+    @Volatile private var lastCallerName: String = ""
+    @Volatile private var callListenerRegistered: Boolean = false
+
+    private fun isCallAudioActive(): Boolean {
+        return try {
+            val m = audioMgr.mode
+            m == AudioManager.MODE_IN_CALL || m == AudioManager.MODE_IN_COMMUNICATION
+        } catch (_: Exception) { false }
+    }
+
+    private fun ensureCallStateListener() {
+        if (callListenerRegistered) return
+        if (ctx.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) return
+        try {
+            val tm = ctx.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager ?: return
+            mainH.post {
+                try {
+                    @Suppress("DEPRECATION")
+                    val psl = object : PhoneStateListener() {
+                        @Deprecated("Deprecated in Java")
+                        override fun onCallStateChanged(state: Int, phoneNumber: String?) {
+                            if (state == TelephonyManager.CALL_STATE_RINGING && !phoneNumber.isNullOrBlank()) {
+                                lastIncomingNumber = phoneNumber
+                                lastCallerName = resolveCallerName(phoneNumber)
+                            } else if (state == TelephonyManager.CALL_STATE_IDLE) {
+                                lastIncomingNumber = ""
+                                lastCallerName = ""
+                            }
+                        }
+                    }
+                    @Suppress("DEPRECATION")
+                    tm.listen(psl, PhoneStateListener.LISTEN_CALL_STATE)
+                    callListenerRegistered = true
+                } catch (_: Exception) {}
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun resolveCallerName(phone: String): String {
+        if (phone.isBlank()) return ""
+        if (ctx.checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) return ""
+        return try {
+            val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phone))
+            ctx.contentResolver.query(uri, arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME), null, null, null)?.use { c ->
+                if (c.moveToFirst()) c.getString(0) ?: "" else ""
+            } ?: ""
+        } catch (_: Exception) { "" }
+    }
+
+    private fun setSpeakerphone(on: Boolean): String {
+        return try {
+            audioMgr.isSpeakerphoneOn = on
+            if (on) "ஸ்பீக்கர்போன் இயக்கப்பட்டது." else "ஸ்பீக்கர்போன் அணைக்கப்பட்டது."
+        } catch (e: Exception) {
+            "ஸ்பீக்கர்போன் மாற்ற முடியவில்லை: ${e.message}"
+        }
+    }
+
+    @JavascriptInterface
+    fun getLastCallerInfo(): String {
+        ensureCallStateListener()
+        if (ctx.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            return "அழைப்பாளர் பெயரை அறிய Phone State அனுமதியை வழங்கவும்."
+        }
+        val name = lastCallerName.ifBlank { resolveCallerName(lastIncomingNumber) }
+        return when {
+            name.isNotBlank() -> "$name உங்களை அழைக்கிறார்."
+            lastIncomingNumber.isNotBlank() -> "$lastIncomingNumber எண்ணிலிருந்து அழைப்பு வருகிறது."
+            isCallAudioActive() -> "தற்போது அழைப்பு நடந்துகொண்டிருக்கிறது (எண் விவரம் கிடைக்கவில்லை)."
+            else -> "தற்போது எந்த அழைப்பும் வரவில்லை."
+        }
+    }
+
+
     @JavascriptInterface
     fun speakSmart(text: String, persona: String, baseUrl: String) {
+        speakSmartWithVoice(text, persona, baseUrl, "ta-SG-VenbaNeural")
+    }
+
+    @JavascriptInterface
+    fun speakSmartWithVoice(text: String, persona: String, baseUrl: String, voiceId: String) {
         if (persona.equals("SILENT", true) || text.isBlank()) { mainH.post { onTtsDone() }; return }
-        val hasTamil = text.any { it in '\u0B80'..'\u0BFF' }
+        if (isCallAudioActive()) { mainH.post { onTtsDone() }; return }
         val ep = baseUrl.trim().trimEnd('/')
-        if (!hasTamil && ep.startsWith("http")) {
+        if (ep.startsWith("http")) {
             Thread {
-                val mp3 = fetchCloudTts(ep + "/tts", text)
+                val mp3 = fetchCloudTts(ep + "/tts", text, voiceId.ifBlank { "ta-SG-VenbaNeural" })
                 if (mp3 != null && mp3.exists() && mp3.length() > 500) {
                     mainH.post { playMp3File(mp3) }
                 } else {
@@ -168,7 +252,7 @@ class YunaBridge(
         }
     }
 
-    private fun fetchCloudTts(endpoint: String, text: String): File? {
+    private fun fetchCloudTts(endpoint: String, text: String, voiceId: String = "ta-SG-VenbaNeural"): File? {
         return try {
             val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
@@ -178,7 +262,7 @@ class YunaBridge(
                 setRequestProperty("Content-Type", "application/json")
                 setRequestProperty("User-Agent", "YUNA-App/1.0")
             }
-            val body = JSONObject().apply { put("text", text.take(450)) }.toString()
+            val body = JSONObject().apply { put("text", text.take(480)); put("voice", voiceId) }.toString()
             conn.outputStream.use { it.write(body.toByteArray()) }
             if (conn.responseCode != 200) return null
             val out = File(ctx.cacheDir, "yuna_tts.mp3")
@@ -268,6 +352,7 @@ class YunaBridge(
 
     @JavascriptInterface
     fun startCloudWhisper(baseUrl: String) {
+        if (isCallAudioActive()) { mainH.post { android.widget.Toast.makeText(ctx, "அழைப்பு நடக்கிறது — மைக் பாதுகாக்கப்பட்டது", android.widget.Toast.LENGTH_SHORT).show(); onTtsDone() }; return }
         if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             onVoiceReq("ta-IN")
             return
@@ -346,7 +431,8 @@ class YunaBridge(
         } catch (_: Exception) { "" }
     }
 
-    @JavascriptInterface fun startVoice(lang: String) { mainH.post { onVoiceReq(lang.ifBlank { "ta-IN" }) } }
+    @JavascriptInterface fun startVoice(lang: String) {
+        if (isCallAudioActive()) { mainH.post { android.widget.Toast.makeText(ctx, "அழைப்பு நடக்கிறது — மைக் பாதுகாக்கப்பட்டது", android.widget.Toast.LENGTH_SHORT).show(); onTtsDone() }; return } mainH.post { onVoiceReq(lang.ifBlank { "ta-IN" }) } }
     @JavascriptInterface fun stopVoice() { mainH.post { onStopVoiceReq() } }
     @JavascriptInterface fun startBluetoothMic() { try { if (audioMgr.isBluetoothScoAvailableOffCall) { audioMgr.mode = AudioManager.MODE_IN_COMMUNICATION; audioMgr.startBluetoothSco() } } catch (_: Exception) {} }
     @JavascriptInterface fun scanScreen(): String = PuyalAccessService.instance?.scanScreenText() ?: "திரையைப் படிக்க அணுகல்தன்மை (Accessibility) அனுமதியை இயக்கவும்."
@@ -426,6 +512,7 @@ class YunaBridge(
 
     @JavascriptInterface
     fun getDetailedPermissions(): String {
+        ensureCallStateListener()
         val overlay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(ctx) else true
         val acc = PuyalAccessService.instance != null
         val mic = ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
@@ -554,6 +641,9 @@ class YunaBridge(
             "SCROLL_DOWN" -> acc?.scrollDirection(true) ?: "அணுகல்தன்மை இயக்கப்படவில்லை."
             "SCROLL_UP" -> acc?.scrollDirection(false) ?: "அணுகல்தன்மை இயக்கப்படவில்லை."
             "TYPE_SEARCH" -> acc?.typeAndSearch(target) ?: "அணுகல்தன்மை இயக்கப்படவில்லை."
+            "SPEAKER_ON" -> setSpeakerphone(true)
+            "SPEAKER_OFF" -> setSpeakerphone(false)
+            "WHO_IS_CALLING" -> getLastCallerInfo()
             "VOLUME_UP" -> { audioMgr.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI); "ஒலி அளவு கூட்டப்பட்டது." }
             "VOLUME_DOWN" -> { audioMgr.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI); "ஒலி அளவு குறைக்கப்பட்டது." }
             "VOLUME_MUTE" -> { audioMgr.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, AudioManager.FLAG_SHOW_UI); "ஒலி அமைதி நிலை மாற்றப்பட்டது." }
