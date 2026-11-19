@@ -186,6 +186,8 @@ class PuyalCoreService : Service() {
         startImmortalForeground()
         applyRootOomProtection()
         registerScreenReceiver()
+        val f = android.content.IntentFilter().apply { addAction("com.puyal.os.ACTION_YUNA_FG"); addAction("com.puyal.os.ACTION_YUNA_BG") }
+        if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(fgReceiver, f, RECEIVER_NOT_EXPORTED) else registerReceiver(fgReceiver, f)
 
         if (Settings.canDrawOverlays(this)) {
             setupFloatingBubble()
@@ -325,7 +327,9 @@ class PuyalCoreService : Service() {
         nm.notify(NOTIF_ID, notification)
     }
 
-    private fun registerScreenReceiver() {
+    private fun registerScreenReceiver()
+        val f = android.content.IntentFilter().apply { addAction("com.puyal.os.ACTION_YUNA_FG"); addAction("com.puyal.os.ACTION_YUNA_BG") }
+        if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(fgReceiver, f, RECEIVER_NOT_EXPORTED) else registerReceiver(fgReceiver, f) {
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_SCREEN_ON)

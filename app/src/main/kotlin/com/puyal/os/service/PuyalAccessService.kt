@@ -5,10 +5,12 @@ import android.content.Intent
 import android.net.Uri
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 
 class PuyalAccessService : AccessibilityService() {
     companion object {
         @Volatile var instance: PuyalAccessService? = null
+        @Volatile var lastScreenText: String = ""
         private var lastActionMs = 0L
         private val BANKING_BLOCKLIST = setOf(
             "com.google.android.apps.nbu.paisa.user",
@@ -23,10 +25,35 @@ class PuyalAccessService : AccessibilityService() {
     override fun onServiceConnected() { super.onServiceConnected(); instance = this }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val pkg = event?.packageName?.toString() ?: return
-        if (pkg in BANKING_BLOCKLIST) return
+        if (pkg in BANKING_BLOCKLIST) {
+            lastScreenText = "[REDACTED: Banking/UPI App Protected]"
+            return
+        }
+        val root = rootInActiveWindow ?: return
+        val sb = StringBuilder()
+        collectText(root, sb, 0)
+        if (sb.isNotEmpty()) lastScreenText = "[$pkg] " + sb.toString().take(800)
     }
+
+    private fun collectText(node: AccessibilityNodeInfo?, sb: StringBuilder, depth: Int) {
+        if (node == null || depth > 12 || sb.length > 800) return
+        node.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { sb.append(it).append(" | ") }
+        for (i in 0 until node.childCount) {
+            collectText(node.getChild(i), sb, depth + 1)
+        }
+    }
+
     override fun onInterrupt() {}
     override fun onDestroy() { instance = null; super.onDestroy() }
+
+    fun scanNow(): String {
+        val root = rootInActiveWindow ?: return lastScreenText
+        val pkg = root.packageName?.toString() ?: "unknown"
+        if (pkg in BANKING_BLOCKLIST) return "[REDACTED: Banking/UPI App Protected]"
+        val sb = StringBuilder()
+        collectText(root, sb, 0)
+        return if (sb.isNotEmpty()) "[$pkg] " + sb.toString().take(800) else lastScreenText
+    }
 
     fun runNav(actionId: Int): Boolean {
         val now = SystemClock.uptimeMillis()

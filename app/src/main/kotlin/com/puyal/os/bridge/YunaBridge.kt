@@ -10,13 +10,24 @@ import android.provider.Settings
 import android.webkit.JavascriptInterface
 import com.puyal.os.service.PuyalAccessService
 
-class YunaBridge(private val ctx: Context) {
+class YunaBridge(private val ctx: Context, private val onVoiceReq: (String) -> Unit) {
     private var torchOn = false
     private val allowlist = setOf(
         "OPEN_APP", "DEEP_LINK_SEARCH", "GLOBAL_BACK", "GLOBAL_HOME",
         "GLOBAL_RECENTS", "GLOBAL_NOTIFICATIONS", "GLOBAL_QUICK_SETTINGS",
         "TORCH", "BRIGHTNESS_UP", "BRIGHTNESS_DOWN", "NET_PANEL"
     )
+
+    @JavascriptInterface
+    fun scanScreen(): String {
+        val acc = PuyalAccessService.instance
+        return acc?.scanNow()?.ifBlank { "No readable text on screen" } ?: "Enable YUNA Accessibility in Settings"
+    }
+
+    @JavascriptInterface
+    fun startVoice(lang: String) {
+        onVoiceReq(lang.ifBlank { "ta-IN" })
+    }
 
     @JavascriptInterface
     fun executeAction(action: String, target: String): String {

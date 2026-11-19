@@ -1099,7 +1099,11 @@ function routeYunaPersona(q) {
     return { title: 'YUNA • LOCAL', reply: 'டார்ச் toggle பண்ணியாச்சு பாஸ்!', meta: 'HARDWARE ACTION', statusLabel: 'Ready • Tap orb to speak', step: 'Hardware Control' };
   }
   if (low.includes('screen') || low.includes('vision')) {
-    return { title: 'YUNA • VISION', reply: 'Screen Vision: YUNA App active. வேற app-ல இருக்கும்போது side floating orb வழியா அந்த screen-ஐ வாசிப்பேன் பாஸ்!', meta: 'DOM + OCR VISION', statusLabel: 'Ready • Tap orb to speak', step: 'Screen Reader' };
+    let liveDom = '';
+    if (window.YunaBridge && window.YunaBridge.scanScreen) {
+      try { liveDom = window.YunaBridge.scanScreen(); } catch (_) {}
+    }
+    return { title: 'YUNA • VISION', reply: liveDom ? ('Screen Scan Result:\n' + liveDom) : 'Screen Vision: YUNA App active. வேற app-ல இருக்கும்போது side floating orb வழியா அந்த screen-ஐ வாசிப்பேன் பாஸ்!', meta: 'DOM + OCR VISION', statusLabel: 'Ready • Tap orb to speak', step: 'Screen Reader' };
   }
   if (low.includes('wa') || low.includes('whatsapp')) {
     return { title: 'YUNA • WA INTEL', reply: 'WhatsApp unread notifications எதுவும் pending இல்ல பாஸ்.', meta: 'NOTIFICATION LISTENER', statusLabel: 'Ready • Tap orb to speak', step: 'WA Intel' };
@@ -1188,6 +1192,15 @@ window.addEventListener('scroll', () => {
   if (g) g.textContent = h < 12 ? 'Kaalai Vanakkam Boss' : h < 17 ? 'Vanakkam Boss' : 'Maalai Vanakkam Boss';
 })();
 
+
+
+window.onYunaVoiceResult = function(text) {
+  if (!text) return;
+  inp.value = text;
+  syncInputMode();
+  autoGrowInp();
+  send();
+};
 
 </script>
 </body>
