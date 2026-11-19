@@ -1187,21 +1187,43 @@ function setCloudUrlPrompt() {
   const u = prompt('Cloudflare Worker URL (e.g. https://yuna-ai.workers.dev):', cloudUrl);
   if (u !== null) { cloudUrl = u.trim(); try { localStorage.setItem('yuna_cloud_url', cloudUrl); } catch (_) {} showToast(cloudUrl ? 'Cloud URL saved' : 'Cloud URL cleared'); }
 }
+const yunaCloudSid = (() => {
+  let s = localStorage.getItem('yuna_cloud_sid');
+  if (!s) { s = 'y_' + Date.now().toString(36); try { localStorage.setItem('yuna_cloud_sid', s); } catch (_) {} }
+  return s;
+})();
 async function callYunaCloudRemote(promptText) {
   if (!cloudUrl) return null;
   try {
-    const r = await fetch(cloudUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: promptText, lang: voiceLang }) });
+    const r = await fetch(cloudUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: promptText, sessionId: yunaCloudSid }) });
     const d = await r.json();
-    let actNote = '';
-    if (d.action && d.action !== 'NONE') {
-      if (d.action === 'OPEN_APP_DYNAMIC' && window.YunaBridge && window.YunaBridge.openAppByName) {
-        actNote = window.YunaBridge.openAppByName(d.target || '');
+    const list = Array.isArray(d.actions) ? d.actions.slice(0, 4) : (d.action && d.action !== 'NONE' ? [{ action: d.action, target: d.target || '' }] : []);
+    const notes = [];
+    const restricted = new Set(['DIAL', 'CLEAR_RECENTS', 'LOCK_SCREEN', 'WA_REPLY']);
+    const runOne = (item) => {
+      if (item.action === 'OPEN_APP_DYNAMIC' && window.YunaBridge && window.YunaBridge.openAppByName) {
+        return window.YunaBridge.openAppByName(item.target || '');
+      }
+      return execLocalOsAction(item.action, item.target || '');
+    };
+    if (list.length > 0) {
+      if (restricted.has(list[0].action) && safetyMode !== 'AUTO') {
+        pendingConfirmAction = { cmd: list[0].action, tgt: list[0].target || '', step: list[0].action };
+        notes.push('உறுதிப்படுத்தல் தேவை: ' + list[0].action);
       } else {
-        actNote = execLocalOsAction(d.action, d.target || '');
+        notes.push(runOne(list[0]));
+        list.slice(1).forEach((it, idx) => {
+          setTimeout(() => {
+            if (restricted.has(it.action) && safetyMode !== 'AUTO') return;
+            const out = runOne(it);
+            addYunaStream('YUNA • STEP ' + (idx + 2), out, 'CLOUD MULTI-STEP', it.action, false, null);
+            speakOutput(out);
+          }, (idx + 1) * 1200);
+        });
       }
     }
-    const finalReply = [d.reply, actNote].filter(Boolean).join('\n');
-    return { title: 'YUNA • CLOUD', reply: finalReply || 'பதில் கிடைக்கவில்லை.', meta: 'GROQ + GEMINI', statusLabel: 'Ready', step: d.action !== 'NONE' ? d.action : 'Cloud AI' };
+    const finalReply = [d.reply, ...notes].filter(Boolean).join('\n');
+    return { title: 'YUNA • CLOUD', reply: finalReply || 'பதில் கிடைக்கவில்லை.', meta: 'GROQ + D1 MEMORY', statusLabel: 'Ready', step: list.length ? list.map(x => x.action).join(' → ') : 'Cloud AI' };
   } catch (_) { return null; }
 }
 

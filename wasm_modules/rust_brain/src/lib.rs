@@ -190,6 +190,16 @@ pub mod yuna_core {
         low.contains("காப்பி") || low.contains("கிளிப்போர்டு") || low.contains("clipboard")
     }
 
+    
+    pub fn sanitize_session_id(raw: &str) -> String {
+        let clean: String = raw.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-').take(40).collect();
+        if clean.is_empty() { "default".to_string() } else { clean }
+    }
+
+    pub fn count_actions_in_json(json: &str) -> usize {
+        json.matches("\"action\":\"").count().min(4)
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
