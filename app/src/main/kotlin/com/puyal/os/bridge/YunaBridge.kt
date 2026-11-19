@@ -534,7 +534,8 @@ class YunaBridge(
         return JSONObject().apply {
             put("accessibility", acc); put("overlay", overlay); put("mic", mic)
             put("contacts", contacts); put("call", call); put("notifications", notif)
-            put("battery", battery); put("assistant", assistant)
+            put("battery", battery); put("phoneState", ctx.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED)
+                put("assistant", assistant)
         }.toString()
     }
 
