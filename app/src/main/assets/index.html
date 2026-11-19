@@ -448,6 +448,7 @@
       <div class="set-item" onclick="cycleMood()"><span>Persona Mood</span><span class="set-pill" id="moodPill">COMEDY</span></div>
       <div class="set-item" onclick="verifyOwnerViaBiometric()"><span>Biometric Check</span><span class="set-pill">VERIFY</span></div>
       <div class="set-item" onclick="exportToObsidian()"><span>Export Notes</span><span class="set-pill">EXPORT</span></div>
+      <div class="set-item" onclick="setCloudUrlPrompt()"><span>Cloud Worker URL</span><span class="set-pill">SET</span></div>
       <div class="set-item" onclick="showCrashLog()"><span>Crash Log</span><span class="set-pill">VIEW</span></div>
     </div>
   </details>
@@ -948,8 +949,11 @@ function send(overrideText) {
   if (activeReplyTimeout) clearTimeout(activeReplyTimeout);
   activeReplyTimeout = setTimeout(async () => {
     let res = null;
-    if (brainMode === 'CLOUD') { res = await callPuyalCloud(fullQ); if (res && res.reply) speakOutput(res.reply); }
-    if (!res) res = routeYunaPersona(fullQ);
+    res = routeYunaPersona(fullQ);
+    if (res && res.meta === 'YUNA ROUTER' && cloudUrl) {
+      const cRes = await callYunaCloudRemote(fullQ);
+      if (cRes) { res = cRes; speakOutput(res.reply); }
+    }
     typingWrap.remove(); sendLock = false; actionOrb.classList.remove('locked');
     setOrbState(res.stranger ? 'STRANGER' : 'IDLE', res.statusLabel);
     addYunaStream(res.title, res.reply, res.meta, res.step, false, fullQ);
@@ -1174,6 +1178,30 @@ function parseTargetTimeMs(q) {
   d.setHours(hr % 24, min, 0, 0);
   if (!isTom && d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
   return d;
+}
+
+
+let cloudUrl = localStorage.getItem('yuna_cloud_url') || '';
+function setCloudUrlPrompt() {
+  const u = prompt('Cloudflare Worker URL (e.g. https://yuna-ai.workers.dev):', cloudUrl);
+  if (u !== null) { cloudUrl = u.trim(); try { localStorage.setItem('yuna_cloud_url', cloudUrl); } catch (_) {} showToast(cloudUrl ? 'Cloud URL saved' : 'Cloud URL cleared'); }
+}
+async function callYunaCloudRemote(promptText) {
+  if (!cloudUrl) return null;
+  try {
+    const r = await fetch(cloudUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: promptText, lang: voiceLang }) });
+    const d = await r.json();
+    let actNote = '';
+    if (d.action && d.action !== 'NONE') {
+      if (d.action === 'OPEN_APP_DYNAMIC' && window.YunaBridge && window.YunaBridge.openAppByName) {
+        actNote = window.YunaBridge.openAppByName(d.target || '');
+      } else {
+        actNote = execLocalOsAction(d.action, d.target || '');
+      }
+    }
+    const finalReply = [d.reply, actNote].filter(Boolean).join('\n');
+    return { title: 'YUNA • CLOUD', reply: finalReply || 'பதில் கிடைக்கவில்லை.', meta: 'GROQ + GEMINI', statusLabel: 'Ready', step: d.action !== 'NONE' ? d.action : 'Cloud AI' };
+  } catch (_) { return null; }
 }
 
 function routeYunaPersona(rawQ) {

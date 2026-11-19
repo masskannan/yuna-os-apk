@@ -27,4 +27,8 @@ object YunaNative {
         } else false
         return rustAllow || cmd.startsWith("oom_score_adj") || cmd.startsWith("svc ") || cmd.startsWith("input ")
     }
+
+    fun isRestrictedAction(action: String): Boolean {
+        return action == "DIAL" || action == "CLEAR_RECENTS" || action == "LOCK_SCREEN" || action == "WA_REPLY"
+    }
 }
