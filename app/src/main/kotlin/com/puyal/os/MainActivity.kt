@@ -156,12 +156,12 @@ class MainActivity : ComponentActivity() {
                     }
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() {
-                        if (error == SpeechRecognizer.ERROR_AUDIO || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
-                            webView.evaluateJavascript("if(typeof showToast==='function')showToast('மைக் மற்றொரு செயலியில் பயன்பாட்டில் உள்ளது');", null)
-                        }
                         webView.evaluateJavascript("if(window.onYunaVoiceEnded)window.onYunaVoiceEnded();", null)
                     }
                     override fun onError(error: Int) {
+                        if (error == SpeechRecognizer.ERROR_AUDIO || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
+                            webView.evaluateJavascript("if(typeof showToast==='function')showToast('மைக் மற்றொரு செயலியில் பயன்பாட்டில் உள்ளது');", null)
+                        }
                         if (!preferOffline && (error == SpeechRecognizer.ERROR_NETWORK || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT)) {
                             startHeadlessVoice(lang, true)
                             return
