@@ -8,7 +8,9 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.webkit.JavascriptInterface
+import com.puyal.os.nativebridge.YunaNative
 import com.puyal.os.service.PuyalAccessService
+import com.puyal.os.service.PuyalNotifService
 
 class YunaBridge(private val ctx: Context, private val onVoiceReq: (String) -> Unit) {
     private var torchOn = false
@@ -18,15 +20,18 @@ class YunaBridge(private val ctx: Context, private val onVoiceReq: (String) -> U
         "TORCH", "BRIGHTNESS_UP", "BRIGHTNESS_DOWN", "NET_PANEL"
     )
 
-    @JavascriptInterface
-    fun scanScreen(): String {
-        val acc = PuyalAccessService.instance
-        return acc?.scanNow()?.ifBlank { "No readable text on screen" } ?: "Enable YUNA Accessibility in Settings"
-    }
+    @JavascriptInterface fun scanScreen(): String = PuyalAccessService.instance?.scanNow()?.ifBlank { "No readable text" } ?: "Enable YUNA Accessibility"
+    @JavascriptInterface fun getWaSummary(): String = PuyalNotifService.getSummary()
+    @JavascriptInterface fun clickOnScreen(label: String): String = PuyalAccessService.instance?.clickByText(label) ?: "Enable YUNA Accessibility"
+    @JavascriptInterface fun checkSensitive(txt: String): Boolean = YunaNative.hasSensitiveToken(txt)
+    @JavascriptInterface fun startVoice(lang: String) { onVoiceReq(lang.ifBlank { "ta-IN" }) }
 
     @JavascriptInterface
-    fun startVoice(lang: String) {
-        onVoiceReq(lang.ifBlank { "ta-IN" })
+    fun getPermissionStatus(): String {
+        val ov = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(ctx) else true
+        val acc = PuyalAccessService.instance != null
+        val wr = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.System.canWrite(ctx) else true
+        return "{\"overlay\":$ov,\"accessibility\":$acc,\"writeSettings\":$wr}"
     }
 
     @JavascriptInterface
@@ -51,17 +56,13 @@ class YunaBridge(private val ctx: Context, private val onVoiceReq: (String) -> U
                 val q = target.removePrefix("youtube:")
                 val uri = "https://www.youtube.com/results?search_query=" + Uri.encode(q)
                 if (acc?.launchUriFromService(uri) == true) "YouTube Search: $q"
-                else {
-                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                    "YouTube Search: $q"
-                }
+                else { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); "YouTube Search: $q" }
             }
             "TORCH" -> {
                 try {
                     val cm = ctx.getSystemService(Context.CAMERA_SERVICE) as CameraManager
                     val id = cm.cameraIdList.firstOrNull() ?: return "No flash"
-                    torchOn = !torchOn
-                    cm.setTorchMode(id, torchOn)
+                    torchOn = !torchOn; cm.setTorchMode(id, torchOn)
                     if (torchOn) "Torch ON" else "Torch OFF"
                 } catch (e: Exception) { "Torch err: ${e.message}" }
             }
@@ -77,8 +78,7 @@ class YunaBridge(private val ctx: Context, private val onVoiceReq: (String) -> U
             }
             "NET_PANEL" -> {
                 val act = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) Settings.Panel.ACTION_INTERNET_CONNECTIVITY else Settings.ACTION_WIFI_SETTINGS
-                ctx.startActivity(Intent(act).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                "Net Panel Opened"
+                ctx.startActivity(Intent(act).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); "Net Panel Opened"
             }
             else -> "Done"
         }

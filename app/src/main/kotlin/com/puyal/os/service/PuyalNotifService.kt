@@ -1,56 +1,31 @@
 package com.puyal.os.service
 
-import android.app.RemoteInput
-import android.content.Intent
-import android.os.Bundle
+import android.app.Notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import java.util.concurrent.ConcurrentLinkedDeque
+import com.puyal.os.nativebridge.YunaNative
+import java.util.concurrent.CopyOnWriteArrayList
 
 class PuyalNotifService : NotificationListenerService() {
-
     companion object {
-        val actionLedger = ConcurrentLinkedDeque<String>()
-        private val vipKeywords = listOf("amma", "அம்மா", "akka", "அக்கா", "vel", "load", "லோட்")
+        private val waQueue = CopyOnWriteArrayList<String>()
+        private val WA_PKGS = setOf("com.whatsapp", "com.whatsapp.w4b")
+
+        fun getSummary(): String {
+            if (waQueue.isEmpty()) return "WhatsApp unread notifications எதுவும் pending இல்ல பாஸ்."
+            return "Unread WhatsApp:\n" + waQueue.takeLast(5).joinToString("\n")
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         val pkg = sbn?.packageName ?: return
-        if (pkg != "com.whatsapp" && pkg != "com.whatsapp.w4b") return
-
+        if (pkg !in WA_PKGS) return
         val extras = sbn.notification?.extras ?: return
-        val sender = extras.getCharSequence("android.title")?.toString() ?: return
-        val text = extras.getCharSequence("android.text")?.toString() ?: return
-
-        val isVip = vipKeywords.any { sender.lowercase().contains(it) || text.lowercase().contains(it) }
-        if (!isVip) return
-
-        val actions = sbn.notification?.actions ?: return
-        for (act in actions) {
-            val remoteInputs = act.remoteInputs ?: continue
-            if (remoteInputs.isNotEmpty()) {
-                val replyText = if (text.contains("load", true) || text.contains("லோட்")) {
-                    "வணக்கம், Vel Logistics பதிவு செய்யப்பட்டது. உடனே தொடர்பு கொள்கிறோம்."
-                } else {
-                    "இப்போ கொஞ்சம் வேலையா இருக்கேன், சிறிது நேரத்தில் கால் பண்றேன்."
-                }
-                sendSilentReply(act.actionIntent, remoteInputs, replyText)
-                if (actionLedger.size >= 50) actionLedger.pollFirst()
-                actionLedger.addLast("WhatsApp auto-replied to $sender")
-                break
-            }
-        }
-    }
-
-    private fun sendSilentReply(pendingIntent: android.app.PendingIntent, remoteInputs: Array<RemoteInput>, msg: String) {
-        try {
-            val intent = Intent()
-            val bundle = Bundle()
-            for (ri in remoteInputs) {
-                bundle.putCharSequence(ri.resultKey, msg)
-            }
-            RemoteInput.addResultsToIntent(remoteInputs, intent, bundle)
-            pendingIntent.send(this, 0, intent)
-        } catch (_: Exception) {}
+        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim() ?: return
+        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim() ?: return
+        val safeText = if (YunaNative.hasSensitiveToken(text)) "[REDACTED OTP/PIN]" else text
+        val entry = "• $title: $safeText"
+        if (waQueue.size >= 15) waQueue.removeAt(0)
+        waQueue.add(entry)
     }
 }

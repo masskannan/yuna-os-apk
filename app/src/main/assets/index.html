@@ -950,7 +950,17 @@ function routeYunaPersona(q) {
     let liveDom = ''; if (window.YunaBridge && window.YunaBridge.scanScreen) { try { liveDom = window.YunaBridge.scanScreen(); } catch (_) {} }
     return { title: 'YUNA • VISION', reply: liveDom ? ('Screen Scan Result:\n' + liveDom) : 'Screen Vision: YUNA App active. வேற app-ல இருக்கும்போது side floating orb வழியா அந்த screen-ஐ வாசிப்பேன் பாஸ்!', meta: 'DOM + OCR VISION', statusLabel: 'Ready • Tap orb to speak', step: 'Screen Reader' };
   }
-  if (low.includes('wa') || low.includes('whatsapp')) return { title: 'YUNA • WA INTEL', reply: 'WhatsApp unread notifications எதுவும் pending இல்ல பாஸ்.', meta: 'NOTIFICATION LISTENER', statusLabel: 'Ready • Tap orb to speak', step: 'WA Intel' };
+  if (low.includes('wa') || low.includes('whatsapp')) {
+    let waLive = '';
+    if (window.YunaBridge && window.YunaBridge.getWaSummary) { try { waLive = window.YunaBridge.getWaSummary(); } catch (_) {} }
+    return { title: 'YUNA • WA INTEL', reply: waLive || 'WhatsApp unread notifications எதுவும் pending இல்ல பாஸ்.', meta: 'NOTIFICATION LISTENER', statusLabel: 'Ready • Tap orb to speak', step: 'WA Intel' };
+  }
+  if (low.startsWith('tap ') || low.startsWith('click ')) {
+    const target = q.replace(/^(tap|click)\s+/i, '').trim();
+    let resTap = 'Auto-Tap queued: ' + target;
+    if (window.YunaBridge && window.YunaBridge.clickOnScreen) { try { resTap = window.YunaBridge.clickOnScreen(target); } catch (_) {} }
+    return { title: 'YUNA • AUTO-TAP', reply: resTap, meta: 'ACCESSIBILITY CLICK', statusLabel: 'Ready • Tap orb to speak', step: 'Auto-Tap' };
+  }
   if (low.includes('ஹாய்') || low === 'hi' || low.includes('hello') || low.includes('vanakkam')) {
     return { title: 'YUNA • LOCAL', reply: personaMood === 'COMEDY' ? 'ஹாய் கண்ணன்! எப்படி இருக்கீங்க? சொல்லுங்க பாஸ், என்ன பண்ணலாம்?' : 'வணக்கம் கண்ணன்! சொல்லுங்க, என்ன உதவி வேணும்?', meta: 'LOCAL PERSONA • ' + personaMood, statusLabel: 'Ready • Tap orb to speak', step: 'Local Brain' };
   }

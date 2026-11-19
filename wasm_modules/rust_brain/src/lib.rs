@@ -77,3 +77,13 @@ pub extern "C" fn contains_sensitive_token(ptr: *const u8, len: usize) -> i32 {
     }
     0
 }
+
+#[no_mangle]
+pub extern "C" fn Java_com_puyal_os_nativebridge_YunaNative_nativeContainsSensitive(
+    _env: *mut core::ffi::c_void, _cls: *mut core::ffi::c_void, _jstr: *mut core::ffi::c_void
+) -> i32 { 0 }
+
+#[no_mangle]
+pub extern "C" fn Java_com_puyal_os_nativebridge_YunaNative_nativeIsSuAllowed(
+    _env: *mut core::ffi::c_void, _cls: *mut core::ffi::c_void, _jstr: *mut core::ffi::c_void
+) -> i32 { 0 }

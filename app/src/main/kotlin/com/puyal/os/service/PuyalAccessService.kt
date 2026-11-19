@@ -13,34 +13,24 @@ class PuyalAccessService : AccessibilityService() {
         @Volatile var lastScreenText: String = ""
         private var lastActionMs = 0L
         private val BANKING_BLOCKLIST = setOf(
-            "com.google.android.apps.nbu.paisa.user",
-            "com.phonepe.app",
-            "net.one97.paytm",
-            "com.sbi.lotusintouch",
-            "com.csam.icici.bank.imobile",
-            "com.snapwork.hdfc"
+            "com.google.android.apps.nbu.paisa.user", "com.phonepe.app", "net.one97.paytm",
+            "com.sbi.lotusintouch", "com.csam.icici.bank.imobile", "com.snapwork.hdfc"
         )
     }
 
     override fun onServiceConnected() { super.onServiceConnected(); instance = this }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val pkg = event?.packageName?.toString() ?: return
-        if (pkg in BANKING_BLOCKLIST) {
-            lastScreenText = "[REDACTED: Banking/UPI App Protected]"
-            return
-        }
+        if (pkg in BANKING_BLOCKLIST) { lastScreenText = "[REDACTED: Banking/UPI App Protected]"; return }
         val root = rootInActiveWindow ?: return
-        val sb = StringBuilder()
-        collectText(root, sb, 0)
+        val sb = StringBuilder(); collectText(root, sb, 0)
         if (sb.isNotEmpty()) lastScreenText = "[$pkg] " + sb.toString().take(800)
     }
 
     private fun collectText(node: AccessibilityNodeInfo?, sb: StringBuilder, depth: Int) {
         if (node == null || depth > 12 || sb.length > 800) return
         node.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { sb.append(it).append(" | ") }
-        for (i in 0 until node.childCount) {
-            collectText(node.getChild(i), sb, depth + 1)
-        }
+        for (i in 0 until node.childCount) collectText(node.getChild(i), sb, depth + 1)
     }
 
     override fun onInterrupt() {}
@@ -50,9 +40,27 @@ class PuyalAccessService : AccessibilityService() {
         val root = rootInActiveWindow ?: return lastScreenText
         val pkg = root.packageName?.toString() ?: "unknown"
         if (pkg in BANKING_BLOCKLIST) return "[REDACTED: Banking/UPI App Protected]"
-        val sb = StringBuilder()
-        collectText(root, sb, 0)
+        val sb = StringBuilder(); collectText(root, sb, 0)
         return if (sb.isNotEmpty()) "[$pkg] " + sb.toString().take(800) else lastScreenText
+    }
+
+    fun clickByText(label: String): String {
+        val root = rootInActiveWindow ?: return "No active screen"
+        val pkg = root.packageName?.toString() ?: ""
+        if (pkg in BANKING_BLOCKLIST) return "Blocked on Banking App"
+        val matches = root.findAccessibilityNodeInfosByText(label)
+        for (n in matches) {
+            var cur: AccessibilityNodeInfo? = n
+            var hops = 0
+            while (cur != null && hops < 5) {
+                if (cur.isClickable) {
+                    val ok = cur.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    return if (ok) "Tapped '$label'" else "Tap failed"
+                }
+                cur = cur.parent; hops++
+            }
+        }
+        return "Button '$label' not found"
     }
 
     fun runNav(actionId: Int): Boolean {
@@ -64,13 +72,10 @@ class PuyalAccessService : AccessibilityService() {
 
     fun launchAppFromService(pkg: String): Boolean {
         val intent = packageManager.getLaunchIntentForPackage(pkg) ?: return false
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        startActivity(intent)
-        return true
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(intent); return true
     }
 
     fun launchUriFromService(uriStr: String): Boolean {
-        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uriStr)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        return true
+        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uriStr)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); return true
     }
 }
