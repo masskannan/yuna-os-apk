@@ -47,12 +47,15 @@ jobs:
         run: |
           mkdir -p app/src/main/jniLibs/arm64-v8a
           zig build-lib wasm_modules/zig_hands/src/main.zig -target aarch64-linux-android -dynamic -O ReleaseSmall -femit-bin=app/src/main/jniLibs/arm64-v8a/libyuna_zig.so
-      - name: Build Polyglot Debug APK
+      - name: Build Debug & Minified Release APK + Size Check
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
-      - name: Upload APK Artifact
+          ./gradlew assembleDebug assembleRelease --no-daemon
+          ls -lh app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/*.apk
+      - name: Upload Debug & Release APKs
         uses: actions/upload-artifact@v4
         with:
-          name: yuna-polyglot-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: yuna-polyglot-apks
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/release/*.apk
