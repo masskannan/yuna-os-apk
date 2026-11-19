@@ -13,6 +13,7 @@ import android.hardware.camera2.CameraManager
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.media.MediaPlayer
 import android.media.MediaRecorder
 import java.net.HttpURLConnection
 import java.net.URL
@@ -145,6 +146,77 @@ class YunaBridge(
         return s.replace(Regex("\\s+"), " ").trim()
     }
 
+
+    private var mediaPlayer: MediaPlayer? = null
+
+    @JavascriptInterface
+    fun speakSmart(text: String, persona: String, baseUrl: String) {
+        if (persona.equals("SILENT", true) || text.isBlank()) { mainH.post { onTtsDone() }; return }
+        val hasTamil = text.any { it in '\u0B80'..'\u0BFF' }
+        val ep = baseUrl.trim().trimEnd('/')
+        if (!hasTamil && ep.startsWith("http")) {
+            Thread {
+                val mp3 = fetchCloudTts(ep + "/tts", text)
+                if (mp3 != null && mp3.exists() && mp3.length() > 500) {
+                    mainH.post { playMp3File(mp3) }
+                } else {
+                    speakPersona(text, persona)
+                }
+            }.start()
+        } else {
+            speakPersona(text, persona)
+        }
+    }
+
+    private fun fetchCloudTts(endpoint: String, text: String): File? {
+        return try {
+            val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                connectTimeout = 5000
+                readTimeout = 8000
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("User-Agent", "YUNA-App/1.0")
+            }
+            val body = JSONObject().apply { put("text", text.take(450)) }.toString()
+            conn.outputStream.use { it.write(body.toByteArray()) }
+            if (conn.responseCode != 200) return null
+            val out = File(ctx.cacheDir, "yuna_tts.mp3")
+            conn.inputStream.use { inp -> out.outputStream().use { inp.copyTo(it) } }
+            out
+        } catch (_: Exception) { null }
+    }
+
+    private fun playMp3File(f: File) {
+        try {
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+            mediaPlayer = null
+            requestDuckFocus()
+            mediaPlayer = MediaPlayer().apply {
+                setDataSource(f.absolutePath)
+                setOnCompletionListener { mp ->
+                    try { mp.release() } catch (_: Exception) {}
+                    mediaPlayer = null
+                    abandonDuckFocus()
+                    onTtsDone()
+                }
+                setOnErrorListener { mp, _, _ ->
+                    try { mp.release() } catch (_: Exception) {}
+                    mediaPlayer = null
+                    abandonDuckFocus()
+                    onTtsDone()
+                    true
+                }
+                prepare()
+                start()
+            }
+        } catch (_: Exception) {
+            abandonDuckFocus()
+            onTtsDone()
+        }
+    }
+
     @JavascriptInterface
     fun speakPersona(text: String, persona: String) {
         if (!ttsReady && !persona.equals("SILENT", true) && text.isNotBlank()) { pendingTtsText = text; pendingTtsPersona = persona; return }
@@ -181,6 +253,7 @@ class YunaBridge(
     @JavascriptInterface
     fun stopSpeaking() {
         mainH.post {
+            try { mediaPlayer?.stop(); mediaPlayer?.release(); mediaPlayer = null } catch (_: Exception) {}
             try { tts?.stop() } catch (_: Exception) {}
             abandonDuckFocus()
             onTtsDone()

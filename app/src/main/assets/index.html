@@ -701,6 +701,9 @@ function stopAnySpeaking() {
 }
 function speakOutput(txt) {
   if (!txt || voicePersona === 'SILENT') return;
+  if (window.YunaBridge && window.YunaBridge.speakSmart) {
+    try { window.YunaBridge.speakSmart(txt, voicePersona, cloudUrl || ''); return; } catch (_) {}
+  }
   if (window.YunaBridge && window.YunaBridge.speakPersona) {
     try { window.YunaBridge.speakPersona(txt, voicePersona); return; } catch (_) {}
   }
@@ -1054,7 +1057,7 @@ function speakText(btn) {
     if (s.textContent === 'Stop') { stopAnySpeaking(); s.textContent = 'Listen'; activeListenSpan = null; return; }
     if (activeListenSpan) activeListenSpan.textContent = 'Listen';
     activeListenSpan = s; s.textContent = 'Stop';
-    window.YunaBridge.speakPersona(txt, voicePersona === 'SILENT' ? 'YUNA' : voicePersona);
+    if (window.YunaBridge.speakSmart) window.YunaBridge.speakSmart(txt, voicePersona === 'SILENT' ? 'YUNA' : voicePersona, cloudUrl || ''); else window.YunaBridge.speakPersona(txt, voicePersona === 'SILENT' ? 'YUNA' : voicePersona);
     return;
   }
   if (!('speechSynthesis' in window)) { showToast('TTS unavailable'); return; }
