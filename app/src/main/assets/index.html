@@ -1104,6 +1104,95 @@ window.addEventListener('scroll', () => {
   if (g) g.textContent = h < 12 ? 'Kaalai Vanakkam Boss' : h < 17 ? 'Vanakkam Boss' : 'Maalai Vanakkam Boss';
 })();
 
+
+// === v6 DUAL-BRAIN: LOCAL PRIVACY FIREWALL + FULL OS CONTROL + CLOUD->YUNA DELEGATION ===
+const SAFE_DELEGATE_ALLOWLIST = new Set([
+  'OPEN_APP', 'DEEP_LINK_SEARCH', 'GLOBAL_BACK', 'GLOBAL_HOME',
+  'GLOBAL_RECENTS', 'GLOBAL_NOTIFICATIONS', 'GLOBAL_QUICK_SETTINGS',
+  'TORCH', 'BRIGHTNESS_UP', 'BRIGHTNESS_DOWN', 'NET_PANEL'
+]);
+
+function redactSensitiveLocal(txt) {
+  return (txt || '')
+    .replace(/\b\d{4,8}\b/g, '[REDACTED_NUM]')
+    .replace(/\b(otp|cvv|pin|upi|password|mpin)\b/gi, '[REDACTED_KEY]');
+}
+
+function execLocalOsAction(action, target) {
+  if (!SAFE_DELEGATE_ALLOWLIST.has(action)) {
+    return 'Blocked by YUNA Tier Guard: ' + action;
+  }
+  if (window.YunaBridge && window.YunaBridge.executeAction) {
+    try { return window.YunaBridge.executeAction(action, target || ''); } catch (_) {}
+  }
+  return 'YUNA Local Action queued: ' + action + (target ? ' (' + target + ')' : '');
+}
+
+const _origCallPuyalCloud = callPuyalCloud;
+callPuyalCloud = async function(promptText) {
+  const safePrompt = redactSensitiveLocal(promptText);
+  const res = await _origCallPuyalCloud(safePrompt);
+  if (!res) return null;
+  try {
+    const parsed = typeof res.reply === 'string' && res.reply.trim().startsWith('{') ? JSON.parse(res.reply) : null;
+    if (parsed && parsed.delegate_to === 'YUNA' && parsed.action) {
+      const localNote = execLocalOsAction(parsed.action, parsed.target || '');
+      return {
+        title: 'PUYAL → YUNA',
+        reply: (parsed.say || 'சரி பாஸ், YUNA கிட்ட சொல்லி உடனே பண்றேன்!') + '\n[' + localNote + ']',
+        meta: 'CLOUD DELEGATED • LOCAL EXECUTED',
+        statusLabel: 'Ready • Tap orb to speak',
+        step: 'Cloud → YUNA Handoff'
+      };
+    }
+  } catch (_) {}
+  return res;
+};
+
+const _origRouteYuna = routeYunaPersona;
+routeYunaPersona = function(q) {
+  const low = q.toLowerCase();
+  if (low.includes('youtube') && (low.includes('போடு') || low.includes('play') || low.includes('search'))) {
+    const query = q.replace(/youtube|ஓபன்|open|பண்ணு|போடு|play|search|-ல|ல/gi, '').trim() || 'trending tamil';
+    execLocalOsAction('DEEP_LINK_SEARCH', 'youtube:' + query);
+    return { title: 'YUNA • OS CONTROL', reply: 'YouTube-ல "' + query + '" இப்போ open பண்றேன் பாஸ்!', meta: 'LOCAL OS ACTION • PRIVACY LOCKED', statusLabel: 'Ready • Tap orb to speak', step: 'YouTube Deep Link' };
+  }
+  if (low.includes('youtube') && (low.includes('open') || low.includes('ஓபன்'))) {
+    execLocalOsAction('OPEN_APP', 'com.google.android.youtube');
+    return { title: 'YUNA • OS CONTROL', reply: 'YouTube open பண்ணியாச்சு பாஸ்!', meta: 'LOCAL APP LAUNCH', statusLabel: 'Ready • Tap orb to speak', step: 'App Switcher' };
+  }
+  if (low.includes('chrome')) {
+    execLocalOsAction('OPEN_APP', 'com.android.chrome');
+    return { title: 'YUNA • OS CONTROL', reply: 'Chrome open பண்ணியாச்சு பாஸ்!', meta: 'LOCAL APP LAUNCH', statusLabel: 'Ready • Tap orb to speak', step: 'App Switcher' };
+  }
+  if (low.includes('back') || low.includes('பேக்')) {
+    execLocalOsAction('GLOBAL_BACK', '');
+    return { title: 'YUNA • NAVIGATION', reply: 'Back பண்ணியாச்சு பாஸ்!', meta: 'GLOBAL NAV', statusLabel: 'Ready • Tap orb to speak', step: 'Bottom Nav Back' };
+  }
+  if (low.includes('home') || low.includes('ஹோம்')) {
+    execLocalOsAction('GLOBAL_HOME', '');
+    return { title: 'YUNA • NAVIGATION', reply: 'Home screen-க்கு வந்தாச்சு பாஸ்!', meta: 'GLOBAL NAV', statusLabel: 'Ready • Tap orb to speak', step: 'Bottom Nav Home' };
+  }
+  if (low.includes('recent') || low.includes('ரீசண்ட்')) {
+    execLocalOsAction('GLOBAL_RECENTS', '');
+    return { title: 'YUNA • NAVIGATION', reply: 'Recent apps open பண்ணியாச்சு!', meta: 'GLOBAL NAV', statusLabel: 'Ready • Tap orb to speak', step: 'Bottom Nav Recents' };
+  }
+  if (low.includes('notification') || low.includes('நோட்டிபிகேஷன்')) {
+    execLocalOsAction('GLOBAL_NOTIFICATIONS', '');
+    return { title: 'YUNA • NAVIGATION', reply: 'Top Notification shade இறக்கியாச்சு!', meta: 'TOP NAV CONTROL', statusLabel: 'Ready • Tap orb to speak', step: 'Top Shade' };
+  }
+  if (low.includes('brightness') || low.includes('பிரைட்னஸ்')) {
+    const up = low.includes('கூட்டு') || low.includes('up') || low.includes('high') || low.includes('அதிகம்');
+    execLocalOsAction(up ? 'BRIGHTNESS_UP' : 'BRIGHTNESS_DOWN', '');
+    return { title: 'YUNA • HARDWARE', reply: up ? 'Brightness கூட்டியாச்சு பாஸ்!' : 'Brightness குறைச்சாச்சு பாஸ்!', meta: 'LOCAL DISPLAY CONTROL', statusLabel: 'Ready • Tap orb to speak', step: 'Brightness' };
+  }
+  if (low.includes('net') || low.includes('wifi') || low.includes('நெட்')) {
+    execLocalOsAction('NET_PANEL', '');
+    return { title: 'YUNA • NETWORK', reply: 'Internet / Wi-Fi Quick Panel open பண்ணியாச்சு!', meta: 'LOCAL CONNECTIVITY', statusLabel: 'Ready • Tap orb to speak', step: 'Net Panel' };
+  }
+  return _origRouteYuna(q);
+};
+
 </script>
 </body>
 </html>
