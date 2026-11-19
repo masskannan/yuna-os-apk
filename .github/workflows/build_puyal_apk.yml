@@ -1,5 +1,8 @@
 name: Build YUNA Polyglot Sovereign APK
 
+permissions:
+  contents: write
+
 on:
   push:
     branches: [ "main" ]
@@ -69,4 +72,20 @@ jobs:
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/SHA256SUMS.txt
+
+      - name: Prepare Raw Direct-Install APKs
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk YUNA-Sovereign-Debug.apk
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk YUNA-Sovereign-Release.apk
+          fi
+      - name: Publish Direct .apk GitHub Release (latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: YUNA Sovereign OS (Direct APK)
+          prerelease: false
+          files: |
+            YUNA-Sovereign-*.apk
             app/build/outputs/apk/SHA256SUMS.txt
