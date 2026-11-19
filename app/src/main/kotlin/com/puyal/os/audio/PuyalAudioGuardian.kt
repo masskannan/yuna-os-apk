@@ -1,81 +1,39 @@
 package com.puyal.os.audio
 
 import android.content.Context
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
+import android.media.AudioDeviceInfo
 import android.media.AudioManager
-import android.media.AudioRecord
-import android.media.audiofx.AcousticEchoCanceler
 import android.os.Build
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import kotlin.math.sqrt
 
-class PuyalAudioGuardian(private val context: Context) {
-    companion object {
-        init { System.loadLibrary("puyal_ffi") }
-    }
+object PuyalAudioGuardian {
+    private const val THRESHOLD = 0.85f
 
-    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    private var audioRecord: AudioRecord? = null
-    private var echoCanceler: AcousticEchoCanceler? = null
-    @Volatile var isMicYieldedToCall = false
-    @Volatile var isListening = false
-
-    external fun nativeSetTtsSpeaking(speaking: Boolean)
-    external fun nativeVerifyVoiceprint(liveEmb: FloatArray, adminEmb: FloatArray, timePinFallback: String?): Boolean
-    external fun nativeProcessPcmFrame(pcmFrame: ShortArray, sampleRate: Int): String
-
-    private val focusListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
-        when (focusChange) {
-            AudioManager.AUDIOFOCUS_LOSS,
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                isMicYieldedToCall = true
-                stopCaptureImmediately()
+    fun enableBluetoothSco(ctx: Context): String {
+        return try {
+            val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val bt = am.availableCommunicationDevices.firstOrNull {
+                    it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO || it.type == AudioDeviceInfo.TYPE_BLE_HEADSET
+                }
+                if (bt != null) { am.setCommunicationDevice(bt); return "Bluetooth Mic Active" }
+            } else {
+                @Suppress("DEPRECATION")
+                am.startBluetoothSco()
+                am.isBluetoothScoOn = true
+                return "Bluetooth SCO Active"
             }
-            AudioManager.AUDIOFOCUS_GAIN -> {
-                isMicYieldedToCall = false
-            }
-        }
+            "Phone Mic Active"
+        } catch (e: Exception) { "Audio route err: ${e.message}" }
     }
 
-    fun requestAudioFocusAndStart(): Boolean {
-        if (isMicYieldedToCall) return false
-        val res = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ASSISTANT)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build()
-                )
-                .setOnAudioFocusChangeListener(focusListener)
-                .build()
-            audioManager.requestAudioFocus(req)
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.requestAudioFocus(focusListener, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-        }
-        return res == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    fun cosineSimilarity(a: FloatArray, b: FloatArray): Float {
+        if (a.size != b.size || a.isEmpty()) return 0f
+        var dot = 0f; var na = 0f; var nb = 0f
+        for (i in a.indices) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i] }
+        val denom = sqrt(na) * sqrt(nb)
+        return if (denom > 0f) dot / denom else 0f
     }
 
-    fun attachHardwareEchoCanceler(audioSessionId: Int) {
-        if (AcousticEchoCanceler.isAvailable()) {
-            echoCanceler?.release()
-            echoCanceler = AcousticEchoCanceler.create(audioSessionId)?.apply { enabled = true }
-        }
-    }
-
-    fun getCurrentTimePin(): String = SimpleDateFormat("HHmm", Locale.US).format(Date())
-
-    fun stopCaptureImmediately() {
-        isListening = false
-        try {
-            audioRecord?.stop()
-            audioRecord?.release()
-            audioRecord = null
-            echoCanceler?.release()
-            echoCanceler = null
-        } catch (_: Exception) {}
-    }
+    fun isOwnerVoice(sample: FloatArray, enrolled: FloatArray): Boolean = cosineSimilarity(sample, enrolled) >= THRESHOLD
 }

@@ -10,7 +10,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.speech.RecognizerIntent
 import android.webkit.*
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -20,7 +20,7 @@ import com.puyal.os.service.PuyalCoreService
 import org.json.JSONObject
 import java.io.File
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     private lateinit var webView: WebView
     private var fileCb: ValueCallback<Array<Uri>>? = null
 

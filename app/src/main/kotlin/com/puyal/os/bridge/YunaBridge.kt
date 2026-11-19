@@ -107,4 +107,23 @@ class YunaBridge(private val ctx: Context, private val onVoiceReq: (String) -> U
         return if (f.exists()) f.readText().takeLast(1200) else "No crashes recorded"
     }
 
+
+    @JavascriptInterface
+    fun startBluetoothMic(): String = com.puyal.os.audio.PuyalAudioGuardian.enableBluetoothSco(ctx)
+
+    @JavascriptInterface
+    fun verifyOwnerBiometric() {
+        val act = ctx as? androidx.fragment.app.FragmentActivity ?: return
+        act.runOnUiThread {
+            val exec = androidx.core.content.ContextCompat.getMainExecutor(ctx)
+            val prompt = androidx.biometric.BiometricPrompt(act, exec, object : androidx.biometric.BiometricPrompt.AuthenticationCallback() {})
+            val info = androidx.biometric.BiometricPrompt.PromptInfo.Builder()
+                .setTitle("YUNA Voice Shield Fallback")
+                .setSubtitle("Verify Kannan identity")
+                .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK or androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+                .build()
+            prompt.authenticate(info)
+        }
+    }
+
 }

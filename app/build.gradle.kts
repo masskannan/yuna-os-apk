@@ -65,6 +65,7 @@ android {
 }
 
 dependencies {
+    implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.work:work-runtime-ktx:2.9.0")
     implementation("androidx.webkit:webkit:1.10.0")
     val composeBom = platform("androidx.compose:compose-bom:2024.06.00")

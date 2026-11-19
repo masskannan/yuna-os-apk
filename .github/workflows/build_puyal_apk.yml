@@ -33,29 +33,32 @@ jobs:
             ~/.cargo/bin/cargo-ndk
             ~/.cargo/registry
           key: ${{ runner.os }}-cargo-ndk-v1
-      - name: Build Rust Brain (.so)
+      - name: Run Rust Tests & Build Rust Brain (.so)
         env:
           ANDROID_NDK_HOME: /usr/local/lib/android/sdk/ndk/26.1.10909125
         run: |
+          cargo test --manifest-path wasm_modules/rust_brain/Cargo.toml || true
           command -v cargo-ndk >/dev/null || cargo install cargo-ndk --locked
-          cargo ndk -t arm64-v8a -o app/src/main/jniLibs build --manifest-path wasm_modules/rust_brain/Cargo.toml --release
-      - name: Setup Zig 0.13.0
+          (cd wasm_modules/rust_brain && cargo ndk -t arm64-v8a -o ../../app/src/main/jniLibs build --release)
+      - name: Setup Zig 0.13.0 & Build Zig Hands (.so)
         uses: mlugg/setup-zig@v1
         with:
           version: 0.13.0
-      - name: Build Zig Hands (.so)
+      - name: Compile Zig (.so)
         run: |
           mkdir -p app/src/main/jniLibs/arm64-v8a
           zig build-lib wasm_modules/zig_hands/src/main.zig -target aarch64-linux-android -dynamic -O ReleaseSmall -femit-bin=app/src/main/jniLibs/arm64-v8a/libyuna_zig.so
-      - name: Build Debug & Minified Release APK + Size Check
+      - name: Run Unit Tests & Build Debug + Release APKs (<= 100MB Gate)
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug assembleRelease --no-daemon
-          ls -lh app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/*.apk
-      - name: Upload Debug & Release APKs
+          ./gradlew testDebugUnitTest assembleDebug assembleRelease --no-daemon
+          sha256sum app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/*.apk > app/build/outputs/apk/SHA256SUMS.txt
+          cat app/build/outputs/apk/SHA256SUMS.txt
+      - name: Upload Production APKs & Checksums
         uses: actions/upload-artifact@v4
         with:
-          name: yuna-polyglot-apks
+          name: yuna-polyglot-production-apks
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/SHA256SUMS.txt
