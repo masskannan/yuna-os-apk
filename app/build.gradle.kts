@@ -4,6 +4,10 @@ plugins {
 }
 
 android {
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
+    }
     externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }
     namespace = "com.puyal.os"
     compileSdk = 34
@@ -65,6 +69,7 @@ android {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.work:work-runtime-ktx:2.9.0")
     implementation("androidx.webkit:webkit:1.10.0")

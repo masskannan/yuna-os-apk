@@ -56,9 +56,9 @@ jobs:
         run: |
           if [ -f ./gradlew ]; then
             chmod +x gradlew
-            ./gradlew testDebugUnitTest assembleDebug assembleRelease --no-daemon
+            ./gradlew testDebugUnitTest assembleDebug assembleRelease --no-daemon --continue
           else
-            gradle testDebugUnitTest assembleDebug assembleRelease --no-daemon
+            gradle testDebugUnitTest assembleDebug assembleRelease --no-daemon --continue
           fi
           sha256sum app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/*.apk > app/build/outputs/apk/SHA256SUMS.txt
           cat app/build/outputs/apk/SHA256SUMS.txt
