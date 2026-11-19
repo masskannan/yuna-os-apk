@@ -601,7 +601,7 @@ async function toggleVoice() {
   dockBar.classList.add('mic-on'); micBtn.classList.add('active');
   inp.placeholder = 'Listening... Speak now'; if (vs) vs.textContent = 'ON';
   if (window.YunaBridge && window.YunaBridge.startBluetoothMic) { try { window.YunaBridge.startBluetoothMic(); } catch (_) {} }
-  if (window.YunaBridge && window.YunaBridge.startVoice) { try { window.YunaBridge.startVoice(voiceLang); } catch (_) {} }
+  if (window.YunaBridge && window.YunaBridge.startVoice) { try { window.YunaBridge.startVoice(voiceLang); } catch (_) {} return; }
   try {
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -637,6 +637,7 @@ async function toggleVoice() {
   }
 }
 
+window.onYunaVoicePartial = function(text) { if (text) { inp.value = text; syncInputMode(); autoGrowInp(); } };
 window.onYunaVoiceResult = function(text) {
   if (!text) return;
   inp.value = text; syncInputMode(); autoGrowInp(); send();
@@ -781,7 +782,7 @@ function clearSavedHistory() {
 
 function ask(q) { inp.value = q; syncInputMode(); send(); }
 
-const SAFE_DELEGATE_ALLOWLIST = new Set(['OPEN_APP','DEEP_LINK_SEARCH','GLOBAL_BACK','GLOBAL_HOME','GLOBAL_RECENTS','GLOBAL_NOTIFICATIONS','GLOBAL_QUICK_SETTINGS','TORCH','BRIGHTNESS_UP','BRIGHTNESS_DOWN','NET_PANEL']);
+const SAFE_DELEGATE_ALLOWLIST = new Set(['OPEN_APP','OPEN_CAMERA','DEEP_LINK_SEARCH','TYPE_SEARCH','GLOBAL_BACK','GLOBAL_HOME','GLOBAL_RECENTS','CLEAR_RECENTS','GLOBAL_NOTIFICATIONS','GLOBAL_QUICK_SETTINGS','TOGGLE_WIFI','TOGGLE_DATA','TOGGLE_BT','TORCH','TORCH_ON','TORCH_OFF','BRIGHTNESS_UP','BRIGHTNESS_DOWN','VOLUME_UP','VOLUME_DOWN','VOLUME_MUTE','MEDIA_NEXT','MEDIA_PLAY_PAUSE','SCROLL_DOWN','SCROLL_UP','LOCK_SCREEN','SCREENSHOT','NET_PANEL','DIAL']);
 function forceRefreshUi() { const u = new URL(window.location.href); u.searchParams.set('v', Date.now().toString()); window.location.replace(u.toString()); }
 function redactSensitiveLocal(txt) {
   if (window.YunaBridge && window.YunaBridge.checkSensitive) { try { if (window.YunaBridge.checkSensitive(txt || '')) return '[REDACTED_BY_RUST_SHIELD]'; } catch (_) {} } return (txt || '').replace(/\b\d{4,8}\b/g, '[REDACTED_NUM]').replace(/\b(otp|cvv|pin|upi|password|mpin)\b/gi, '[REDACTED_KEY]'); }
@@ -935,41 +936,88 @@ function triggerStrangerGuard() {
 }
 
 function routeYunaPersona(q) {
-  const low = q.toLowerCase();
+  const low = q.toLowerCase().trim();
   if (low.includes('stranger')) return { stranger: true, title: 'YUNA • SHIELD', reply: 'ஏய்! இது எங்க அண்ணன் கண்ணன் போன், எடுக்காதீங்க!', meta: 'VOICEPRINT GUARD', statusLabel: 'STRANGER BLOCKED', step: 'Voice Shield' };
-  if (low.includes('youtube') && (low.includes('போடு') || low.includes('play') || low.includes('search'))) {
-    const query = q.replace(/youtube|ஓபன்|open|பண்ணு|போடு|play|search|-ல|ல/gi, '').trim() || 'trending tamil';
-    execLocalOsAction('DEEP_LINK_SEARCH', 'youtube:' + query);
-    return { title: 'YUNA • OS CONTROL', reply: 'YouTube-ல "' + query + '" இப்போ open பண்றேன் பாஸ்!', meta: 'LOCAL OS ACTION • PRIVACY LOCKED', statusLabel: 'Ready • Tap orb to speak', step: 'YouTube Deep Link' };
+
+  const run = (act, tgt, meta, step) => {
+    const res = execLocalOsAction(act, tgt || '');
+    return { title: 'YUNA • LOCAL OS', reply: res, meta: meta || 'REAL-TIME OS', statusLabel: 'Ready • Tap orb to speak', step: step || act };
+  };
+
+  // Hardware: Torch / Camera / Brightness / Volume / Lock / Screenshot
+  if (low.includes('torch') || low.includes('flash') || low.includes('டார்ச்') || low.includes('லைட்') || low.includes('ஃபிளாஷ்')) {
+    const act = (low.includes('off') || low.includes('ஆஃப்') || low.includes('நிறுத்து')) ? 'TORCH_OFF' : ((low.includes('on') || low.includes('ஆன்') || low.includes('போடு')) ? 'TORCH_ON' : 'TORCH');
+    return run(act, '', 'HARDWARE • TORCH', 'Torch');
   }
-  if (low.includes('youtube') && (low.includes('open') || low.includes('ஓபன்'))) { execLocalOsAction('OPEN_APP', 'com.google.android.youtube'); return { title: 'YUNA • OS CONTROL', reply: 'YouTube open பண்ணியாச்சு பாஸ்!', meta: 'LOCAL APP LAUNCH', statusLabel: 'Ready • Tap orb to speak', step: 'App Switcher' }; }
-  if (low.includes('chrome')) { execLocalOsAction('OPEN_APP', 'com.android.chrome'); return { title: 'YUNA • OS CONTROL', reply: 'Chrome open பண்ணியாச்சு பாஸ்!', meta: 'LOCAL APP LAUNCH', statusLabel: 'Ready • Tap orb to speak', step: 'App Switcher' }; }
-  if (low.includes('back') || low.includes('பேக்')) { execLocalOsAction('GLOBAL_BACK', ''); return { title: 'YUNA • NAVIGATION', reply: 'Back பண்ணியாச்சு பாஸ்!', meta: 'GLOBAL NAV', statusLabel: 'Ready • Tap orb to speak', step: 'Bottom Nav Back' }; }
-  if (low.includes('home') || low.includes('ஹோம்')) { execLocalOsAction('GLOBAL_HOME', ''); return { title: 'YUNA • NAVIGATION', reply: 'Home screen-க்கு வந்தாச்சு பாஸ்!', meta: 'GLOBAL NAV', statusLabel: 'Ready • Tap orb to speak', step: 'Bottom Nav Home' }; }
-  if (low.includes('recent') || low.includes('ரீசண்ட்')) { execLocalOsAction('GLOBAL_RECENTS', ''); return { title: 'YUNA • NAVIGATION', reply: 'Recent apps open பண்ணியாச்சு!', meta: 'GLOBAL NAV', statusLabel: 'Ready • Tap orb to speak', step: 'Bottom Nav Recents' }; }
-  if (low.includes('notification') || low.includes('நோட்டிபிகேஷன்')) { execLocalOsAction('GLOBAL_NOTIFICATIONS', ''); return { title: 'YUNA • NAVIGATION', reply: 'Top Notification shade இறக்கியாச்சு!', meta: 'TOP NAV CONTROL', statusLabel: 'Ready • Tap orb to speak', step: 'Top Shade' }; }
-  if (low.includes('brightness') || low.includes('பிரைட்னஸ்')) { const up = low.includes('கூட்டு') || low.includes('up') || low.includes('high') || low.includes('அதிகம்'); execLocalOsAction(up ? 'BRIGHTNESS_UP' : 'BRIGHTNESS_DOWN', ''); return { title: 'YUNA • HARDWARE', reply: up ? 'Brightness கூட்டியாச்சு பாஸ்!' : 'Brightness குறைச்சாச்சு பாஸ்!', meta: 'LOCAL DISPLAY CONTROL', statusLabel: 'Ready • Tap orb to speak', step: 'Brightness' }; }
-  if (low.includes('net') || low.includes('wifi') || low.includes('நெட்')) { execLocalOsAction('NET_PANEL', ''); return { title: 'YUNA • NETWORK', reply: 'Internet / Wi-Fi Quick Panel open பண்ணியாச்சு!', meta: 'LOCAL CONNECTIVITY', statusLabel: 'Ready • Tap orb to speak', step: 'Net Panel' }; }
-  if (low.includes('torch')) { execLocalOsAction('TORCH', ''); return { title: 'YUNA • LOCAL', reply: 'டார்ச் toggle பண்ணியாச்சு பாஸ்!', meta: 'HARDWARE ACTION', statusLabel: 'Ready • Tap orb to speak', step: 'Hardware Control' }; }
+  if (low.includes('camera') || low.includes('கேமரா')) return run('OPEN_CAMERA', '', 'HARDWARE • CAMERA', 'Camera');
+  if (low.includes('brightness') || low.includes('பிரைட்னஸ்')) {
+    const up = low.includes('கூட்டு') || low.includes('up') || low.includes('high') || low.includes('அதிகம்');
+    return run(up ? 'BRIGHTNESS_UP' : 'BRIGHTNESS_DOWN', '', 'HARDWARE • DISPLAY', 'Brightness');
+  }
+  if (low.includes('volume') || low.includes('சவுண்ட்') || low.includes('வால்யூம்')) {
+    if (low.includes('mute') || low.includes('சைலண்ட்')) return run('VOLUME_MUTE', '', 'HARDWARE • AUDIO', 'Mute');
+    const up = low.includes('up') || low.includes('high') || low.includes('கூட்டு') || low.includes('அதிகம்');
+    return run(up ? 'VOLUME_UP' : 'VOLUME_DOWN', '', 'HARDWARE • AUDIO', 'Volume');
+  }
+  if (low.includes('screen off') || low.includes('lock screen') || low.includes('ஸ்கிரீன் ஆஃப்') || low.includes('லாக் பண்ணு')) return run('LOCK_SCREEN', '', 'OS • LOCK', 'Screen Lock');
+  if (low.includes('screenshot') || low.includes('ஸ்கிரீன்ஷாட்')) return run('SCREENSHOT', '', 'OS • CAPTURE', 'Screenshot');
+
+  // Navigation & Recents Close All
+  if (low.includes('clear all') || low.includes('close all') || low.includes('minimax') || low.includes('மினிமேக்ஸ்') || (low.includes('எல்லாத்தையும்') && low.includes('க்ளோஸ்'))) return run('CLEAR_RECENTS', '', 'OS • RECENTS', 'Clear All Apps');
+  if (low.includes('recent') || low.includes('ரீசண்ட்')) return run('GLOBAL_RECENTS', '', 'OS • NAV', 'Recents');
+  if (low.includes('back') || low.includes('பேக்')) return run('GLOBAL_BACK', '', 'OS • NAV', 'Back');
+  if (low.includes('home') || low.includes('ஹோம்')) return run('GLOBAL_HOME', '', 'OS • NAV', 'Home');
+
+  // Notification Shade (1 pull / 2 pulls) & Quick Settings Tiles (Wi-Fi / Mobile Data / BT)
+  if (low.includes('wifi') || low.includes('wi-fi') || low.includes('வைஃபை')) return run('TOGGLE_WIFI', '', 'QUICK SETTINGS • WIFI', 'Wi-Fi');
+  if (low.includes('mobile data') || low.includes('நெட் ஆன்') || low.includes('நெட் ஆஃப்') || low.includes('net on') || low.includes('data on')) return run('TOGGLE_DATA', '', 'QUICK SETTINGS • DATA', 'Mobile Data');
+  if (low.includes('net') || low.includes('நெட்')) return run('NET_PANEL', '', 'OS • NETWORK', 'Net Panel');
+  if (low.includes('bluetooth') || low.includes('ப்ளூடூத்')) return run('TOGGLE_BT', '', 'QUICK SETTINGS • BT', 'Bluetooth');
+  if (low.includes('quick') || low.includes('ரெண்டு') || low.includes('two')) return run('GLOBAL_QUICK_SETTINGS', '', 'TOP SHADE • 2X PULL', 'Quick Settings');
+  if (low.includes('notification') || low.includes('நோட்டிபிகேஷன்') || low.includes('இழு')) return run('GLOBAL_NOTIFICATIONS', '', 'TOP SHADE • 1X PULL', 'Notifications');
+
+  // Media & Scroll & Auto-Type
+  if (low.includes('next video') || low.includes('next song') || low.includes('அடுத்த வீடியோ')) return run('MEDIA_NEXT', '', 'MEDIA • NEXT', 'Next');
+  if (low.includes('pause') || low.includes('stop video') || low.includes('நிறுத்து')) return run('MEDIA_PLAY_PAUSE', '', 'MEDIA • PLAY/PAUSE', 'Play/Pause');
+  if (low.includes('scroll down') || low.includes('கீழே')) return run('SCROLL_DOWN', '', 'ACCESSIBILITY • SCROLL', 'Scroll Down');
+  if (low.includes('scroll up') || low.includes('மேலே')) return run('SCROLL_UP', '', 'ACCESSIBILITY • SCROLL', 'Scroll Up');
+  if (low.startsWith('type ') || low.startsWith('search ')) {
+    const qtxt = q.replace(/^(type|search)\s+/i, '').trim();
+    return run('TYPE_SEARCH', qtxt, 'ACCESSIBILITY • AUTO-TYPE', 'Auto-Type Search');
+  }
+
+  // Apps: YouTube, WhatsApp, Chrome, Maps
+  if (low.includes('youtube') || low.includes('யூடியூப்') || low.includes('யூட்யூப்')) {
+    if (low.includes('போடு') || low.includes('play') || low.includes('search') || low.includes('சர்ச்') || low.includes('தேடு')) {
+      const query = q.replace(/youtube|யூடியூப்|யூட்யூப்|ஓபன்|open|பண்ணு|போடு|play|search|சர்ச்|தேடு|-ல|ல/gi, '').trim() || 'trending tamil';
+      return run('DEEP_LINK_SEARCH', 'youtube:' + query, 'YOUTUBE • SEARCH', 'YouTube Search');
+    }
+    return run('OPEN_APP', 'com.google.android.youtube', 'APP LAUNCH', 'YouTube');
+  }
+  if (low.includes('whatsapp') || low.includes('வாட்ஸ்அப்')) {
+    if (low.includes('unread') || low.includes('message') || low.includes('மெசேஜ்') || low.includes('summary')) {
+      let waLive = '';
+      if (window.YunaBridge && window.YunaBridge.getWaSummary) { try { waLive = window.YunaBridge.getWaSummary(); } catch (_) {} }
+      return { title: 'YUNA • WA INTEL', reply: waLive || 'WhatsApp unread notifications எதுவும் pending இல்ல பாஸ்.', meta: 'NOTIFICATION LISTENER', statusLabel: 'Ready • Tap orb to speak', step: 'WA Intel' };
+    }
+    return run('OPEN_APP', 'com.whatsapp', 'APP LAUNCH', 'WhatsApp');
+  }
+  if (low.includes('chrome') || low.includes('குரோம்')) return run('OPEN_APP', 'com.android.chrome', 'APP LAUNCH', 'Chrome');
+
   if (low.includes('screen') || low.includes('vision')) {
     let liveDom = ''; if (window.YunaBridge && window.YunaBridge.scanScreen) { try { liveDom = window.YunaBridge.scanScreen(); } catch (_) {} }
-    return { title: 'YUNA • VISION', reply: liveDom ? ('Screen Scan Result:\n' + liveDom) : 'Screen Vision: YUNA App active. வேற app-ல இருக்கும்போது side floating orb வழியா அந்த screen-ஐ வாசிப்பேன் பாஸ்!', meta: 'DOM + OCR VISION', statusLabel: 'Ready • Tap orb to speak', step: 'Screen Reader' };
-  }
-  if (low.includes('wa') || low.includes('whatsapp')) {
-    let waLive = '';
-    if (window.YunaBridge && window.YunaBridge.getWaSummary) { try { waLive = window.YunaBridge.getWaSummary(); } catch (_) {} }
-    return { title: 'YUNA • WA INTEL', reply: waLive || 'WhatsApp unread notifications எதுவும் pending இல்ல பாஸ்.', meta: 'NOTIFICATION LISTENER', statusLabel: 'Ready • Tap orb to speak', step: 'WA Intel' };
+    return { title: 'YUNA • VISION', reply: liveDom || 'Enable Accessibility to scan screen.', meta: 'DOM VISION', statusLabel: 'Ready • Tap orb to speak', step: 'Screen Reader' };
   }
   if (low.startsWith('tap ') || low.startsWith('click ')) {
     const target = q.replace(/^(tap|click)\s+/i, '').trim();
-    let resTap = 'Auto-Tap queued: ' + target;
+    let resTap = 'Enable YUNA Accessibility';
     if (window.YunaBridge && window.YunaBridge.clickOnScreen) { try { resTap = window.YunaBridge.clickOnScreen(target); } catch (_) {} }
     return { title: 'YUNA • AUTO-TAP', reply: resTap, meta: 'ACCESSIBILITY CLICK', statusLabel: 'Ready • Tap orb to speak', step: 'Auto-Tap' };
   }
   if (low.includes('ஹாய்') || low === 'hi' || low.includes('hello') || low.includes('vanakkam')) {
-    return { title: 'YUNA • LOCAL', reply: personaMood === 'COMEDY' ? 'ஹாய் கண்ணன்! எப்படி இருக்கீங்க? சொல்லுங்க பாஸ், என்ன பண்ணலாம்?' : 'வணக்கம் கண்ணன்! சொல்லுங்க, என்ன உதவி வேணும்?', meta: 'LOCAL PERSONA • ' + personaMood, statusLabel: 'Ready • Tap orb to speak', step: 'Local Brain' };
+    return { title: 'YUNA • LOCAL', reply: personaMood === 'COMEDY' ? 'ஹாய் கண்ணன்! சொல்லுங்க பாஸ், எந்த app open பண்ணலாம்?' : 'வணக்கம் கண்ணன்! சொல்லுங்க, என்ன உதவி வேணும்?', meta: 'LOCAL PERSONA • ' + personaMood, statusLabel: 'Ready • Tap orb to speak', step: 'Local Brain' };
   }
-  return { title: 'YUNA • ' + brainMode, reply: 'சரி பாஸ், "' + q + '"-க்கு உடனே check பண்ணிப் பார்க்கிறேன்! (Local + Cloud hybrid ready)', meta: brainMode + ' ENGINE • TAMIL/TANGLISH', statusLabel: 'Ready • Tap orb to speak', step: brainMode === 'CLOUD' ? 'Cloud Gateway' : 'Local Rust Brain' };
+  return { title: 'YUNA • LOCAL', reply: 'Local command puriyala: "' + q + '" (Try: Torch on, Open YouTube, Back, Home, Clear all, Wi-Fi, Camera)', meta: 'LOCAL OS ROUTER', statusLabel: 'Ready • Tap orb to speak', step: 'Local Brain' };
 }
 
 const moods = ['COMEDY', 'PRO', 'FOCUS'];

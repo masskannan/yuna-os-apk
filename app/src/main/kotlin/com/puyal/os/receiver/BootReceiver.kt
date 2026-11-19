@@ -13,8 +13,10 @@ class BootReceiver : BroadcastReceiver() {
             action == "android.intent.action.QUICKBOOT_POWERON" ||
             action == "com.htc.intent.action.QUICKBOOT_POWERON"
         ) {
-            val svcIntent = Intent(context, PuyalCoreService::class.java)
-            ContextCompat.startForegroundService(context, svcIntent)
+            try {
+                val svcIntent = Intent(context, PuyalCoreService::class.java).putExtra("boot_only", true)
+                ContextCompat.startForegroundService(context, svcIntent)
+            } catch (_: Exception) {}
         }
     }
 }
