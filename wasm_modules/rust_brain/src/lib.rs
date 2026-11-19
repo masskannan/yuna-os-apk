@@ -1,11 +1,8 @@
-#![no_std]
-use core::panic::PanicInfo;
+// std enabled for f64 math & cargo test
+
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-#[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-    loop {}
-}
+
 
 // Banking & Sensitive Package Shield (FLAG_SECURE Blacklist)
 #[no_mangle]
