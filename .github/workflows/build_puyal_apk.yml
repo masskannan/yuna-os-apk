@@ -48,10 +48,18 @@ jobs:
         run: |
           mkdir -p app/src/main/jniLibs/arm64-v8a
           zig build-lib wasm_modules/zig_hands/src/main.zig -target aarch64-linux-android -dynamic -O ReleaseSmall -femit-bin=app/src/main/jniLibs/arm64-v8a/libyuna_zig.so
+      - name: Setup Gradle 8.7 (for AGP 8.5.2)
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
       - name: Run Unit Tests & Build Debug + Release APKs (<= 100MB Gate)
         run: |
-          chmod +x gradlew
-          ./gradlew testDebugUnitTest assembleDebug assembleRelease --no-daemon
+          if [ -f ./gradlew ]; then
+            chmod +x gradlew
+            ./gradlew testDebugUnitTest assembleDebug assembleRelease --no-daemon
+          else
+            gradle testDebugUnitTest assembleDebug assembleRelease --no-daemon
+          fi
           sha256sum app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/*.apk > app/build/outputs/apk/SHA256SUMS.txt
           cat app/build/outputs/apk/SHA256SUMS.txt
       - name: Upload Production APKs & Checksums
