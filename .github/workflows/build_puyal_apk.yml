@@ -59,9 +59,9 @@ jobs:
         run: |
           if [ -f ./gradlew ]; then
             chmod +x gradlew
-            ./gradlew testDebugUnitTest assembleDebug assembleRelease --no-daemon --continue
+            ./gradlew testDebugUnitTest assembleDebug assembleRelease -PyunaBuildNum=${{ github.run_number }} --no-daemon --continue
           else
-            gradle testDebugUnitTest assembleDebug assembleRelease --no-daemon --continue
+            gradle testDebugUnitTest assembleDebug assembleRelease -PyunaBuildNum=${{ github.run_number }} --no-daemon --continue
           fi
           sha256sum app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/*.apk > app/build/outputs/apk/SHA256SUMS.txt
           cat app/build/outputs/apk/SHA256SUMS.txt
@@ -73,19 +73,18 @@ jobs:
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/release/*.apk
             app/build/outputs/apk/SHA256SUMS.txt
-
-      - name: Prepare Raw Direct-Install APKs
+      - name: Prepare Numbered Direct-Install APKs
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk YUNA-Sovereign-Debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk "YUNA-Build-${{ github.run_number }}-Debug.apk"
           if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp app/build/outputs/apk/release/app-release.apk YUNA-Sovereign-Release.apk
+            cp app/build/outputs/apk/release/app-release.apk "YUNA-Build-${{ github.run_number }}-Release.apk"
           fi
-      - name: Publish Direct .apk GitHub Release (latest)
+      - name: Publish Numbered GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
-          name: YUNA Sovereign OS (Direct APK)
+          tag_name: build-${{ github.run_number }}
+          name: "YUNA Build #${{ github.run_number }}"
+          make_latest: true
           prerelease: false
           files: |
-            YUNA-Sovereign-*.apk
-            app/build/outputs/apk/SHA256SUMS.txt
+            YUNA-Build-*.apk

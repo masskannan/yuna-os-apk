@@ -16,8 +16,8 @@ android {
         applicationId = "com.puyal.os"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0-yuna"
+        versionCode = (project.findProperty("yunaBuildNum")?.toString()?.toIntOrNull()) ?: 1
+        versionName = "1.0.${(project.findProperty("yunaBuildNum")?.toString()) ?: "1"}-yuna"
 
         ndk {
             abiFilters += listOf("arm64-v8a")
