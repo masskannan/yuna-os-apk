@@ -12,17 +12,19 @@ object YunaNative {
     private external fun nativeIsSuAllowed(cmd: String): Int
 
     fun hasSensitiveToken(text: String): Boolean {
-        if (rustLoaded) {
-            try { return nativeContainsSensitive(text) == 1 } catch (_: UnsatisfiedLinkError) {}
-        }
+        val rustHit = if (rustLoaded) {
+            try { nativeContainsSensitive(text) == 1 } catch (_: UnsatisfiedLinkError) { false }
+        } else false
+        if (rustHit) return true
         val low = text.lowercase()
-        return low.contains("otp") || low.contains("cvv") || low.contains("upi") || Regex("\\b\\d{4,8}\\b").containsMatchIn(low)
+        return low.contains("otp") || low.contains("cvv") || low.contains("upi") ||
+            low.contains("pin") || Regex("\\b\\d{4,8}\\b").containsMatchIn(low)
     }
 
     fun isAllowedSuCmd(cmd: String): Boolean {
-        if (rustLoaded) {
-            try { return nativeIsSuAllowed(cmd) == 1 } catch (_: UnsatisfiedLinkError) {}
-        }
-        return cmd.startsWith("oom_score_adj") || cmd.startsWith("svc ") || cmd.startsWith("input ")
+        val rustAllow = if (rustLoaded) {
+            try { nativeIsSuAllowed(cmd) == 1 } catch (_: UnsatisfiedLinkError) { false }
+        } else false
+        return rustAllow || cmd.startsWith("oom_score_adj") || cmd.startsWith("svc ") || cmd.startsWith("input ")
     }
 }

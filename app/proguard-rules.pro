@@ -34,3 +34,5 @@
     @android.webkit.JavascriptInterface <methods>;
 }
 -keep class com.puyal.os.cloud.** { *; }
+
+-keep class com.puyal.os.service.** { *; }

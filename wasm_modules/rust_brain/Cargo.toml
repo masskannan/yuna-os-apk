@@ -5,7 +5,7 @@ edition = "2021"
 
 [lib]
 name = "yuna_rust"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [profile.release]
 opt-level = "z"
