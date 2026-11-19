@@ -13,6 +13,10 @@ import android.hardware.camera2.CameraManager
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.media.MediaRecorder
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.UUID
 import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
@@ -42,7 +46,9 @@ class YunaBridge(
     private val onVoiceReq: (String) -> Unit,
     private val onStopVoiceReq: () -> Unit = {},
     private val onBiometricReq: () -> Unit = {},
-    private val onTtsDone: () -> Unit = {}
+    private val onTtsDone: () -> Unit = {},
+    private val onMicLevel: (Float) -> Unit = {},
+    private val onVoiceDone: (String) -> Unit = {}
 ) {
     private val mainH = Handler(Looper.getMainLooper())
     private var torchState = false
@@ -179,6 +185,92 @@ class YunaBridge(
             abandonDuckFocus()
             onTtsDone()
         }
+    }
+
+
+    private var recorder: MediaRecorder? = null
+    private var recFile: File? = null
+    private var recEndpoint: String = ""
+    @Volatile private var isRecordingWhisper = false
+
+    @JavascriptInterface
+    fun startCloudWhisper(baseUrl: String) {
+        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            onVoiceReq("ta-IN")
+            return
+        }
+        mainH.post {
+            try {
+                try { recorder?.stop() } catch (_: Exception) {}
+                try { recorder?.release() } catch (_: Exception) {}
+                val out = File(ctx.cacheDir, "yuna_mic.m4a")
+                recFile = out
+                recEndpoint = baseUrl.trimEnd('/') + "/stt"
+                val mr = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaRecorder(ctx) else @Suppress("DEPRECATION") MediaRecorder()
+                mr.setAudioSource(MediaRecorder.AudioSource.MIC)
+                mr.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                mr.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                mr.setAudioSamplingRate(16000)
+                mr.setAudioEncodingBitRate(32000)
+                mr.setMaxDuration(20000)
+                mr.setOutputFile(out.absolutePath)
+                mr.prepare()
+                mr.start()
+                recorder = mr
+                isRecordingWhisper = true
+                Thread {
+                    while (isRecordingWhisper) {
+                        try {
+                            val amp = recorder?.maxAmplitude ?: 0
+                            val db = (amp / 3276.7f).coerceIn(0f, 10f)
+                            mainH.post { onMicLevel(db) }
+                            Thread.sleep(75)
+                        } catch (_: Exception) { break }
+                    }
+                }.start()
+            } catch (_: Exception) {
+                isRecordingWhisper = false
+                onVoiceReq("ta-IN")
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun stopCloudWhisper() {
+        if (!isRecordingWhisper) return
+        isRecordingWhisper = false
+        mainH.post {
+            try { recorder?.stop() } catch (_: Exception) {}
+            try { recorder?.release() } catch (_: Exception) {}
+            recorder = null
+            val f = recFile ?: return@post
+            val ep = recEndpoint
+            if (!f.exists() || f.length() < 1000) { onVoiceDone(""); return@post }
+            Thread {
+                val txt = uploadAudioToWhisper(ep, f)
+                mainH.post { onVoiceDone(txt) }
+            }.start()
+        }
+    }
+
+    private fun uploadAudioToWhisper(endpoint: String, audio: File): String {
+        return try {
+            val boundary = "----YunaAudio" + UUID.randomUUID().toString().replace("-", "")
+            val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                connectTimeout = 10000
+                readTimeout = 20000
+                setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+            }
+            conn.outputStream.use { os ->
+                os.write("--$boundary\r\nContent-Disposition: form-data; name="file"; filename="yuna_mic.m4a"\r\nContent-Type: audio/mp4\r\n\r\n".toByteArray())
+                audio.inputStream().use { it.copyTo(os) }
+                os.write("\r\n--$boundary--\r\n".toByteArray())
+            }
+            val resp = conn.inputStream.bufferedReader().readText()
+            JSONObject(resp).optString("text", "").trim()
+        } catch (_: Exception) { "" }
     }
 
     @JavascriptInterface fun startVoice(lang: String) { mainH.post { onVoiceReq(lang.ifBlank { "ta-IN" }) } }

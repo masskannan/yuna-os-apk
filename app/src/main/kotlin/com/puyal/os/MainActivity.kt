@@ -79,7 +79,16 @@ class MainActivity : ComponentActivity() {
             onVoiceReq = { lang -> startHeadlessVoice(lang, false) },
             onStopVoiceReq = { stopHeadlessVoice() },
             onBiometricReq = { verifyBiometricOwner() },
-            onTtsDone = { webView.evaluateJavascript("if(window.onYunaTtsDone)window.onYunaTtsDone();", null) }
+            onTtsDone = { webView.evaluateJavascript("if(window.onYunaTtsDone)window.onYunaTtsDone();", null) },
+            onMicLevel = { db -> webView.evaluateJavascript("if(window.onYunaMicLevel)window.onYunaMicLevel($db);", null) },
+            onVoiceDone = { txt ->
+                if (txt.isNotEmpty()) {
+                    val safe = JSONObject.quote(txt)
+                    webView.evaluateJavascript("if(window.onYunaVoiceResult)window.onYunaVoiceResult($safe);", null)
+                } else {
+                    webView.evaluateJavascript("if(window.onYunaVoiceEnded)window.onYunaVoiceEnded();", null)
+                }
+            }
         )
         webView.addJavascriptInterface(bridge, "YunaBridge")
         webView.loadUrl("file:///android_asset/index.html")

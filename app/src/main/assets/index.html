@@ -627,6 +627,7 @@ function stopMicHardware() {
   document.body.classList.remove('mic-edge-glow');
   voicePaused = false;
   const pb = document.getElementById('voicePauseBtn'); if (pb) pb.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>';
+  if (window.YunaBridge && window.YunaBridge.stopCloudWhisper) { try { window.YunaBridge.stopCloudWhisper(); } catch (_) {} }
   if (window.YunaBridge && window.YunaBridge.stopVoice) { try { window.YunaBridge.stopVoice(); } catch (_) {} }
   if (micRaf) { cancelAnimationFrame(micRaf); micRaf = null; }
   if (speechRec) { try { speechRec.stop(); } catch (_) {} speechRec = null; }
@@ -647,6 +648,7 @@ async function toggleVoice() {
   dockBar.classList.add('mic-on'); micBtn.classList.add('active');
   inp.placeholder = 'Listening... Speak now'; if (vs) vs.textContent = 'ON';
   if (window.YunaBridge && window.YunaBridge.startBluetoothMic) { try { window.YunaBridge.startBluetoothMic(); } catch (_) {} }
+  if (cloudUrl && window.YunaBridge && window.YunaBridge.startCloudWhisper) { try { window.YunaBridge.startCloudWhisper(cloudUrl); } catch (_) {} return; }
   if (window.YunaBridge && window.YunaBridge.startVoice) { try { window.YunaBridge.startVoice(voiceLang); } catch (_) {} return; }
   try {
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -707,12 +709,14 @@ function pauseOrResumeVoice() {
   const pb = document.getElementById('voicePauseBtn');
   if (!voicePaused) {
     voicePaused = true;
+    if (window.YunaBridge && window.YunaBridge.stopCloudWhisper) { try { window.YunaBridge.stopCloudWhisper(); } catch (_) {} }
     if (window.YunaBridge && window.YunaBridge.stopVoice) { try { window.YunaBridge.stopVoice(); } catch (_) {} }
     if (pb) pb.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>';
     setOrbState('IDLE', 'Voice Paused • Tap ▶ or ➤');
   } else {
     voicePaused = false;
-    if (window.YunaBridge && window.YunaBridge.startVoice) { try { window.YunaBridge.startVoice(voiceLang); } catch (_) {} }
+    if (cloudUrl && window.YunaBridge && window.YunaBridge.startCloudWhisper) { try { window.YunaBridge.startCloudWhisper(cloudUrl); } catch (_) {} }
+    else if (window.YunaBridge && window.YunaBridge.startVoice) { try { window.YunaBridge.startVoice(voiceLang); } catch (_) {} }
     if (pb) pb.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>';
     setOrbState('LISTENING', 'Listening • Speak Tamil / English');
   }
@@ -1182,7 +1186,7 @@ function parseTargetTimeMs(q) {
 }
 
 
-let cloudUrl = localStorage.getItem('yuna_cloud_url') || '';
+let cloudUrl = localStorage.getItem('yuna_cloud_url') || 'https://yuna-ai-gateway.masskannan719.workers.dev';
 function setCloudUrlPrompt() {
   const u = prompt('Cloudflare Worker URL (e.g. https://yuna-ai.workers.dev):', cloudUrl);
   if (u !== null) { cloudUrl = u.trim(); try { localStorage.setItem('yuna_cloud_url', cloudUrl); } catch (_) {} showToast(cloudUrl ? 'Cloud URL saved' : 'Cloud URL cleared'); }
