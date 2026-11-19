@@ -321,6 +321,12 @@
   .msg-body a { color: #38BDF8; text-decoration: underline; }
   @media (max-width: 360px) { .dock { gap: 6px; padding: 9px 10px; } .plus-orb, .wave-btn, .send-orb { width: 35px; height: 35px; } .voice-pause-btn { width: 31px; height: 31px; } }
 
+
+  #micBtn line { transition: transform 0.08s ease-out; }
+  .perm-grid { display: flex; flex-direction: column; gap: 6px; }
+  .perm-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(14,28,58,0.68); border: 1px solid var(--glass-border); border-radius: 14px; font-size: 12.5px; }
+  .perm-badge-on { color: #34D399; font-family: monospace; font-size: 11px; font-weight: 700; }
+  .perm-badge-off { background: rgba(244,63,94,0.22); border: 1px solid #F43F5E; color: #FDA4AF; border-radius: 999px; padding: 3px 10px; font-size: 10.5px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -342,8 +348,7 @@
       <path d="M70 25 V3 L88 25 V3" stroke="url(#yunaDual)" stroke-width="2.7" stroke-linejoin="bevel"/>
       <path d="M101 25 L112.5 3 L124 25" stroke="url(#yunaDual)" stroke-width="2.7"/>
     </svg>
-    <button class="tag-pill" id="modeBadge" onclick="toggleBrainMode()"><span class="live-dot"></span><span id="modeTxt">LOCAL ▾</span></button>
-      <button class="voice-persona-pill" id="voicePersonaBtn" onclick="cycleVoicePersona()" title="Voice Persona">YUNA ♀</button>
+    <span class="tag-pill" style="pointer-events:none;"><span class="live-dot"></span><span>YUNA AI</span></span>
     </div>
   </div>
   <div class="top-right-pill">
@@ -425,11 +430,12 @@
     <div class="set-item" onclick="cycleVoicePersona(); document.getElementById('setVoicePill').textContent=voicePersona"><span>குரல் நிலை</span><span class="set-pill" id="setVoicePill">YUNA</span></div>
     <div class="set-item" onclick="cycleLangSet()"><span>மொழி</span><span class="set-pill" id="langSetPill">TA</span></div>
   </div>
-  <div class="set-group-title">அனுமதி &amp; பேட்டரி</div>
-  <div class="set-card">
-    <div class="set-item" onclick="showPermStatus()"><span>அனுமதிகள் நிலை</span><span class="set-pill" id="permPill">CHECK</span></div>
-    <div class="set-item" onclick="if(window.YunaBridge&&window.YunaBridge.requestBatteryOptimizationExemption){showToast(window.YunaBridge.requestBatteryOptimizationExemption());}else{showToast('APK-இல் மட்டும்');}"><span>பேட்டரி விலக்கு</span><span class="set-pill">ALLOW</span></div>
+  <div class="set-group-title">அனுமதி &amp; Resource Manager</div>
+  <div class="set-card" style="margin-bottom:8px;">
+    <div class="set-item" onclick="cycleSafetyMode()"><span>பாதுகாப்பு நிலை (Calls/Reply)</span><span class="set-pill" id="safetyPill">CONFIRM</span></div>
+    <div class="set-item" onclick="refreshPermHub()"><span>அனுமதிகளைச் சரிபார்</span><span class="set-pill">REFRESH</span></div>
   </div>
+  <div class="perm-grid" id="permHubGrid"></div>
   <div class="set-group-title">தோற்றம் &amp; தரவு</div>
   <div class="set-card">
     <div class="set-item" onclick="cycleTheme()"><span>வண்ணத் தீம்</span><span class="set-pill" id="themePill">CYAN-VIOLET</span></div>
@@ -538,7 +544,7 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E2E8F0" stroke-width="1.85" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     </button>
     <textarea id="inp" rows="1" placeholder="Ask YUNA..." oninput="syncInputMode(); autoGrowInp()" onpaste="setTimeout(()=>{syncInputMode();autoGrowInp();},20)" onkeyup="syncInputMode()" oncompositionend="syncInputMode(); autoGrowInp()" onchange="syncInputMode()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send();}"></textarea>
-    <button class="voice-pause-btn" id="voicePauseBtn" onpointerdown="event.preventDefault()" onclick="pauseOrResumeVoice()" title="Pause / Resume Voice" aria-label="Pause Voice">⏸</button>
+    <button class="voice-pause-btn" id="voicePauseBtn" onpointerdown="event.preventDefault()" onclick="pauseOrResumeVoice()" title="Pause / Resume Voice" aria-label="Pause Voice"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg></button>
     <button class="wave-btn" id="micBtn" onpointerdown="event.preventDefault()" onclick="toggleVoice()" title="Mic ON / OFF" aria-label="Voice Mic">
       <svg width="22" height="20" viewBox="0 0 28 24" aria-hidden="true">
         <line x1="3" y1="10" x2="3" y2="14" stroke="#2DD4BF" stroke-width="2" stroke-linecap="round"/>
@@ -618,7 +624,7 @@ let micStream = null, audioCtx = null, micRaf = null, speechRec = null;
 function stopMicHardware() {
   document.body.classList.remove('mic-edge-glow');
   voicePaused = false;
-  const pb = document.getElementById('voicePauseBtn'); if (pb) pb.textContent = '⏸';
+  const pb = document.getElementById('voicePauseBtn'); if (pb) pb.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>';
   if (window.YunaBridge && window.YunaBridge.stopVoice) { try { window.YunaBridge.stopVoice(); } catch (_) {} }
   if (micRaf) { cancelAnimationFrame(micRaf); micRaf = null; }
   if (speechRec) { try { speechRec.stop(); } catch (_) {} speechRec = null; }
@@ -700,12 +706,12 @@ function pauseOrResumeVoice() {
   if (!voicePaused) {
     voicePaused = true;
     if (window.YunaBridge && window.YunaBridge.stopVoice) { try { window.YunaBridge.stopVoice(); } catch (_) {} }
-    if (pb) pb.textContent = '▶';
+    if (pb) pb.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>';
     setOrbState('IDLE', 'Voice Paused • Tap ▶ or ➤');
   } else {
     voicePaused = false;
     if (window.YunaBridge && window.YunaBridge.startVoice) { try { window.YunaBridge.startVoice(voiceLang); } catch (_) {} }
-    if (pb) pb.textContent = '⏸';
+    if (pb) pb.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>';
     setOrbState('LISTENING', 'Listening • Speak Tamil / English');
   }
 }
@@ -737,7 +743,7 @@ window.onYunaVoicePartial = function(text) {
 window.onYunaVoiceResult = function(text) {
   if (!text) { window.onYunaVoiceEnded(); return; }
   voicePaused = false;
-  const pb = document.getElementById('voicePauseBtn'); if (pb) pb.textContent = '⏸';
+  const pb = document.getElementById('voicePauseBtn'); if (pb) pb.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>';
   inp.value = text; syncInputMode(); autoGrowInp(); send();
 };
 
@@ -760,7 +766,7 @@ function syncModalLock() {
 }
 function openDrawer() { closeMore(); renderHistory(); drawerScrim.classList.add('open'); syncModalLock(); }
 function closeDrawer() { drawerScrim.classList.remove('open'); syncModalLock(); }
-function openSettings() { closeMore(); settingsPage.classList.add('open'); syncModalLock(); }
+function openSettings() { closeMore(); settingsPage.classList.add('open'); syncModalLock(); refreshPermHub(); }
 function closeSettings() { settingsPage.classList.remove('open'); settingsPage.querySelectorAll('details').forEach(d=>d.open=false); syncModalLock(); }
 function openPlus() { closeMore(); inp.blur(); plusScrim.classList.add('open'); syncModalLock(); }
 function closePlus() { plusScrim.classList.remove('open'); syncModalLock(); }
@@ -1069,6 +1075,43 @@ function triggerStrangerGuard() {
 }
 
 
+
+let safetyMode = localStorage.getItem('yuna_safety_mode') || 'CONFIRM';
+function cycleSafetyMode() {
+  safetyMode = safetyMode === 'CONFIRM' ? 'AUTO' : 'CONFIRM';
+  try { localStorage.setItem('yuna_safety_mode', safetyMode); } catch (_) {}
+  const sp = document.getElementById('safetyPill'); if (sp) sp.textContent = safetyMode;
+  showToast('Safety: ' + safetyMode);
+}
+function refreshPermHub() {
+  const g = document.getElementById('permHubGrid'); if (!g) return;
+  let s = { accessibility: false, overlay: false, mic: false, contacts: false, call: false, notifications: false, battery: false, assistant: false };
+  if (window.YunaBridge && window.YunaBridge.getDetailedPermissions) {
+    try { s = JSON.parse(window.YunaBridge.getDetailedPermissions()); } catch (_) {}
+  }
+  const rows = [
+    ['accessibility', 'Accessibility (Back/Home/Vision)', s.accessibility],
+    ['overlay', 'Display Over Apps (Side Orb)', s.overlay],
+    ['mic', 'Microphone (Voice Input)', s.mic],
+    ['contacts', 'Contacts (Smart Call)', s.contacts],
+    ['call', 'Phone Call (Direct Dial)', s.call],
+    ['notifications', 'Notifications (WhatsApp Read)', s.notifications],
+    ['battery', 'Battery Optimization Exempt', s.battery],
+    ['assistant', 'Home Button Default Assistant', s.assistant]
+  ];
+  g.innerHTML = rows.map(([k, label, ok]) =>
+    '<div class="perm-row"><span>' + label + '</span>' +
+    (ok ? '<span class="perm-badge-on">ON ✓</span>' : '<button class="perm-badge-off" onclick="grantPerm(\'' + k + '\')">GRANT</button>') +
+    '</div>'
+  ).join('');
+}
+function grantPerm(k) {
+  if (window.YunaBridge && window.YunaBridge.openPermissionSettings) {
+    try { showToast(window.YunaBridge.openPermissionSettings(k)); return; } catch (_) {}
+  }
+  showToast('APK-இல் மட்டும்');
+}
+
 function normalizeTamilStt(raw) {
   let s = (raw || '').trim();
   if (!s || s.length > 300) return s;
@@ -1076,7 +1119,9 @@ function normalizeTamilStt(raw) {
   s = s.replace(/(^|\s)(\S+)(?:\s+\2)+(?=\s|$)/gi, '$1$2');
   const map = [
     [/யூடுப்|யூட்யூப்|யூடியூபில்|யூடியூப்ல/gi, 'யூடியூப்'],
-    [/வாட்சப்|வாட்ஸப்|வாட்ஸ்அப்பில்|வாட்ஸ்அப்ல/gi, 'வாட்ஸ்அப்'],
+    [/வாட்ஸ்\s*அப்|வாட்சப்|வாட்ஸப்|வாட்ஸ்அப்பில்|வாட்ஸ்அப்ல/gi, 'வாட்ஸ்அப்'],
+    [/யுவனா|யுனா|யூனா/gi, 'YUNA'],
+    [/ஓபன் பண்ணு|ஓபன்|தொற/gi, 'திற'],
     [/லைட்டு|பிளாஷ்|ஃபிளாஷ்/gi, 'டார்ச்'],
     [/போன் போடு|ரிங் பண்ணு|கூப்பிடு/gi, 'கால் பண்ணு'],
     [/ஞாபகப்படுத்து|மறக்காம சொல்லு/gi, 'ரிமைண்ட் பண்ணு'],
@@ -1155,7 +1200,7 @@ function routeYunaPersona(rawQ) {
   pendingConfirmAction = null;
 
   // Clean 2-Step Command Chaining (preserves ஆன்/ஆஃப்/திற in Step 1!)
-  const chainMatch = q.match(/(.+?(?:ஆன்|ஆஃப்|திற)?)\s*(?:பண்ணி|செய்து|விட்டு)\s+(.+)/i) || q.match(/(.+?)\s+(?:அப்புறம்|and then|then)\s+(.+)/i);
+  const chainMatch = q.match(/(.+?(?:ஆன்|ஆஃப்|திற)?)\s*(?:பண்ணிட்டு|பண்ணி|செய்துவிட்டு|செய்து|விட்டு)\s+(.+)/i) || q.match(/(.+?)\s+(?:அப்புறம்|and then|then)\s+(.+)/i);
   if (chainMatch && chainMatch[1].trim().length > 1 && chainMatch[2].trim().length > 1) {
     const s1Txt = chainMatch[1].trim(), s2Txt = chainMatch[2].trim();
     const step1 = routeSingleCommand(s1Txt, '', rawQ);
@@ -1192,6 +1237,7 @@ function routeSingleCommand(q, ctxApp, rawQ) {
         if (info && info.startsWith('FOUND:')) {
           const parts = info.split(':');
           const cName = parts[1] || name, cNum = parts[2] || '';
+          if (safetyMode === 'AUTO') { return run('DIAL', cNum, 'CONTACTS • AUTO', 'Call ' + cName); }
           pendingConfirmAction = { cmd: 'DIAL', tgt: cNum, step: 'Call ' + cName };
           return { title: 'YUNA • SAFETY GATE', reply: cName + ' (' + cNum + ') எண்ணுக்கு அழைக்கலாமா?', meta: 'CONFIRM CALL', statusLabel: 'Awaiting Confirmation', step: 'Safety Gate' };
         }
@@ -1394,7 +1440,19 @@ function routeSingleCommand(q, ctxApp, rawQ) {
   if (low.includes('ஹாய்') || low === 'hi' || low.includes('hello') || low.includes('vanakkam') || low.includes('வணக்கம்')) {
     return { title: 'YUNA • LOCAL', reply: 'வணக்கம் கண்ணன்! சொல்லுங்கள், என்ன உதவி வேண்டும்?', meta: 'LOCAL PERSONA • ' + personaMood, statusLabel: 'Ready • Tap orb to speak', step: 'Local Brain' };
   }
-  return { title: 'YUNA • LOCAL', reply: 'இந்தக் கட்டளை புரியவில்லை: "' + raw + '" (எ.கா: டார்ச் ஆன், யூடியூப் திற, 10 கிமீ எவ்வளவு, பேட்டரி நிலை)', meta: 'LOCAL OS ROUTER', statusLabel: 'Ready • Tap orb to speak', step: 'Local Brain' };
+  // Dynamic Any-App Launcher ("<App> திற" / "open <App>")
+  if (low.includes('திற') || low.startsWith('open ')) {
+    const appQ = raw.replace(/திற|தொற|ஓபன் பண்ணு|ஓபன்|open|பண்ணு/gi, '').trim();
+    if (appQ && window.YunaBridge && window.YunaBridge.openAppByName) {
+      try {
+        const appRes = window.YunaBridge.openAppByName(appQ);
+        if (appRes && !appRes.startsWith('NOT_FOUND:')) {
+          return { title: 'YUNA • APP', reply: appRes, meta: 'DYNAMIC LAUNCHER', statusLabel: 'Ready', step: appQ };
+        }
+      } catch (_) {}
+    }
+  }
+  return { title: 'YUNA', reply: 'மன்னிக்கவும், இந்தக் கட்டளை புரியவில்லை. (எ.கா: டார்ச் ஆன், வாட்ஸ்அப் திற, பேட்டரி நிலை)', meta: 'YUNA ROUTER', statusLabel: 'Ready', step: 'YUNA' };
 }
 
 const moods = ['COMEDY', 'PRO', 'FOCUS'];
@@ -1424,6 +1482,7 @@ window.addEventListener('scroll', () => { const farUp = (document.body.scrollHei
   if (b) b.classList.toggle('mode-cloud', brainMode === 'CLOUD');
   const mp = document.getElementById('moodPill'); if (mp) mp.textContent = personaMood;
   const vpb = document.getElementById('voicePersonaBtn'); if (vpb) vpb.textContent = voicePersona === 'YUNA' ? 'YUNA ♀' : (voicePersona === 'PUYAL' ? 'PUYAL ♂' : 'SILENT');
+  const sp2 = document.getElementById('safetyPill'); if (sp2) sp2.textContent = safetyMode;
   const svp = document.getElementById('setVoicePill'); if (svp) svp.textContent = voicePersona;
   const h = new Date().getHours(); const g = document.querySelector('.greet');
   if (g) g.textContent = h < 12 ? 'Kaalai Vanakkam Boss' : h < 17 ? 'Vanakkam Boss' : 'Maalai Vanakkam Boss';

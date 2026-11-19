@@ -1,6 +1,8 @@
 package com.puyal.os.bridge
 
 import android.Manifest
+import android.app.role.RoleManager
+import android.os.PowerManager
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.content.Intent
@@ -228,6 +230,80 @@ class YunaBridge(
             }
             "பேட்டரி சேமிப்பு விலக்கு அமைப்பு திறக்கப்பட்டது."
         } catch (e: Exception) { "அமைப்பைத் திறக்க முடியவில்லை: ${e.message}" }
+    }
+
+
+    @JavascriptInterface
+    fun openAppByName(query: String): String {
+        val q = query.trim().lowercase()
+        if (q.isEmpty()) return "NOT_FOUND:empty"
+        return try {
+            val pm = ctx.packageManager
+            val apps = pm.getInstalledApplications(0)
+            var exactPkg: String? = null
+            var startPkg: String? = null
+            var partPkg: String? = null
+            var chosenLabel = query
+            for (ai in apps) {
+                if (pm.getLaunchIntentForPackage(ai.packageName) == null) continue
+                val lbl = pm.getApplicationLabel(ai)?.toString()?.trim() ?: continue
+                val low = lbl.lowercase()
+                if (low == q) { exactPkg = ai.packageName; chosenLabel = lbl; break }
+                if (startPkg == null && low.startsWith(q)) { startPkg = ai.packageName; chosenLabel = lbl }
+                if (partPkg == null && (low.contains(q) || q.contains(low))) { partPkg = ai.packageName; chosenLabel = lbl }
+            }
+            val pkg = exactPkg ?: startPkg ?: partPkg ?: return "NOT_FOUND:$query"
+            val intent = pm.getLaunchIntentForPackage(pkg)?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) ?: return "NOT_FOUND:$query"
+            ctx.startActivity(intent)
+            "$chosenLabel திறக்கப்பட்டது."
+        } catch (e: Exception) { "NOT_FOUND:${e.message}" }
+    }
+
+    @JavascriptInterface
+    fun getDetailedPermissions(): String {
+        val overlay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(ctx) else true
+        val acc = PuyalAccessService.instance != null
+        val mic = ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        val contacts = ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+        val call = ContextCompat.checkSelfPermission(ctx, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED
+        val notif = try {
+            val enabled = Settings.Secure.getString(ctx.contentResolver, "enabled_notification_listeners") ?: ""
+            enabled.contains(ctx.packageName)
+        } catch (_: Exception) { false }
+        val battery = try {
+            val pm = ctx.getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) pm.isIgnoringBatteryOptimizations(ctx.packageName) else true
+        } catch (_: Exception) { false }
+        val assistant = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val rm = ctx.getSystemService(RoleManager::class.java)
+                rm?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
+            } else false
+        } catch (_: Exception) { false }
+        return JSONObject().apply {
+            put("accessibility", acc); put("overlay", overlay); put("mic", mic)
+            put("contacts", contacts); put("call", call); put("notifications", notif)
+            put("battery", battery); put("assistant", assistant)
+        }.toString()
+    }
+
+    @JavascriptInterface
+    fun openPermissionSettings(kind: String): String = launchMain {
+        mainH.post {
+            try {
+                val i = when (kind.lowercase()) {
+                    "accessibility" -> Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                    "overlay" -> Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${ctx.packageName}"))
+                    "notifications" -> Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
+                    "battery" -> Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${ctx.packageName}"))
+                    "assistant" -> Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)
+                    else -> Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}"))
+                }
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                ctx.startActivity(i)
+            } catch (_: Exception) {}
+        }
+        "அனுமதி அமைப்புப் பக்கம் திறக்கப்பட்டது."
     }
 
     @JavascriptInterface

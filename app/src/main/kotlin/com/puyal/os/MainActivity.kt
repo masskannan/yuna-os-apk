@@ -94,7 +94,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleQuickVoiceIntent(i: Intent?) {
-        if (i?.action == "com.puyal.os.ACTION_QUICK_VOICE") {
+        if (i?.action == "com.puyal.os.ACTION_QUICK_VOICE" || i?.action == Intent.ACTION_ASSIST || i?.action == "android.intent.action.VOICE_ASSIST") {
             if (pageLoaded) {
                 webView.evaluateJavascript("if(typeof toggleVoice==='function'&&state!=='LISTENING')toggleVoice();", null)
             } else {
