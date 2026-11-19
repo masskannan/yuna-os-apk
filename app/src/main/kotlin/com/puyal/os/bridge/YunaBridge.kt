@@ -56,9 +56,7 @@ class YunaBridge(private val ctx: Context) {
             }
             "BRIGHTNESS_UP", "BRIGHTNESS_DOWN" -> {
                 if (!Settings.System.canWrite(ctx)) {
-                    val i = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${ctx.packageName}"))
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    ctx.startActivity(i)
+                    ctx.startActivity(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${ctx.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     return "Grant Write Settings"
                 }
                 val cur = Settings.System.getInt(ctx.contentResolver, Settings.System.SCREEN_BRIGHTNESS, 128)
@@ -67,11 +65,8 @@ class YunaBridge(private val ctx: Context) {
                 "Brightness: ${(next * 100) / 255}%"
             }
             "NET_PANEL" -> {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    ctx.startActivity(Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                } else {
-                    ctx.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                }
+                val act = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) Settings.Panel.ACTION_INTERNET_CONNECTIVITY else Settings.ACTION_WIFI_SETTINGS
+                ctx.startActivity(Intent(act).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 "Net Panel Opened"
             }
             else -> "Done"

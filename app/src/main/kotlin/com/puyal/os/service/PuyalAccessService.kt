@@ -20,22 +20,13 @@ class PuyalAccessService : AccessibilityService() {
         )
     }
 
-    override fun onServiceConnected() {
-        super.onServiceConnected()
-        instance = this
-    }
-
+    override fun onServiceConnected() { super.onServiceConnected(); instance = this }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val pkg = event?.packageName?.toString() ?: return
         if (pkg in BANKING_BLOCKLIST) return
     }
-
     override fun onInterrupt() {}
-
-    override fun onDestroy() {
-        instance = null
-        super.onDestroy()
-    }
+    override fun onDestroy() { instance = null; super.onDestroy() }
 
     fun runNav(actionId: Int): Boolean {
         val now = SystemClock.uptimeMillis()
@@ -52,10 +43,7 @@ class PuyalAccessService : AccessibilityService() {
     }
 
     fun launchUriFromService(uriStr: String): Boolean {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uriStr)).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        startActivity(intent)
+        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uriStr)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         return true
     }
 }
