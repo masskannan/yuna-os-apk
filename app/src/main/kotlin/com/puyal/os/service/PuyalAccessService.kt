@@ -11,7 +11,7 @@ import android.os.Looper
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import com.puyal.os.security.YunaTierGuards
+import com.puyal.os.guard.YunaTierGuards
 import java.lang.ref.WeakReference
 
 class PuyalAccessService : AccessibilityService() {
@@ -38,9 +38,9 @@ class PuyalAccessService : AccessibilityService() {
     override fun onInterrupt() {}
 
     override fun onKeyEvent(event: KeyEvent?): Boolean {
-        if (event != null && event.action == KeyEvent.ACTION_DOWN) {
+        if (event != null) {
             try {
-                if (YunaTierGuards.onHardwareKeyEvent(this, event.keyCode)) return true
+                if (YunaTierGuards.onHardwareKeyEvent(event)) return true
             } catch (_: Exception) {}
         }
         return super.onKeyEvent(event)
@@ -49,6 +49,8 @@ class PuyalAccessService : AccessibilityService() {
     private fun isYouTubeActive(): Boolean {
         return rootInActiveWindow?.packageName?.toString() == "com.google.android.youtube"
     }
+
+    fun scanNow(): String = scanScreenText()
 
     fun scanScreenText(): String {
         val root = rootInActiveWindow ?: return "திரையில் உள்ளடக்கம் எதுவும் கண்டறியப்படவில்லை."
