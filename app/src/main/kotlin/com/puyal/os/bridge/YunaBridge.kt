@@ -337,7 +337,7 @@ class YunaBridge(
                 setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
             }
             conn.outputStream.use { os ->
-                os.write("--$boundary\r\nContent-Disposition: form-data; name="file"; filename="yuna_mic.m4a"\r\nContent-Type: audio/mp4\r\n\r\n".toByteArray())
+                os.write("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"yuna_mic.m4a\"\r\nContent-Type: audio/mp4\r\n\r\n".toByteArray())
                 audio.inputStream().use { it.copyTo(os) }
                 os.write("\r\n--$boundary--\r\n".toByteArray())
             }
