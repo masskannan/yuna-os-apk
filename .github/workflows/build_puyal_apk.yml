@@ -1,4 +1,4 @@
-name: Build Puyal Sovereign APK
+name: Build YUNA Polyglot Sovereign APK
 
 on:
   push:
@@ -8,37 +8,60 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
 
-      - name: Verify Pre-installed Android SDK
+      - name: Accept SDK Licenses & Install NDK 26
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;26.1.10909125"
 
-      - name: Grant gradlew permission
-        run: chmod +x gradlew
+      - name: Setup Rust (arm64-v8a)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
 
-      - name: Build Slim arm64-v8a Debug APK
-        run: ./gradlew assembleDebug --no-daemon
+      - name: Cache Cargo NDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-ndk
+            ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-ndk-v1
 
-      - name: Generate APK SHA-256 Checksum
+      - name: Build Rust Brain (.so)
+        env:
+          ANDROID_NDK_HOME: /usr/local/lib/android/sdk/ndk/26.1.10909125
         run: |
-          sha256sum app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/app-debug.apk.sha256
-          cat app/build/outputs/apk/debug/app-debug.apk.sha256
+          command -v cargo-ndk >/dev/null || cargo install cargo-ndk --locked
+          cargo ndk -t arm64-v8a -o app/src/main/jniLibs build --manifest-path wasm_modules/rust_brain/Cargo.toml --release
 
-      - name: Upload APK & Checksum
+      - name: Setup Zig 0.13.0
+        uses: mlugg/setup-zig@v1
+        with:
+          version: 0.13.0
+
+      - name: Build Zig Hands (.so)
+        run: |
+          mkdir -p app/src/main/jniLibs/arm64-v8a
+          zig build-lib wasm_modules/zig_hands/src/main.zig -target aarch64-linux-android -dynamic -O ReleaseSmall -femit-bin=app/src/main/jniLibs/arm64-v8a/libyuna_zig.so
+
+      - name: Build Polyglot Debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: puyal-sovereign-apk
-          path: |
-            app/build/outputs/apk/debug/app-debug.apk
-            app/build/outputs/apk/debug/app-debug.apk.sha256
+          name: yuna-polyglot-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk

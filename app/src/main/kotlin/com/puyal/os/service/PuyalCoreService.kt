@@ -72,6 +72,7 @@ class PuyalCoreService : Service() {
     private var bubbleView: TextView? = null
     private var menuView: LinearLayout? = null
     private lateinit var bubbleParams: WindowManager.LayoutParams
+    private var bubbleAdded = false
     private lateinit var menuParams: WindowManager.LayoutParams
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -286,6 +287,7 @@ class PuyalCoreService : Service() {
     }
 
     private fun applyRootOomProtection() {
+        if (!java.io.File("/system/bin/su").exists() && !java.io.File("/system/xbin/su").exists()) return
         Thread {
             val pid = Process.myPid()
             try {
@@ -337,6 +339,8 @@ class PuyalCoreService : Service() {
     }
 
     private fun setupFloatingBubble() {
+        if (bubbleAdded) return
+        bubbleAdded = true
         val density = resources.displayMetrics.density
         val sizePx = (52 * density).toInt()
 
