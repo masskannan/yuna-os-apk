@@ -12,8 +12,6 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
-import android.Manifest
-import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
@@ -432,7 +430,8 @@ class YunaBridge(
     }
 
     @JavascriptInterface fun startVoice(lang: String) {
-        if (isCallAudioActive()) { mainH.post { android.widget.Toast.makeText(ctx, "அழைப்பு நடக்கிறது — மைக் பாதுகாக்கப்பட்டது", android.widget.Toast.LENGTH_SHORT).show(); onTtsDone() }; return } mainH.post { onVoiceReq(lang.ifBlank { "ta-IN" }) } }
+        if (isCallAudioActive()) { mainH.post { android.widget.Toast.makeText(ctx, "அழைப்பு நடக்கிறது — மைக் பாதுகாக்கப்பட்டது", android.widget.Toast.LENGTH_SHORT).show(); onTtsDone() }; return }
+        mainH.post { onVoiceReq(lang.ifBlank { "ta-IN" }) } }
     @JavascriptInterface fun stopVoice() { mainH.post { onStopVoiceReq() } }
     @JavascriptInterface fun startBluetoothMic() { try { if (audioMgr.isBluetoothScoAvailableOffCall) { audioMgr.mode = AudioManager.MODE_IN_COMMUNICATION; audioMgr.startBluetoothSco() } } catch (_: Exception) {} }
     @JavascriptInterface fun scanScreen(): String = PuyalAccessService.instance?.scanScreenText() ?: "திரையைப் படிக்க அணுகல்தன்மை (Accessibility) அனுமதியை இயக்கவும்."
