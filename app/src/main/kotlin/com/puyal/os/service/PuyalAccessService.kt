@@ -22,6 +22,7 @@ class PuyalAccessService : AccessibilityService() {
     }
 
     private val mainH = Handler(Looper.getMainLooper())
+    @Volatile var lastActivePkg: String = ""
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -34,7 +35,7 @@ class PuyalAccessService : AccessibilityService() {
         instanceRef = null
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) { event?.packageName?.toString()?.let { if (it != packageName) lastActivePkg = it } }
     override fun onInterrupt() {}
 
     override fun onKeyEvent(event: KeyEvent?): Boolean {
@@ -107,6 +108,10 @@ class PuyalAccessService : AccessibilityService() {
         val root = rootInActiveWindow ?: return false
         for (a in aliases) {
             val matches = findNodesByTextOrDesc(root, a)
+            val exact = matches.firstOrNull {
+                it.text?.toString()?.equals(a, true) == true || it.contentDescription?.toString()?.equals(a, true) == true
+            }
+            if (exact != null && clickNodeOrParent(exact)) return true
             for (m in matches) {
                 if (clickNodeOrParent(m)) return true
             }
@@ -211,15 +216,15 @@ class PuyalAccessService : AccessibilityService() {
         performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
         mainH.postDelayed({
             clickAnyAlias(aliases)
-            mainH.postDelayed({ performGlobalAction(GLOBAL_ACTION_BACK) }, 650)
-        }, 700)
+            mainH.postDelayed({ performGlobalAction(GLOBAL_ACTION_BACK) }, 700)
+        }, 850)
         return "விரைவு அமைப்புகளில் $label நிலை மாற்றப்பட்டது."
     }
 
     fun clearAllRecents(): String {
         performGlobalAction(GLOBAL_ACTION_RECENTS)
         mainH.postDelayed({
-            val ok = clickAnyAlias(listOf("Clear all", "Close all", "Close all apps", "Clear", "அனைத்தையும் அழி"))
+            val ok = clickAnyAlias(listOf("Clear all", "Close all", "Close all apps", "Remove", "Clear", "அனைத்தையும் அழி"))
             if (!ok) mainH.postDelayed({ clickAnyAlias(listOf("Clear all", "Close all", "Close all apps")) }, 450)
         }, 650)
         return "பின்னணி செயலிகள் அனைத்தும் மூடப்படுகின்றன."

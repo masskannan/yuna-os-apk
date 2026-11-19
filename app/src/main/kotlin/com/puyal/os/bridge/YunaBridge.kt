@@ -18,6 +18,7 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.provider.AlarmClock
+import android.provider.CalendarContract
 import android.provider.ContactsContract
 import android.provider.MediaStore
 import android.provider.Settings
@@ -46,6 +47,8 @@ class YunaBridge(
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     private var isTamilTts = false
+    @Volatile private var pendingTtsText: String? = null
+    @Volatile private var pendingTtsPersona: String = "YUNA"
     private val audioMgr = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private var focusReq: AudioFocusRequest? = null
 
@@ -74,6 +77,7 @@ class YunaBridge(
                         val enRes = tts?.setLanguage(Locale("en", "IN"))
                         ttsReady = (enRes != TextToSpeech.LANG_MISSING_DATA && enRes != TextToSpeech.LANG_NOT_SUPPORTED)
                     }
+                    pendingTtsText?.let { pt -> pendingTtsText = null; speakPersona(pt, pendingTtsPersona) }
                     tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                         override fun onStart(utteranceId: String?) {}
                         override fun onDone(utteranceId: String?) {
@@ -135,6 +139,7 @@ class YunaBridge(
 
     @JavascriptInterface
     fun speakPersona(text: String, persona: String) {
+        if (!ttsReady && !persona.equals("SILENT", true) && text.isNotBlank()) { pendingTtsText = text; pendingTtsPersona = persona; return }
         if (!ttsReady || persona.equals("SILENT", true) || text.isBlank()) {
             mainH.post { onTtsDone() }
             return
@@ -176,7 +181,7 @@ class YunaBridge(
 
     @JavascriptInterface fun startVoice(lang: String) { mainH.post { onVoiceReq(lang.ifBlank { "ta-IN" }) } }
     @JavascriptInterface fun stopVoice() { mainH.post { onStopVoiceReq() } }
-    @JavascriptInterface fun startBluetoothMic() {}
+    @JavascriptInterface fun startBluetoothMic() { try { if (audioMgr.isBluetoothScoAvailableOffCall) { audioMgr.mode = AudioManager.MODE_IN_COMMUNICATION; audioMgr.startBluetoothSco() } } catch (_: Exception) {} }
     @JavascriptInterface fun scanScreen(): String = PuyalAccessService.instance?.scanScreenText() ?: "திரையைப் படிக்க அணுகல்தன்மை (Accessibility) அனுமதியை இயக்கவும்."
     @JavascriptInterface fun clickOnScreen(target: String): String = PuyalAccessService.instance?.clickByText(target) ?: "அணுகல்தன்மை (Accessibility) அனுமதியை இயக்கவும்."
     @JavascriptInterface fun getWaSummary(): String = PuyalNotifService.getSummary()
@@ -242,7 +247,8 @@ class YunaBridge(
     @JavascriptInterface
     fun saveObsidianNote(title: String, md: String): String {
         return try {
-            val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "Second_Brain/YUNA_Notes")
+            val base = ctx.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS) ?: ctx.filesDir
+            val dir = File(base, "YUNA_Notes")
             if (!dir.exists()) dir.mkdirs()
             val safe = title.replace(Regex("[^a-zA-Z0-9_-]"), "_").take(50)
             File(dir, "$safe.md").writeText(md)
@@ -262,8 +268,7 @@ class YunaBridge(
             "CAMERA_SHUTTER" -> acc?.tapCameraShutter() ?: "கேமரா ஷட்டருக்கு அணுகல்தன்மை (Accessibility) தேவை."
             "OPEN_APP" -> openAppPkg(target)
             "OPEN_MAPS_NAV" -> launchMain {
-                val i = Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=" + Uri.encode(target))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                ctx.startActivity(i)
+                try { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=" + Uri.encode(target))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://maps.google.com/?q=" + Uri.encode(target))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                 "$target-க்கு Google Maps வழிசெலுத்தல் திறக்கப்பட்டது."
             }
             "DEEP_LINK_SEARCH" -> launchMain {
@@ -306,11 +311,40 @@ class YunaBridge(
             "MEDIA_PLAY_PAUSE" -> { sendMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE); "இசை Play/Pause செய்யப்பட்டது." }
             "BRIGHTNESS_UP" -> adjustBrightness(true)
             "BRIGHTNESS_DOWN" -> adjustBrightness(false)
+            "BRIGHTNESS_AUTO" -> launchMain { Settings.System.putInt(ctx.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC); "தானியங்கி பிரகாசம் இயக்கப்பட்டது." }
+                        "ADD_CALENDAR_EVENT" -> launchMain {
+                val parts = target.split("|", limit = 2)
+                val title = parts.getOrNull(0)?.ifBlank { "YUNA Event" } ?: "YUNA Event"
+                val beginMs = parts.getOrNull(1)?.toLongOrNull() ?: (System.currentTimeMillis() + 3600000L)
+                val i = Intent(Intent.ACTION_INSERT).apply {
+                    data = CalendarContract.Events.CONTENT_URI
+                    putExtra(CalendarContract.Events.TITLE, title)
+                    putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, beginMs)
+                    putExtra(CalendarContract.EXTRA_EVENT_END_TIME, beginMs + 3600000L)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                ctx.startActivity(i)
+                "நாட்காட்டியில் '$title' நிகழ்வு திறக்கப்பட்டது."
+            }
+            "SET_REMINDER" -> launchMain {
+                val parts = target.split("|", limit = 2)
+                val title = parts.getOrNull(0)?.ifBlank { "YUNA Reminder" } ?: "YUNA Reminder"
+                val beginMs = parts.getOrNull(1)?.toLongOrNull() ?: (System.currentTimeMillis() + 3600000L)
+                val i = Intent(Intent.ACTION_INSERT).apply {
+                    data = CalendarContract.Events.CONTENT_URI
+                    putExtra(CalendarContract.Events.TITLE, "⏰ " + title)
+                    putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, beginMs)
+                    putExtra(CalendarContract.EXTRA_EVENT_END_TIME, beginMs + 1800000L)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                ctx.startActivity(i)
+                "நினைவூட்டல் '$title' பதிவுப் பக்கம் திறக்கப்பட்டது."
+            }
             "SET_ALARM" -> setAlarm(target)
             "SET_TIMER" -> setTimer(target)
             "GET_BATTERY_TIME" -> getBatteryAndTime()
             "DIAL" -> launchMain {
-                val num = target.replace(Regex("[^0-9+*#]"), "")
+                val num = Uri.encode(target.replace(Regex("[^0-9+*#]"), ""))
                 val hasCallPerm = ContextCompat.checkSelfPermission(ctx, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED
                 val act = if (hasCallPerm) Intent.ACTION_CALL else Intent.ACTION_DIAL
                 ctx.startActivity(Intent(act, Uri.parse("tel:$num")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -373,13 +407,14 @@ class YunaBridge(
             cm.setTorchMode(id, next)
             torchState = next
             if (next) "டார்ச் ஆன் செய்யப்பட்டது." else "டார்ச் அணைக்கப்பட்டது."
-        } catch (e: Exception) { "டார்ச் பிழை: ${e.message}" }
+        } catch (e: android.hardware.camera2.CameraAccessException) { "கேமரா பயன்பாட்டில் உள்ளதால் டார்ச் இயக்க முடியவில்லை." } catch (e: Exception) { "டார்ச் பிழை: ${e.message}" }
     }
 
     private fun openAppPkg(pkg: String): String = launchMain {
         val pm = ctx.packageManager
-        val i = pm.getLaunchIntentForPackage(pkg)?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            ?: return@launchMain "செயலி நிறுவப்படவில்லை ($pkg)."
+        var i = pm.getLaunchIntentForPackage(pkg)
+        if (i == null && pkg == "com.whatsapp") i = pm.getLaunchIntentForPackage("com.whatsapp.w4b")
+        i = i?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) ?: return@launchMain "செயலி நிறுவப்படவில்லை ($pkg)."
         ctx.startActivity(i)
         "செயலி திறக்கப்பட்டது."
     }

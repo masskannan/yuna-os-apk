@@ -17,6 +17,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.puyal.os.bridge.YunaBridge
@@ -33,6 +34,16 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Thread.setDefaultUncaughtExceptionHandler { _, e ->
+            try { java.io.File(filesDir, "yuna_crash.log").appendText("\n--- " + java.util.Date() + " ---\n" + e.stackTraceToString().take(1500)) } catch (_: Exception) {}
+        }
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                webView.evaluateJavascript("(function(){const s=document.getElementById('settingsPage'),d=document.getElementById('drawerScrim'),p=document.getElementById('plusScrim'),l=document.getElementById('lightbox');if(l&&l.classList.contains('open')){l.classList.remove('open');return '1';}if(s&&s.classList.contains('open')){closeSettings();return '1';}if(d&&d.classList.contains('open')){closeDrawer();return '1';}if(p&&p.classList.contains('open')){closePlus();return '1';}return '0';})()") { res ->
+                    if (res?.contains("1") != true) { isEnabled = false; onBackPressedDispatcher.onBackPressed() }
+                }
+            }
+        })
         webView = WebView(this)
         setContentView(webView)
 
@@ -42,6 +53,8 @@ class MainActivity : ComponentActivity() {
             mediaPlaybackRequiresUserGesture = false
             allowFileAccess = true
             cacheMode = WebSettings.LOAD_DEFAULT
+            mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) safeBrowsingEnabled = true
         }
 
         webView.webChromeClient = object : WebChromeClient() {
@@ -143,6 +156,9 @@ class MainActivity : ComponentActivity() {
                     }
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() {
+                        if (error == SpeechRecognizer.ERROR_AUDIO || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
+                            webView.evaluateJavascript("if(typeof showToast==='function')showToast('மைக் மற்றொரு செயலியில் பயன்பாட்டில் உள்ளது');", null)
+                        }
                         webView.evaluateJavascript("if(window.onYunaVoiceEnded)window.onYunaVoiceEnded();", null)
                     }
                     override fun onError(error: Int) {
