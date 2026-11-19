@@ -11,49 +11,89 @@
 <style>
   :root {
     --bg: #040814; --text: #F8FAFC; --muted: #94A3B8;
-    --accent-a: #00E5FF; --accent-b: #7C3AED; --cyan: #00E5FF;
-    --glass-border: rgba(148, 197, 255, 0.28);
+    --mint: #2DD4BF; --accent-a: #00E5FF; --accent-b: #8B5CF6; --cyan: #00E5FF;
+    --glass: rgba(10, 22, 48, 0.56);
+    --glass-border: rgba(186, 230, 253, 0.24);
+    --specular: inset 0 1px 0 rgba(255, 255, 255, 0.30);
   }
   body.theme-gold { --cyan: #F59E0B; --accent-a: #F59E0B; --accent-b: #06B6D4; }
   body.theme-emerald { --cyan: #10B981; --accent-a: #10B981; --accent-b: #0EA5E9; }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   html { min-height: 100dvh; background: var(--bg); overscroll-behavior-y: auto; }
-  body { min-height: 100dvh; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Tamil", sans-serif; overflow-x: clip; overscroll-behavior-y: auto; }
+  body {
+    min-height: 100dvh; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Noto Sans Tamil", sans-serif;
+    overflow-x: clip; overscroll-behavior-y: auto; -webkit-font-smoothing: antialiased;
+  }
   body.modal-open { overflow: hidden; height: 100dvh; }
+  body.settings-open .dock-wrap, body.settings-open main#chat, body.settings-open header#topHeader { display: none !important; }
 
+  /* #15 Rain-Streaked Cyan-Violet Glass Wallpaper */
   .aurora-bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: #030712; }
   .wp15-img { position: absolute; inset: -3%; width: 106%; height: 106%; object-fit: cover; filter: brightness(0.92) saturate(1.12); animation: rainBreath 26s ease-in-out infinite alternate; will-change: transform; }
-  .wp15-vignette { position: absolute; inset: 0; background: radial-gradient(circle at 50% 34%, rgba(6, 16, 40, 0.14) 0%, rgba(3, 7, 18, 0.62) 72%, rgba(2, 5, 14, 0.88) 100%); }
+  .wp15-vignette { position: absolute; inset: 0; background: radial-gradient(circle at 50% 34%, rgba(6, 16, 40, 0.14) 0%, rgba(3, 7, 18, 0.60) 72%, rgba(2, 5, 14, 0.88) 100%); }
   body.night-dim .wp15-img { filter: brightness(0.50) contrast(1.06); }
   @keyframes rainBreath { 0% { transform: translate3d(0,0,0) scale(1.02); } 100% { transform: translate3d(-1%,1%,0) scale(1.05); } }
   body.freeze-anim * { animation-play-state: paused !important; }
 
+  /* iOS Liquid Glass Header (True 3-Column Center) */
   header#topHeader {
     position: fixed; top: 0; left: 0; right: 0; z-index: 50; max-width: 480px; margin: 0 auto;
     display: grid; grid-template-columns: 78px 1fr 78px; align-items: center;
     padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
-    background: linear-gradient(to bottom, rgba(4, 9, 24, 0.54) 48%, transparent);
+    background: linear-gradient(to bottom, rgba(4, 9, 24, 0.48) 45%, transparent);
   }
-  .circle-glass-btn { width: 40px; height: 40px; border-radius: 999px; background: rgba(14, 28, 56, 0.60); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.30); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .circle-glass-btn {
+    width: 40px; height: 40px; border-radius: 999px;
+    background: var(--glass); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.32), var(--specular);
+    color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer;
+    transition: transform 0.14s ease, border-color 0.2s ease;
+  }
+  .circle-glass-btn:active { transform: scale(0.93); border-color: var(--accent-a); }
   header#topHeader > .circle-glass-btn { justify-self: start; }
   .brand-row { justify-self: center; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 4px 8px; border-radius: 999px; }
-  .yuna-logo-svg { height: 19px; width: auto; display: block; filter: drop-shadow(0 0 10px rgba(124, 232, 245, 0.32)); }
-  .tag-pill { font-family: ui-monospace, monospace; font-size: 10px; font-weight: 600; color: #E0F2FE; background: rgba(14, 28, 58, 0.66); border: 1px solid color-mix(in srgb, var(--accent-a) 38%, transparent); padding: 4px 9px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
-  .tag-pill.mode-cloud { background: rgba(109, 40, 217, 0.32); border-color: rgba(167, 139, 250, 0.7); color: #EDE9FE; }
-  .top-right-pill { justify-self: end; display: flex; align-items: center; gap: 2px; background: rgba(14, 28, 56, 0.60); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: 999px; padding: 3px; }
+  .yuna-logo-svg { height: 19px; width: auto; display: block; filter: drop-shadow(0 0 10px rgba(124, 232, 245, 0.30)); }
+  .tag-pill {
+    font-family: ui-monospace, monospace; font-size: 10px; font-weight: 600; color: #E0F2FE;
+    background: var(--glass); backdrop-filter: blur(16px);
+    border: 1px solid color-mix(in srgb, var(--accent-a) 36%, transparent);
+    box-shadow: var(--specular); padding: 4px 10px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 8px var(--mint); animation: pulseDot 2s infinite; }
+  .tag-pill.mode-cloud { background: rgba(109, 40, 217, 0.34); border-color: rgba(167, 139, 250, 0.68); color: #EDE9FE; }
+  .tag-pill.mode-cloud .live-dot { background: #A78BFA; box-shadow: 0 0 8px #A78BFA; }
+  @keyframes pulseDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.8); } }
+
+  .top-right-pill {
+    justify-self: end; display: flex; align-items: center; gap: 2px;
+    background: var(--glass); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid var(--glass-border); box-shadow: 0 6px 18px rgba(0,0,0,0.32), var(--specular);
+    border-radius: 999px; padding: 3px;
+  }
   .top-right-pill button { width: 34px; height: 34px; border-radius: 999px; border: none; background: transparent; color: #E0F2FE; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-  /* #moreBtn visible on Home & Chat for quick Refresh */
 
-  #moreMenu { position: fixed; top: calc(58px + env(safe-area-inset-top)); right: max(14px, calc(50vw - 226px)); width: 196px; z-index: 70; background: linear-gradient(145deg, rgba(10, 22, 48, 0.95), rgba(20, 14, 52, 0.96)); backdrop-filter: blur(16px); border: 1px solid color-mix(in srgb, var(--accent-a) 40%, transparent); border-radius: 16px; padding: 6px; box-shadow: 0 14px 36px rgba(0, 0, 0, 0.68); display: none; flex-direction: column; gap: 2px; }
-  #moreMenu.open { display: flex; }
-  #moreMenu button { background: transparent; border: none; color: #E2E8F0; text-align: left; padding: 10px 12px; border-radius: 10px; font-size: 13px; cursor: pointer; }
+  #moreMenu {
+    position: fixed; top: calc(58px + env(safe-area-inset-top)); right: max(14px, calc(50vw - 226px));
+    width: 196px; z-index: 70; background: rgba(8, 18, 42, 0.88);
+    backdrop-filter: blur(22px) saturate(150%); -webkit-backdrop-filter: blur(22px) saturate(150%);
+    border: 1px solid color-mix(in srgb, var(--accent-a) 36%, transparent);
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.65), var(--specular);
+    border-radius: 18px; padding: 6px; display: none; flex-direction: column; gap: 2px;
+  }
+  #moreMenu.open { display: flex; animation: waterPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  #moreMenu button { background: transparent; border: none; color: #E2E8F0; text-align: left; padding: 10px 12px; border-radius: 12px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+  #moreMenu button:active { background: rgba(0, 229, 255, 0.14); }
 
-  main#chat { position: relative; z-index: 5; max-width: 480px; width: 100%; margin: 0 auto; padding: calc(64px + env(safe-area-inset-top)) 16px calc(106px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 12px; }
-  .hero { display: flex; flex-direction: column; align-items: center; transition: transform 0.24s ease, opacity 0.28s ease, filter 0.28s ease; }
+  /* Main Stage */
+  main#chat { position: relative; z-index: 5; max-width: 480px; width: 100%; margin: 0 auto; padding: calc(68px + env(safe-area-inset-top)) 16px calc(106px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 12px; }
+  .hero { display: flex; flex-direction: column; align-items: center; transition: transform 0.24s ease, opacity 0.28s ease; }
   .orb-stage { position: relative; width: 212px; height: 212px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-  .orb-aura { position: absolute; width: 176px; height: 176px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--accent-a) 34%, transparent) 0%, rgba(91, 33, 182, 0.24) 55%, transparent 78%); filter: blur(18px); z-index: 1; animation: auraSurge 4.2s ease-in-out infinite; }
+  .orb-aura { position: absolute; width: 176px; height: 176px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--accent-a) 34%, transparent) 0%, rgba(139, 92, 246, 0.24) 55%, transparent 78%); filter: blur(18px); z-index: 1; animation: auraSurge 4.2s ease-in-out infinite; }
   @keyframes auraSurge { 0%, 100% { transform: scale(0.95); opacity: 0.70; } 50% { transform: scale(1.06); opacity: 0.95; } }
-  .orb-core-clip { position: relative; z-index: 2; width: 154px; height: 154px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 28px color-mix(in srgb, var(--accent-a) 36%, transparent), 0 0 46px rgba(109, 40, 217, 0.30); }
+  .orb-core-clip { position: relative; z-index: 2; width: 154px; height: 154px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 28px color-mix(in srgb, var(--accent-a) 36%, transparent), 0 0 46px rgba(139, 92, 246, 0.30); }
   .orb-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; mix-blend-mode: screen; animation: earthSpin 40s linear infinite, powerSurge 4.2s ease-in-out infinite; }
   @keyframes earthSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   @keyframes powerSurge { 0%, 100% { filter: brightness(0.98) contrast(1.06); } 50% { filter: brightness(1.12) contrast(1.12); } }
@@ -61,110 +101,198 @@
   .orb-stage.thinking .orb-img { animation-duration: 6s, 1.0s; }
   .orb-stage.stranger .orb-aura { background: radial-gradient(circle, rgba(244, 63, 94, 0.58) 0%, rgba(139, 92, 246, 0.35) 55%, transparent 78%); }
   .orb-stage.stranger .orb-core-clip { box-shadow: 0 0 34px rgba(244, 63, 94, 0.65), 0 0 54px rgba(139, 92, 246, 0.45); }
+  .orb-water-ripple { position: absolute; width: 154px; height: 154px; border-radius: 50%; border: 2px solid var(--accent-a); opacity: 0; pointer-events: none; z-index: 5; }
+  .orb-stage.ripple .orb-water-ripple { animation: waterDrop 0.65s ease-out; }
+  @keyframes waterDrop { 0% { transform: scale(0.86); opacity: 0.9; } 100% { transform: scale(1.48); opacity: 0; } }
+
   .hud-svg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 4; pointer-events: none; }
   .hud-rot-cw { transform-origin: 122px 122px; animation: spinCW 34s linear infinite; }
   .hud-rot-ccw { transform-origin: 122px 122px; animation: spinCCW 26s linear infinite; }
   @keyframes spinCW { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   @keyframes spinCCW { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
   .greet { font-size: 24px; font-weight: 600; color: #F8FAFC; margin-top: 2px; }
-  .orb-sub { font-family: ui-monospace, monospace; font-size: 10.5px; color: #E0F2FE; margin-top: 6px; padding: 4px 12px; border-radius: 999px; background: rgba(8, 18, 38, 0.56); border: 1px solid color-mix(in srgb, var(--accent-a) 26%, transparent); }
+  .orb-sub { font-family: ui-monospace, monospace; font-size: 10.5px; color: #E0F2FE; margin-top: 6px; padding: 4px 12px; border-radius: 999px; background: var(--glass); backdrop-filter: blur(14px); border: 1px solid color-mix(in srgb, var(--accent-a) 26%, transparent); box-shadow: var(--specular); }
 
-  .vision-card { position: relative; overflow: hidden; background: linear-gradient(135deg, rgba(148, 197, 255, 0.14), rgba(26, 48, 112, 0.26) 55%, rgba(12, 20, 42, 0.58)); backdrop-filter: blur(14px); border: 1px solid rgba(148, 210, 255, 0.30); border-bottom: 1.5px solid var(--accent-a); border-radius: 20px; padding: 14px 16px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  /* iOS Liquid Glass Vision Card & Matching 3-Color Rail */
+  .vision-card {
+    position: relative; overflow: hidden;
+    background: linear-gradient(135deg, rgba(45, 212, 191, 0.10), rgba(0, 229, 255, 0.14) 50%, rgba(139, 92, 246, 0.18));
+    backdrop-filter: blur(20px) saturate(140%); -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid var(--glass-border); border-bottom: 1.5px solid var(--accent-a);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38), var(--specular);
+    border-radius: 22px; padding: 14px 16px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
   .vision-card h2 { font-size: 15.5px; font-weight: 600; color: #F8FAFC; margin-bottom: 3px; }
   .vision-card p { font-size: 11.5px; color: rgba(226, 232, 240, 0.80); }
   .vision-icons { display: flex; gap: 12px; margin-top: 9px; align-items: center; opacity: 0.78; pointer-events: none; }
-  .vision-badge { width: 56px; height: 56px; border-radius: 999px; flex-shrink: 0; border: 1.5px solid var(--accent-a); box-shadow: 0 0 22px color-mix(in srgb, var(--accent-a) 46%, transparent); background: rgba(5, 13, 30, 0.86); display: flex; align-items: center; justify-content: center; }
-  .rail { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
-  .rail-btn { background: linear-gradient(180deg, rgba(20, 36, 70, 0.62), rgba(10, 18, 38, 0.76)); backdrop-filter: blur(10px); border: 1px solid rgba(148, 197, 255, 0.24); border-radius: 18px; padding: 11px 8px 9px; color: #F1F5F9; font-size: 12px; font-weight: 500; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-  .rail-btn.active { border-color: var(--accent-a); }
-  .rail-dot { width: 16px; height: 2.5px; border-radius: 99px; }
-  .rail-btn:not(.active) .rail-dot { opacity: 0.30; box-shadow: none !important; }
+  .vision-badge { width: 54px; height: 54px; border-radius: 999px; flex-shrink: 0; border: 1.5px solid var(--accent-a); box-shadow: 0 0 22px color-mix(in srgb, var(--accent-a) 42%, transparent), var(--specular); background: rgba(5, 13, 30, 0.82); display: flex; align-items: center; justify-content: center; }
 
-  body.chat-active .hero { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -52%); z-index: 1; pointer-events: none; opacity: 0.18; filter: blur(2px); }
+  .rail { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+  .rail-btn {
+    background: linear-gradient(180deg, rgba(20, 36, 70, 0.56), rgba(10, 18, 38, 0.72));
+    backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid var(--glass-border); box-shadow: 0 6px 16px rgba(0,0,0,0.30), var(--specular);
+    border-radius: 18px; padding: 11px 8px 9px; color: #F1F5F9; font-size: 12px; font-weight: 500;
+    cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .rail-btn.active { border-color: var(--accent-a); }
+  .rail-dot { width: 18px; height: 2.5px; border-radius: 99px; transition: opacity 0.2s ease; }
+  .rail-btn:not(.active) .rail-dot { opacity: 0.36; }
+
+  /* Chat Mode (Softly Glowing Orb + Liquid Glass Mint-Cyan-Violet Chat Bubbles) */
+  body.chat-active .hero { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -52%); z-index: 1; pointer-events: none; opacity: 0.28; filter: blur(0.6px); }
   body.chat-active .hero .greet, body.chat-active .hero .orb-sub, body.chat-active .hud-labels, body.chat-active #visionCard, body.chat-active #quickRail { display: none; }
   body.kb-open:not(.chat-active) .hero { transform: scale(0.76); transform-origin: top center; margin-bottom: -44px; }
 
-  .msg-user { align-self: flex-end; max-width: 84%; padding: 11px 15px; background: linear-gradient(135deg, rgba(5, 126, 186, 0.52), rgba(37, 26, 109, 0.68)); border: 1px solid color-mix(in srgb, var(--accent-a) 50%, transparent); backdrop-filter: blur(12px); border-radius: 20px 20px 5px 20px; font-size: 14px; color: #FFFFFF; display: flex; flex-direction: column; gap: 7px; white-space: pre-wrap; }
+  @keyframes waterPop { 0% { opacity: 0; transform: scale(0.92) translateY(8px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+  .msg-user {
+    align-self: flex-end; max-width: 84%; padding: 11px 16px;
+    background: linear-gradient(135deg, rgba(45, 212, 191, 0.24), rgba(0, 229, 255, 0.28) 50%, rgba(139, 92, 246, 0.42));
+    border: 1px solid color-mix(in srgb, var(--accent-a) 45%, transparent);
+    backdrop-filter: blur(18px) saturate(145%); -webkit-backdrop-filter: blur(18px) saturate(145%);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.38), var(--specular);
+    border-radius: 22px 22px 6px 22px; font-size: 14.5px; color: #FFFFFF;
+    display: flex; flex-direction: column; gap: 6px; white-space: pre-wrap;
+    animation: waterPop 0.26s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
   .msg-thumb { max-width: 160px; max-height: 160px; aspect-ratio: 4/3; border-radius: 12px; object-fit: cover; border: 1px solid rgba(125,211,252,0.45); }
-  .msg-yuna-wrap { align-self: flex-start; max-width: 92%; display: flex; flex-direction: column; gap: 6px; }
-  .msg-yuna { padding: 13px 15px; background: rgba(6, 14, 32, 0.88); border: 1px solid rgba(125, 211, 252, 0.34); border-bottom: 1.5px solid color-mix(in srgb, var(--accent-a) 56%, transparent); backdrop-filter: blur(12px); border-radius: 20px 20px 20px 5px; font-size: 14px; line-height: 1.55; color: #FFFFFF; }
-  .msg-head { display: flex; align-items: center; gap: 7px; color: var(--accent-a); font-weight: 600; font-size: 12px; margin-bottom: 4px; }
-  .msg-sub { font-family: ui-monospace, monospace; font-size: 9.5px; color: #94A3B8; margin-top: 6px; }
-  .msg-ts { display: block; font-size: 9.5px; color: #94A3B8; opacity: 0.58; margin-top: 4px; font-family: ui-monospace, monospace; }
+  .msg-yuna-wrap { align-self: flex-start; max-width: 92%; display: flex; flex-direction: column; gap: 7px; }
+  .msg-yuna {
+    padding: 14px 16px;
+    background: linear-gradient(145deg, rgba(10, 22, 48, 0.72), rgba(18, 16, 48, 0.78));
+    border: 1px solid rgba(186, 230, 253, 0.26);
+    border-bottom: 1.5px solid color-mix(in srgb, var(--mint) 55%, var(--accent-a));
+    backdrop-filter: blur(20px) saturate(145%); -webkit-backdrop-filter: blur(20px) saturate(145%);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.44), var(--specular);
+    border-radius: 22px 22px 22px 6px; font-size: 14.5px; line-height: 1.55; color: #FFFFFF;
+    display: flex; flex-direction: column; gap: 6px;
+    animation: waterPop 0.26s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .msg-head { display: flex; align-items: center; gap: 7px; color: var(--accent-a); font-weight: 600; font-size: 12px; }
+  .step-chip {
+    align-self: flex-start; display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 999px;
+    background: linear-gradient(135deg, rgba(45, 212, 191, 0.16), rgba(0, 229, 255, 0.16));
+    border: 1px solid color-mix(in srgb, var(--mint) 44%, transparent);
+    font-family: ui-monospace, monospace; font-size: 10px; color: #A5F3FC;
+  }
+  .msg-body { display: block; white-space: pre-wrap; word-break: break-word; }
+  .msg-sub { font-family: ui-monospace, monospace; font-size: 9.5px; color: #94A3B8; margin-top: 2px; }
+  .msg-ts { display: block; font-size: 9.5px; color: #94A3B8; opacity: 0.60; font-family: ui-monospace, monospace; }
   .msg-actions { display: flex; align-items: center; gap: 6px; padding-left: 4px; flex-wrap: wrap; }
-  .msg-act-btn { background: rgba(14, 26, 54, 0.74); border: 1px solid rgba(125, 211, 252, 0.24); border-radius: 999px; color: #E0F2FE; min-height: 34px; padding: 6px 12px; font-size: 11.5px; cursor: pointer; }
-  .step-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; margin-bottom: 6px; background: color-mix(in srgb, var(--accent-a) 14%, transparent); border: 1px solid color-mix(in srgb, var(--accent-a) 40%, transparent); font-family: ui-monospace, monospace; font-size: 10px; color: #7DD3FC; }
+  .msg-act-btn {
+    background: var(--glass); backdrop-filter: blur(14px);
+    border: 1px solid var(--glass-border); box-shadow: var(--specular);
+    border-radius: 999px; color: #E0F2FE; min-height: 32px; padding: 5px 11px; font-size: 11.5px;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+  }
+  .msg-act-btn:active { border-color: var(--accent-a); transform: scale(0.95); }
+  .typing-dots { display: inline-flex; gap: 5px; padding: 4px 2px; }
+  .typing-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--mint); animation: dotWave 1s infinite ease-in-out; }
+  .typing-dots span:nth-child(2) { background: var(--accent-a); animation-delay: 0.15s; }
+  .typing-dots span:nth-child(3) { background: var(--accent-b); animation-delay: 0.3s; }
+  @keyframes dotWave { 0%,80%,100% { transform: translateY(0); opacity: 0.4; } 40% { transform: translateY(-6px); opacity: 1; } }
 
+  /* Gemini-Proportioned Liquid Glass Dock */
   .dock-wrap { position: fixed; left: 0; right: 0; bottom: calc(14px + env(safe-area-inset-bottom)); padding: 0 16px; pointer-events: none; z-index: 40; max-width: 480px; margin: 0 auto; transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1); }
-  .dock-wrap::before { content: ""; position: fixed; left: 0; right: 0; bottom: 0; height: 82px; background: linear-gradient(to top, rgba(4, 8, 20, 0.74), transparent); pointer-events: none; z-index: -1; }
+  .dock-wrap::before { content: ""; position: fixed; left: 0; right: 0; bottom: 0; height: 82px; background: linear-gradient(to top, rgba(4, 8, 20, 0.72), transparent); pointer-events: none; z-index: -1; }
   .dock-wrap > * { pointer-events: auto; }
-  #scrollDownBtn { width: 36px; height: 36px; border-radius: 999px; margin: 0 auto 10px; background: rgba(14, 28, 56, 0.90); border: 1px solid color-mix(in srgb, var(--accent-a) 45%, transparent); color: #E0F2FE; display: none; align-items: center; justify-content: center; cursor: pointer; }
+  #scrollDownBtn { width: 36px; height: 36px; border-radius: 999px; margin: 0 auto 10px; background: var(--glass); backdrop-filter: blur(16px); border: 1px solid color-mix(in srgb, var(--accent-a) 45%, transparent); box-shadow: var(--specular); color: #E0F2FE; display: none; align-items: center; justify-content: center; cursor: pointer; }
   #scrollDownBtn.show { display: flex; }
-  #quoteBar { display: none; align-items: center; justify-content: space-between; background: rgba(12, 24, 48, 0.92); border-left: 3px solid var(--accent-a); border-radius: 12px; padding: 6px 10px; margin: 0 6px 8px; font-size: 11.5px; color: #BAE6FD; }
+  #quoteBar { display: none; align-items: center; justify-content: space-between; background: rgba(12, 24, 48, 0.90); backdrop-filter: blur(16px); border-left: 3px solid var(--accent-a); border-radius: 12px; padding: 6px 10px; margin: 0 6px 8px; font-size: 11.5px; color: #BAE6FD; }
   #quoteBar.show { display: flex; }
   #quoteTxt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; margin-right: 8px; }
-  #attBar { display: none; align-items: center; gap: 8px; width: fit-content; max-width: calc(100% - 24px); margin: 0 0 8px 12px; padding: 5px 10px 5px 6px; border-radius: 14px; background: rgba(12, 24, 48, 0.92); border: 1px solid color-mix(in srgb, var(--accent-a) 42%, transparent); font-size: 11.5px; color: #E0F2FE; }
+  #attBar { display: none; align-items: center; gap: 8px; width: fit-content; max-width: calc(100% - 24px); margin: 0 0 8px 12px; padding: 5px 10px 5px 6px; border-radius: 14px; background: rgba(12, 24, 48, 0.90); backdrop-filter: blur(16px); border: 1px solid color-mix(in srgb, var(--accent-a) 42%, transparent); font-size: 11.5px; color: #E0F2FE; }
   #attBar.show { display: inline-flex; }
   #attThumb { width: 28px; height: 28px; border-radius: 8px; object-fit: cover; display: none; cursor: pointer; }
   #attName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 190px; }
   #attCancel { background: rgba(255,255,255,0.14); border: none; color: #fff; width: 22px; height: 22px; border-radius: 999px; font-size: 12px; cursor: pointer; }
 
-  .dock { display: flex; align-items: center; gap: 10px; min-height: 58px; border-radius: 28px; padding: 9px 10px 9px 12px; background: linear-gradient(135deg, rgba(16, 30, 58, 0.84), rgba(22, 18, 54, 0.88)); backdrop-filter: blur(16px); border: 1px solid color-mix(in srgb, var(--accent-a) 34%, rgba(148, 197, 255, 0.28)); box-shadow: 0 14px 36px rgba(0, 0, 0, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.22); }
-  .dock.mic-on { border-color: var(--accent-a); box-shadow: 0 14px 36px rgba(0,0,0,0.62), 0 0 28px color-mix(in srgb, var(--accent-a) 42%, transparent); }
-  .plus-orb { width: 40px; height: 40px; border-radius: 999px; flex-shrink: 0; border: 1px solid rgba(148, 197, 255, 0.28); background: rgba(34, 52, 88, 0.66); color: #F8FAFC; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .dock {
+    display: flex; align-items: center; gap: 10px; min-height: 58px; border-radius: 28px; padding: 9px 10px 9px 12px;
+    background: linear-gradient(135deg, rgba(16, 30, 58, 0.72), rgba(24, 18, 56, 0.78));
+    backdrop-filter: blur(22px) saturate(145%); -webkit-backdrop-filter: blur(22px) saturate(145%);
+    border: 1px solid color-mix(in srgb, var(--accent-a) 34%, rgba(186, 230, 253, 0.26));
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.56), var(--specular);
+  }
+  .dock.mic-on { border-color: var(--accent-a); box-shadow: 0 14px 36px rgba(0,0,0,0.60), 0 0 26px color-mix(in srgb, var(--accent-a) 40%, transparent); }
+  .plus-orb { width: 40px; height: 40px; border-radius: 999px; flex-shrink: 0; border: 1px solid rgba(186, 230, 253, 0.24); background: rgba(34, 52, 88, 0.56); box-shadow: var(--specular); color: #F8FAFC; cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .dock textarea { flex: 1; background: transparent; border: none; outline: none; resize: none; color: #FFFFFF; font-size: 15.5px; line-height: 1.4; min-width: 0; padding: 7px 2px; max-height: 104px; font-family: inherit; }
   .dock textarea::placeholder { color: rgba(203, 213, 225, 0.78); }
-  .wave-btn { width: 40px; height: 40px; border-radius: 999px; flex-shrink: 0; cursor: pointer; background: rgba(20, 38, 72, 0.72); border: 1px solid color-mix(in srgb, var(--accent-a) 38%, transparent); display: flex; align-items: center; justify-content: center; }
+  .wave-btn { width: 40px; height: 40px; border-radius: 999px; flex-shrink: 0; cursor: pointer; background: rgba(20, 38, 72, 0.62); border: 1px solid color-mix(in srgb, var(--accent-a) 36%, transparent); box-shadow: var(--specular); display: flex; align-items: center; justify-content: center; }
   .dock.has-text .wave-btn { display: none; }
-  .send-orb { width: 40px; height: 40px; border-radius: 999px; cursor: pointer; flex-shrink: 0; border: 1.5px solid color-mix(in srgb, var(--accent-a) 82%, #fff); background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); box-shadow: 0 0 18px color-mix(in srgb, var(--accent-a) 48%, transparent); display: none; align-items: center; justify-content: center; }
+  .send-orb { width: 40px; height: 40px; border-radius: 999px; cursor: pointer; flex-shrink: 0; border: 1.5px solid color-mix(in srgb, var(--accent-a) 80%, #fff); background: linear-gradient(135deg, var(--mint), var(--accent-a), var(--accent-b)); box-shadow: 0 0 18px color-mix(in srgb, var(--accent-a) 44%, transparent); display: none; align-items: center; justify-content: center; }
   .dock.has-text .send-orb { display: flex; }
   .send-orb.locked { opacity: 0.55; pointer-events: none; }
 
-  #drawerScrim { position: fixed; inset: 0; height: 100dvh; background: rgba(3, 7, 18, 0.72); backdrop-filter: blur(6px); z-index: 80; display: none; }
+  /* Frosted Rain-Glass Drawer */
+  #drawerScrim { position: fixed; inset: 0; height: 100dvh; background: rgba(3, 7, 18, 0.58); backdrop-filter: blur(8px); z-index: 80; display: none; }
   #drawerScrim.open { display: block; }
-  .drawer { width: min(296px, 84vw); height: 100%; background: linear-gradient(175deg, rgba(6, 12, 28, 0.80), rgba(12, 10, 34, 0.86)); backdrop-filter: blur(18px); border-right: 1px solid color-mix(in srgb, var(--accent-a) 30%, transparent); padding: calc(16px + env(safe-area-inset-top)) 14px calc(16px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
+  .drawer {
+    width: min(296px, 84vw); height: 100%;
+    background: linear-gradient(175deg, rgba(8, 16, 38, 0.68), rgba(16, 12, 42, 0.76));
+    backdrop-filter: blur(24px) saturate(150%); -webkit-backdrop-filter: blur(24px) saturate(150%);
+    border-right: 1px solid color-mix(in srgb, var(--accent-a) 28%, transparent);
+    box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55), var(--specular);
+    padding: calc(16px + env(safe-area-inset-top)) 14px calc(16px + env(safe-area-inset-bottom)); display: flex; flex-direction: column;
+  }
   .drawer-top { display: flex; align-items: center; justify-content: space-between; padding-left: 10px; margin-bottom: 12px; }
-  .drawer-top .circle-glass-btn { width: 34px; height: 34px; background: transparent; border-color: rgba(148,197,255,0.22); }
+  .drawer-top .circle-glass-btn { width: 34px; height: 34px; background: rgba(255,255,255,0.06); }
   .drawer-search-wrap { position: relative; margin-bottom: 12px; }
-  .drawer-search { background: rgba(16, 32, 64, 0.68); border: 1px solid rgba(125, 211, 252, 0.28); border-radius: 999px; padding: 9px 34px; color: #fff; font-size: 13.5px; outline: none; width: 100%; }
-  .drawer-search-ico { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; opacity: 0.7; }
+  .drawer-search { background: rgba(16, 32, 64, 0.56); border: 1px solid rgba(125, 211, 252, 0.26); border-radius: 999px; padding: 9px 34px; color: #fff; font-size: 13.5px; outline: none; width: 100%; }
+  .drawer-search-ico { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; opacity: 0.75; }
   .drawer-search-clr { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; border-radius: 999px; border: none; background: rgba(148,197,255,0.20); color: #fff; font-size: 11px; display: none; align-items: center; justify-content: center; cursor: pointer; }
   .drawer-search-clr.show { display: flex; }
   .drawer-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
-  .drawer-sec { font-family: ui-monospace, monospace; font-size: 10px; color: #7DD3FC; margin: 12px 6px 6px; opacity: 0.75; }
-  .svg-row-btn { background: transparent; border: none; color: #E2E8F0; text-align: left; padding: 10px; border-radius: 12px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 10px; width: 100%; }
-  .hist-del-btn { width: 34px !important; height: 34px !important; flex-shrink: 0; border-radius: 999px !important; display: inline-flex; align-items: center; justify-content: center; }
-  .hist-row-active { background: color-mix(in srgb, var(--accent-a) 14%, transparent); border-left: 2.5px solid var(--accent-a); }
-  .drawer-footer { border-top: 1px solid rgba(125, 211, 252, 0.22); padding-top: 12px; display: flex; align-items: center; justify-content: space-between; }
+  .drawer-sec { font-family: ui-monospace, monospace; font-size: 10px; color: #7DD3FC; margin: 12px 6px 6px; opacity: 0.8; }
+  .svg-row-btn { background: transparent; border: none; color: #E2E8F0; text-align: left; padding: 10px; border-radius: 12px; font-size: 13.5px; cursor: pointer; display: flex; align-items: center; gap: 10px; width: 100%; }
+  .svg-row-btn:active { background: rgba(0, 229, 255, 0.12); }
+  .hist-del-btn { width: 34px !important; height: 34px !important; flex-shrink: 0; border-radius: 999px !important; display: inline-flex; align-items: center; justify-content: center; padding: 0 !important; }
+  .hist-row-active { background: color-mix(in srgb, var(--accent-a) 14%, transparent); border-left: 2.5px solid var(--accent-a); border-radius: 12px; }
+  .drawer-footer { border-top: 1px solid rgba(125, 211, 252, 0.20); padding-top: 12px; display: flex; align-items: center; justify-content: space-between; }
   .drawer-profile { display: flex; align-items: center; gap: 10px; }
-  .avatar-dot { width: 34px; height: 34px; border-radius: 999px; background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #fff; }
+  .avatar-dot { width: 34px; height: 34px; border-radius: 999px; background: linear-gradient(135deg, var(--mint), var(--accent-a), var(--accent-b)); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #fff; }
 
-  #settingsPage { position: fixed; inset: 0; height: 100dvh; max-width: 480px; margin: 0 auto; z-index: 95; background: linear-gradient(165deg, rgba(6, 12, 28, 0.88), rgba(14, 10, 36, 0.92)); backdrop-filter: blur(18px); display: none; overflow-y: auto; padding: 0 16px calc(64px + env(safe-area-inset-bottom)); }
-  #settingsPage.open { display: block; }
-  .set-header { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 14px; padding: calc(14px + env(safe-area-inset-top)) 0 12px; margin-bottom: 10px; background: linear-gradient(to bottom, rgba(6, 12, 28, 0.92) 78%, transparent); backdrop-filter: blur(12px); }
+  /* Clean iOS Settings Page (Zero Clipping, Zero Dock Bleed) */
+  #settingsPage {
+    position: fixed; inset: 0; height: 100dvh; max-width: 480px; margin: 0 auto; z-index: 95;
+    background: linear-gradient(165deg, rgba(6, 12, 28, 0.94), rgba(14, 10, 36, 0.96));
+    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    display: none; overflow-y: auto; padding: 0 16px calc(48px + env(safe-area-inset-bottom));
+  }
+  #settingsPage.open { display: block; animation: waterPop 0.22s ease-out; }
+  .set-header {
+    position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 14px;
+    padding: calc(14px + env(safe-area-inset-top)) 0 12px; margin-bottom: 6px;
+    background: rgba(6, 12, 28, 0.92); backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(148, 197, 255, 0.12);
+  }
   .set-header h2 { font-size: 19px; font-weight: 600; color: #F8FAFC; }
-  .set-group-title { font-size: 12px; color: var(--accent-a); margin: 14px 6px 8px; font-weight: 600; }
-  .set-card { background: rgba(16, 30, 60, 0.64); border: 1px solid rgba(125, 211, 252, 0.24); border-radius: 18px; overflow: visible; margin-bottom: 10px; }
-  .set-item { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 14px 15px; border-bottom: 1px solid rgba(125, 211, 252, 0.12); font-size: 13.5px; color: #F1F5F9; cursor: pointer; }
+  .set-group-title { font-size: 12px; color: var(--accent-a); margin: 16px 6px 8px; font-weight: 600; }
+  .set-card {
+    background: rgba(16, 30, 60, 0.62); border: 1px solid var(--glass-border);
+    box-shadow: var(--specular); border-radius: 20px; overflow: visible; margin-bottom: 8px;
+  }
+  .set-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid rgba(125, 211, 252, 0.10); font-size: 14px; color: #F1F5F9; cursor: pointer; }
   .set-item:last-child { border-bottom: none; }
-  .set-pill { font-family: ui-monospace, monospace; font-size: 10.5px; padding: 4px 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent-a) 15%, transparent); border: 1px solid color-mix(in srgb, var(--accent-a) 48%, transparent); color: #E0F2FE; }
-  .set-status { font-family: ui-monospace, monospace; font-size: 11px; color: #2DD4BF; display: inline-flex; align-items: center; gap: 6px; }
-  .set-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #2DD4BF; box-shadow: 0 0 8px #2DD4BF; }
+  .set-pill { font-family: ui-monospace, monospace; font-size: 10.5px; padding: 5px 11px; border-radius: 999px; background: color-mix(in srgb, var(--accent-a) 14%, transparent); border: 1px solid color-mix(in srgb, var(--accent-a) 44%, transparent); color: #E0F2FE; }
+  .set-status { font-family: ui-monospace, monospace; font-size: 11px; color: var(--mint); display: inline-flex; align-items: center; gap: 6px; }
+  .set-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 8px var(--mint); }
 
-  #plusScrim { position: fixed; inset: 0; height: 100dvh; background: rgba(3, 7, 18, 0.64); backdrop-filter: blur(5px); z-index: 75; display: none; align-items: flex-end; justify-content: center; }
+  #plusScrim { position: fixed; inset: 0; height: 100dvh; background: rgba(3, 7, 18, 0.60); backdrop-filter: blur(6px); z-index: 75; display: none; align-items: flex-end; justify-content: center; }
   #plusScrim.open { display: flex; }
-  .plus-sheet { width: 100%; max-width: 480px; background: linear-gradient(180deg, rgba(8, 16, 36, 0.86), rgba(12, 10, 34, 0.92)); backdrop-filter: blur(18px); border-top: 1px solid color-mix(in srgb, var(--accent-a) 38%, transparent); border-radius: 26px 26px 0 0; padding: 10px 14px calc(24px + env(safe-area-inset-bottom)); }
+  .plus-sheet { width: 100%; max-width: 480px; background: linear-gradient(180deg, rgba(8, 16, 36, 0.84), rgba(12, 10, 34, 0.90)); backdrop-filter: blur(22px); border-top: 1px solid color-mix(in srgb, var(--accent-a) 38%, transparent); box-shadow: var(--specular); border-radius: 26px 26px 0 0; padding: 10px 14px calc(24px + env(safe-area-inset-bottom)); }
   .sheet-handle { width: 38px; height: 4px; border-radius: 99px; background: rgba(148, 197, 255, 0.38); margin: 0 auto 12px; }
   .plus-sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 0 4px; font-size: 13px; font-weight: 500; color: #E2E8F0; }
   .sheet-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .sheet-tile { background: rgba(20, 38, 72, 0.74); border: 1px solid rgba(125, 211, 252, 0.26); border-radius: 18px; padding: 15px 4px; color: #F1F5F9; font-size: 11.5px; display: flex; flex-direction: column; align-items: center; gap: 7px; cursor: pointer; }
+  .sheet-tile { background: rgba(20, 38, 72, 0.68); border: 1px solid var(--glass-border); box-shadow: var(--specular); border-radius: 18px; padding: 14px 4px; color: #F1F5F9; font-size: 11.5px; display: flex; flex-direction: column; align-items: center; gap: 7px; cursor: pointer; }
 
-  #toastPill { position: fixed; top: calc(68px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%) translateY(-12px); z-index: 120; background: rgba(8, 18, 38, 0.94); backdrop-filter: blur(14px); border: 1px solid var(--accent-a); color: #E0F2FE; border-radius: 999px; padding: 7px 14px; font-size: 12px; opacity: 0; pointer-events: none; white-space: nowrap; max-width: 90vw; overflow: hidden; text-overflow: ellipsis; transition: opacity 0.2s ease, transform 0.2s ease; display: flex; align-items: center; gap: 10px; }
+  #toastPill { position: fixed; top: calc(68px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%) translateY(-12px); z-index: 120; background: rgba(8, 18, 38, 0.94); backdrop-filter: blur(16px); border: 1px solid var(--accent-a); box-shadow: var(--specular); color: #E0F2FE; border-radius: 999px; padding: 7px 14px; font-size: 12px; opacity: 0; pointer-events: none; white-space: nowrap; max-width: 90vw; overflow: hidden; text-overflow: ellipsis; transition: opacity 0.2s ease, transform 0.2s ease; display: flex; align-items: center; gap: 10px; }
   #toastPill.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
-  #lightbox { position: fixed; inset: 0; height: 100dvh; z-index: 99; background: rgba(2,5,12,0.92); backdrop-filter: blur(12px); display: none; align-items: center; justify-content: center; padding: 20px; }
+  #lightbox { position: fixed; inset: 0; height: 100dvh; z-index: 99; background: rgba(2,5,12,0.92); backdrop-filter: blur(14px); display: none; align-items: center; justify-content: center; padding: 20px; }
   #lightbox.open { display: flex; }
   #lightbox img { max-width: 100%; max-height: 82vh; border-radius: 16px; border: 1px solid var(--accent-a); touch-action: pinch-zoom; }
-  #lbClose { position: fixed; top: calc(16px + env(safe-area-inset-top)); right: 16px; width: 40px; height: 40px; border-radius: 999px; background: rgba(16,30,58,0.85); border: 1px solid var(--accent-a); color: #fff; font-size: 18px; cursor: pointer; }
+  #lbClose { position: fixed; top: calc(16px + env(safe-area-inset-top)); right: 16px; width: 40px; height: 40px; border-radius: 999px; background: rgba(16,30,58,0.85); border: 1px solid var(--accent-a); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .lb-hint { position: fixed; bottom: calc(20px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); font-size: 11px; color: #94A3B8; background: rgba(6, 12, 28, 0.75); padding: 5px 12px; border-radius: 999px; }
 </style>
 </head>
@@ -186,7 +314,7 @@
       <path d="M70 25 V3 L88 25 V3" stroke="url(#yunaDual)" stroke-width="2.7" stroke-linejoin="bevel"/>
       <path d="M101 25 L112.5 3 L124 25" stroke="url(#yunaDual)" stroke-width="2.7"/>
     </svg>
-    <button class="tag-pill" id="modeBadge" onclick="toggleBrainMode()">LOCAL ▾</button>
+    <button class="tag-pill" id="modeBadge" onclick="toggleBrainMode()"><span class="live-dot"></span><span id="modeTxt">LOCAL ▾</span></button>
   </div>
   <div class="top-right-pill">
     <button onclick="resetHome()" title="New Chat" aria-label="New Chat">
@@ -199,25 +327,44 @@
 </header>
 
 <div id="moreMenu" onclick="event.stopPropagation()">
-  <button onclick="forceRefreshUi()">Refresh UI ↻</button>
-  <button onclick="shareFullChat(); closeMore()">Share conversation</button>
-  <button onclick="resetHome(); closeMore()" style="color:#FCA5A5;">Clear chat</button>
+  <button onclick="forceRefreshUi()">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--mint)" stroke-width="1.85" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+    Refresh UI
+  </button>
+  <button onclick="shareFullChat(); closeMore()">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-a)" stroke-width="1.85" stroke-linecap="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+    Share conversation
+  </button>
+  <button onclick="resetHome(); closeMore()" style="color:#FCA5A5;">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F87171" stroke-width="1.85" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+    Clear chat
+  </button>
 </div>
 
 <div id="drawerScrim" onclick="if(event.target===this)closeDrawer()">
   <div class="drawer">
     <div class="drawer-top">
       <span style="font-size:17px;font-weight:600;letter-spacing:2.5px;">YUNA</span>
-      <button class="circle-glass-btn" onclick="closeDrawer()" aria-label="Close">✕</button>
+      <button class="circle-glass-btn" onclick="closeDrawer()" aria-label="Close">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E2E8F0" stroke-width="1.85" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
     <div class="drawer-search-wrap">
       <svg class="drawer-search-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.85" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input class="drawer-search" id="drawerSearch" type="text" placeholder="Search chats..." oninput="renderHistory();document.getElementById('dsClr').classList.toggle('show',this.value.length>0)">
-      <button class="drawer-search-clr" id="dsClr" onclick="const s=document.getElementById('drawerSearch');s.value='';this.classList.remove('show');renderHistory()" aria-label="Clear">✕</button>
+      <button class="drawer-search-clr" id="dsClr" onclick="const s=document.getElementById('drawerSearch');s.value='';this.classList.remove('show');renderHistory()" aria-label="Clear">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
     <div class="drawer-list">
-      <button class="svg-row-btn" onclick="resetHome(); closeDrawer()">New chat</button>
-      <button class="svg-row-btn" onclick="ask('Screen Vision & Scan'); closeDrawer()">Screen Vision</button>
+      <button class="svg-row-btn" onclick="resetHome(); closeDrawer()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--mint)" stroke-width="1.85" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        New chat
+      </button>
+      <button class="svg-row-btn" onclick="ask('Screen Vision & Scan'); closeDrawer()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-a)" stroke-width="1.85" stroke-linecap="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>
+        Screen Vision
+      </button>
       <div class="drawer-sec">RECENT CHATS</div>
       <div id="historyList"></div>
     </div>
@@ -238,7 +385,9 @@
 
 <div id="settingsPage">
   <div class="set-header">
-    <button class="circle-glass-btn" onclick="closeSettings()" aria-label="Back">←</button>
+    <button class="circle-glass-btn" onclick="closeSettings()" aria-label="Back">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E2E8F0" stroke-width="1.85" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    </button>
     <h2>Settings</h2>
   </div>
   <div class="set-group-title">Core Engine</div>
@@ -246,33 +395,30 @@
     <div class="set-item"><span>Engine Profile</span><span class="set-status">LOCAL + CLOUD</span></div>
     <div class="set-item"><span>Immortal Guard</span><span class="set-status">FGS + SHIELD</span></div>
   </div>
-  <div class="set-group-title">Biometric &amp; Permissions</div>
+  <div class="set-group-title">Voice &amp; Security</div>
   <div class="set-card">
     <div class="set-item" onclick="enrollVoiceprint()"><span>Kannan Voiceprint</span><span class="set-status" id="vpStatus">ENROLLED</span></div>
     <div class="set-item" onclick="triggerStrangerGuard(); closeSettings()"><span>Test Stranger Guard</span><span class="set-pill" style="border-color:#F43F5E;color:#FDA4AF;">TEST</span></div>
-    <div class="set-item" onclick="toggleSetPill(this)"><span>Accessibility (Auto-Tap)</span><span class="set-pill">READY</span></div>
-    <div class="set-item" onclick="toggleSetPill(this)"><span>WA Intel Listener</span><span class="set-pill">READY</span></div>
+    <div class="set-item" onclick="toggleVoice(); closeSettings()"><span>Voice Input</span><span class="set-pill" id="voiceSetState">OFF</span></div>
+    <div class="set-item" onclick="cycleLangSet()"><span>Voice Language</span><span class="set-pill" id="langSetPill">TA</span></div>
   </div>
-  <div class="set-group-title">Preferences</div>
+  <div class="set-group-title">Appearance &amp; Data</div>
   <div class="set-card">
-    <div class="set-item" onclick="toggleFreeze()"><span>Core Earth-Spin Motion</span><span class="set-pill" id="animToggleBtn">ACTIVE</span></div>
-    <div class="set-item" onclick="toggleVoice(); closeSettings()"><span>Voice Input (Tamil / Tanglish)</span><span class="set-pill" id="voiceSetState">OFF</span></div>
     <div class="set-item" onclick="cycleMood()"><span>YUNA Persona Mood</span><span class="set-pill" id="moodPill">COMEDY</span></div>
     <div class="set-item" onclick="cycleTheme()"><span>Theme Accent</span><span class="set-pill" id="themePill">CYAN-VIOLET</span></div>
-    <div class="set-item" onclick="cycleLangSet()"><span>Voice Language</span><span class="set-pill" id="langSetPill">TA</span></div>
     <div class="set-item" onclick="toggleNightDim()"><span>Night-Eye Auto Dim</span><span class="set-pill" id="nightPill">OFF</span></div>
-    <div class="set-item"><span>RAM &amp; Battery</span><span class="set-status">~18MB • AUTO-0FPS</span></div>
-    <div class="set-item" onclick="exportToObsidian()"><span>Export Session to Obsidian</span><span class="set-pill">EXPORT</span></div>
-    <div class="set-item" onclick="clearSavedHistory()"><span style="color:#FCA5A5;">Clear Saved Chat History</span><span class="set-pill" style="border-color:rgba(248,113,113,0.45);color:#FCA5A5;">CLEAR</span></div>
+    <div class="set-item" onclick="exportToObsidian()"><span>Export to Obsidian</span><span class="set-pill">EXPORT</span></div>
+    <div class="set-item" onclick="clearSavedHistory()"><span style="color:#FCA5A5;">Clear Chat History</span><span class="set-pill" style="border-color:rgba(248,113,113,0.45);color:#FCA5A5;">CLEAR</span></div>
   </div>
-  <div style="text-align:center;font-family:monospace;font-size:10.5px;color:#94A3B8;margin-top:12px;">YUNA OS v1.0 • Build L1–L7</div>
+  <div style="text-align:center;font-family:monospace;font-size:10.5px;color:#64748B;margin-top:16px;">YUNA OS v6 • iOS Liquid Glass</div>
 </div>
 
 <main id="chat" aria-live="polite">
   <section class="hero" id="hero">
     <div class="orb-stage" id="orbStage">
       <div class="orb-aura"></div>
-      <div class="orb-core-clip" role="button" tabindex="0" aria-label="Tap orb to speak" onclick="toggleVoice()">
+      <div class="orb-water-ripple"></div>
+      <div class="orb-core-clip" role="button" tabindex="0" aria-label="Tap orb to speak" onclick="orbTap()">
         <img class="orb-img" src="data:image/webp;base64,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" alt="YUNA Power Core">
       </div>
       <svg class="hud-svg" viewBox="0 0 244 244" aria-hidden="true">
@@ -315,7 +461,7 @@
       </div>
     </div>
     <div class="vision-badge" aria-hidden="true">
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--accent-a)" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-a)" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
         <path d="M2 12s3.6-5 10-5 10 5 10 5-3.6 5-10 5-10-5-10-5z"/><circle cx="12" cy="12" r="2.5"/>
       </svg>
@@ -336,18 +482,20 @@
 <div id="plusScrim" onclick="if(event.target===this)closePlus()">
   <div class="plus-sheet">
     <div class="sheet-handle"></div>
-    <div class="plus-sheet-head"><span>Attach to YUNA</span><button onclick="closePlus()" style="background:none;border:none;color:#94A3B8;font-size:16px;cursor:pointer;" aria-label="Close">✕</button></div>
+    <div class="plus-sheet-head"><span>Attach to YUNA</span><button onclick="closePlus()" style="background:none;border:none;color:#94A3B8;cursor:pointer;" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="sheet-tiles">
-      <button class="sheet-tile" onclick="document.getElementById('filePhoto').click(); closePlus()">Photos</button>
-      <button class="sheet-tile" onclick="document.getElementById('fileCam').click(); closePlus()">Camera</button>
-      <button class="sheet-tile" onclick="toggleVoice(); closePlus()">Voice</button>
-      <button class="sheet-tile" onclick="document.getElementById('fileDoc').click(); closePlus()">Files</button>
+      <button class="sheet-tile" onclick="document.getElementById('filePhoto').click(); closePlus()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7DD3FC" stroke-width="1.85" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>Photos</button>
+      <button class="sheet-tile" onclick="document.getElementById('fileCam').click(); closePlus()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00E5FF" stroke-width="1.85" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Camera</button>
+      <button class="sheet-tile" onclick="toggleVoice(); closePlus()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="1.85" stroke-linecap="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>Voice</button>
+      <button class="sheet-tile" onclick="document.getElementById('fileDoc').click(); closePlus()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="1.85" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Files</button>
     </div>
   </div>
 </div>
 
 <div class="dock-wrap">
-  <button id="scrollDownBtn" onclick="window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'})" aria-label="Scroll to bottom">↓</button>
+  <button id="scrollDownBtn" onclick="window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'})" aria-label="Scroll to bottom">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+  </button>
   <div id="quoteBar"><span id="quoteTxt"></span><button onclick="clearQuote()" style="background:none;border:none;color:#fff;cursor:pointer;">✕</button></div>
   <div id="attBar"><img id="attThumb" alt=""><span id="attName"></span><button id="attCancel" onclick="clearAttachment()" aria-label="Remove">✕</button></div>
   <div class="dock" id="dockBar">
@@ -357,13 +505,13 @@
     <textarea id="inp" rows="1" placeholder="Ask YUNA..." oninput="syncInputMode(); autoGrowInp()" onkeyup="syncInputMode()" oncompositionend="syncInputMode(); autoGrowInp()" onchange="syncInputMode()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send();}"></textarea>
     <button class="wave-btn" id="micBtn" onpointerdown="event.preventDefault()" onclick="toggleVoice()" title="Mic ON / OFF" aria-label="Voice Mic">
       <svg width="22" height="20" viewBox="0 0 28 24" aria-hidden="true">
-        <line x1="3" y1="10" x2="3" y2="14" stroke="#00E5FF" stroke-width="2" stroke-linecap="round"/>
-        <line x1="7" y1="7" x2="7" y2="17" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
+        <line x1="3" y1="10" x2="3" y2="14" stroke="#2DD4BF" stroke-width="2" stroke-linecap="round"/>
+        <line x1="7" y1="7" x2="7" y2="17" stroke="#00E5FF" stroke-width="2" stroke-linecap="round"/>
         <line x1="11" y1="4" x2="11" y2="20" stroke="#00E5FF" stroke-width="2" stroke-linecap="round"/>
         <line x1="15" y1="2" x2="15" y2="22" stroke="#7DD3FC" stroke-width="2" stroke-linecap="round"/>
         <line x1="19" y1="5" x2="19" y2="19" stroke="#8B5CF6" stroke-width="2" stroke-linecap="round"/>
         <line x1="23" y1="8" x2="23" y2="16" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
-        <line x1="27" y1="10" x2="27" y2="14" stroke="#00E5FF" stroke-width="2" stroke-linecap="round"/>
+        <line x1="27" y1="10" x2="27" y2="14" stroke="#2DD4BF" stroke-width="2" stroke-linecap="round"/>
       </svg>
     </button>
     <button class="send-orb" id="actionOrb" onpointerdown="event.preventDefault()" onclick="sendOrLive()" aria-label="Send to YUNA">
@@ -373,11 +521,9 @@
 </div>
 
 <div id="toastPill"></div>
-<div id="lightbox" onclick="if(event.target===this)this.classList.remove('open')"><button id="lbClose" onclick="document.getElementById('lightbox').classList.remove('open')">✕</button><img id="lbImg" alt=""><div class="lb-hint">Pinch to zoom • Tap outside to close</div></div>
+<div id="lightbox" onclick="if(event.target===this)this.classList.remove('open')"><button id="lbClose" onclick="document.getElementById('lightbox').classList.remove('open')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><img id="lbImg" alt=""><div class="lb-hint">Pinch to zoom • Tap outside to close</div></div>
 
 <script>
-
-const topHeader = document.getElementById('topHeader');
 const orbStage = document.getElementById('orbStage');
 const orbSub = document.getElementById('orbSub');
 const chat = document.getElementById('chat');
@@ -395,41 +541,24 @@ const attName = document.getElementById('attName');
 const dockWrap = document.querySelector('.dock-wrap');
 const scrollDownBtn = document.getElementById('scrollDownBtn');
 
-let pickedFile = '';
-let pickedThumbUrl = '';
-let state = 'IDLE';
-let sendLock = false;
-let activeStreamTimer = null;
-let activeReplyTimeout = null;
+let pickedFile = '', pickedThumbUrl = '', state = 'IDLE', sendLock = false;
+let activeStreamTimer = null, activeReplyTimeout = null, lastPillMs = 0, quotedText = '';
 let brainMode = localStorage.getItem('yuna_brain') || 'LOCAL';
 let voiceLang = localStorage.getItem('yuna_lang') || 'ta-IN';
 let personaMood = localStorage.getItem('yuna_mood') || 'COMEDY';
-let quotedText = '';
-let lastPillMs = 0;
-
-function safeLoadSessions() {
-  try {
-    const d = JSON.parse(localStorage.getItem('yuna_sessions') || '[]');
-    return Array.isArray(d) ? d : [];
-  } catch (_) { return []; }
-}
-let sessions = safeLoadSessions();
+let sessions = (() => { try { const d = JSON.parse(localStorage.getItem('yuna_sessions') || '[]'); return Array.isArray(d) ? d : []; } catch (_) { return []; } })();
 let currentSessionId = null;
 
-function buzz(ms) {
-  if (navigator.vibrate) { try { navigator.vibrate(ms || 12); } catch (_) {} }
-}
+function buzz(ms) { if (navigator.vibrate) { try { navigator.vibrate(ms || 12); } catch (_) {} } }
+function orbTap() { orbStage.classList.remove('ripple'); void orbStage.offsetWidth; orbStage.classList.add('ripple'); toggleVoice(); }
 
 function showToast(msg, undoCb) {
   const t = document.getElementById('toastPill');
   if (!t) return;
   t.innerHTML = '';
-  const span = document.createElement('span');
-  span.textContent = msg;
-  t.appendChild(span);
+  const span = document.createElement('span'); span.textContent = msg; t.appendChild(span);
   if (undoCb) {
-    const b = document.createElement('button');
-    b.textContent = 'UNDO';
+    const b = document.createElement('button'); b.textContent = 'UNDO';
     b.style.cssText = 'background:rgba(0,229,255,0.22);border:1px solid var(--accent-a);color:#fff;border-radius:999px;padding:2px 8px;font-size:10px;cursor:pointer;';
     b.onclick = () => { undoCb(); t.classList.remove('show'); };
     t.appendChild(b);
@@ -449,7 +578,6 @@ function setOrbState(next, label) {
 }
 
 let micStream = null, audioCtx = null, micRaf = null, speechRec = null;
-
 function stopMicHardware() {
   if (micRaf) { cancelAnimationFrame(micRaf); micRaf = null; }
   if (speechRec) { try { speechRec.stop(); } catch (_) {} speechRec = null; }
@@ -462,24 +590,14 @@ async function toggleVoice() {
   buzz(12);
   const vs = document.getElementById('voiceSetState');
   if (state === 'LISTENING') {
-    stopMicHardware();
-    setOrbState('IDLE', 'Ready • Tap orb to speak');
-    dockBar.classList.remove('mic-on');
-    micBtn.classList.remove('active');
-    inp.placeholder = 'Ask YUNA...';
-    if (vs) vs.textContent = 'OFF';
-    return;
+    stopMicHardware(); setOrbState('IDLE', 'Ready • Tap orb to speak');
+    dockBar.classList.remove('mic-on'); micBtn.classList.remove('active');
+    inp.placeholder = 'Ask YUNA...'; if (vs) vs.textContent = 'OFF'; return;
   }
   setOrbState('LISTENING', 'Listening • Speak Tamil / English');
-  dockBar.classList.add('mic-on');
-  micBtn.classList.add('active');
-  inp.placeholder = 'Listening... Speak now';
-  if (vs) vs.textContent = 'ON';
-
-  if (window.YunaBridge && window.YunaBridge.startVoice) {
-    try { window.YunaBridge.startVoice(voiceLang); } catch (_) {}
-  }
-
+  dockBar.classList.add('mic-on'); micBtn.classList.add('active');
+  inp.placeholder = 'Listening... Speak now'; if (vs) vs.textContent = 'ON';
+  if (window.YunaBridge && window.YunaBridge.startVoice) { try { window.YunaBridge.startVoice(voiceLang); } catch (_) {} }
   try {
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -487,42 +605,27 @@ async function toggleVoice() {
       if (AC) {
         audioCtx = new AC();
         const src = audioCtx.createMediaStreamSource(micStream);
-        const analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 32;
-        src.connect(analyser);
+        const analyser = audioCtx.createAnalyser(); analyser.fftSize = 32; src.connect(analyser);
         const bins = new Uint8Array(analyser.frequencyBinCount);
         const bars = document.querySelectorAll('#micBtn line');
         const meter = () => {
           if (state !== 'LISTENING') return;
           analyser.getByteFrequencyData(bins);
-          bars.forEach((b, i) => {
-            const v = (bins[i % bins.length] || 20) / 255;
-            b.style.transformOrigin = 'center';
-            b.style.transform = 'scaleY(' + (0.65 + v * 0.95).toFixed(2) + ')';
-          });
+          bars.forEach((b, i) => { const v = (bins[i % bins.length] || 20) / 255; b.style.transformOrigin = 'center'; b.style.transform = 'scaleY(' + (0.65 + v * 0.95).toFixed(2) + ')'; });
           micRaf = requestAnimationFrame(meter);
-        };
-        meter();
+        }; meter();
       }
     }
   } catch (_) {
     setOrbState('IDLE', 'Mic blocked • Allow in Chrome');
-    dockBar.classList.remove('mic-on');
-    micBtn.classList.remove('active');
-    if (vs) vs.textContent = 'OFF';
-    return;
+    dockBar.classList.remove('mic-on'); micBtn.classList.remove('active'); if (vs) vs.textContent = 'OFF'; return;
   }
-
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (SR) {
-    speechRec = new SR();
-    speechRec.lang = voiceLang;
-    speechRec.interimResults = true;
+    speechRec = new SR(); speechRec.lang = voiceLang; speechRec.interimResults = true;
     speechRec.onresult = (ev) => {
       const res = ev.results[ev.results.length - 1];
-      inp.value = res[0].transcript;
-      syncInputMode();
-      autoGrowInp();
+      inp.value = res[0].transcript; syncInputMode(); autoGrowInp();
       if (res.isFinal) send();
     };
     speechRec.onerror = () => { if (state === 'LISTENING') toggleVoice(); };
@@ -530,43 +633,25 @@ async function toggleVoice() {
   }
 }
 
+window.onYunaVoiceResult = function(text) {
+  if (!text) return;
+  inp.value = text; syncInputMode(); autoGrowInp(); send();
+};
+
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    if (state === 'LISTENING') toggleVoice();
-    document.body.classList.add('freeze-anim');
-  } else {
-    const animBtn = document.getElementById('animToggleBtn');
-    if (!animBtn || animBtn.textContent !== '0-FPS FROZEN') {
-      document.body.classList.remove('freeze-anim');
-    }
-  }
+  if (document.hidden) { if (state === 'LISTENING') toggleVoice(); document.body.classList.add('freeze-anim'); }
+  else document.body.classList.remove('freeze-anim');
 });
-window.addEventListener('pagehide', () => {
-  if (state === 'LISTENING') stopMicHardware();
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-});
+window.addEventListener('pagehide', () => { if (state === 'LISTENING') stopMicHardware(); if ('speechSynthesis' in window) window.speechSynthesis.cancel(); });
 
-function syncInputMode() {
-  const hasPayload = (inp.value && inp.value.trim().length > 0) || pickedFile !== '';
-  dockBar.classList.toggle('has-text', hasPayload);
-}
-
-function autoGrowInp() {
-  inp.style.height = 'auto';
-  inp.style.height = Math.min(inp.scrollHeight, 104) + 'px';
-}
-
-function sendOrLive() {
-  if (sendLock) return;
-  if ((inp.value && inp.value.trim().length > 0) || pickedFile) send();
-  else toggleVoice();
-}
+function syncInputMode() { dockBar.classList.toggle('has-text', (inp.value && inp.value.trim().length > 0) || pickedFile !== ''); }
+function autoGrowInp() { inp.style.height = 'auto'; inp.style.height = Math.min(inp.scrollHeight, 104) + 'px'; }
+function sendOrLive() { if (!sendLock) { if ((inp.value && inp.value.trim().length > 0) || pickedFile) send(); else toggleVoice(); } }
 
 function syncModalLock() {
-  const anyOpen = drawerScrim.classList.contains('open') ||
-                  settingsPage.classList.contains('open') ||
-                  plusScrim.classList.contains('open') ||
-                  document.getElementById('lightbox').classList.contains('open');
+  const sOpen = settingsPage.classList.contains('open');
+  document.body.classList.toggle('settings-open', sOpen);
+  const anyOpen = drawerScrim.classList.contains('open') || sOpen || plusScrim.classList.contains('open') || document.getElementById('lightbox').classList.contains('open');
   document.body.classList.toggle('modal-open', anyOpen);
 }
 function openDrawer() { closeMore(); renderHistory(); drawerScrim.classList.add('open'); syncModalLock(); }
@@ -584,99 +669,65 @@ document.addEventListener('click', (e) => {
 });
 window.addEventListener('scroll', () => closeMore(), { passive: true });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    closeSettings(); closeDrawer(); closePlus(); closeMore();
-    document.getElementById('lightbox').classList.remove('open');
-    syncModalLock();
-  }
+  if (e.key === 'Escape') { closeSettings(); closeDrawer(); closePlus(); closeMore(); document.getElementById('lightbox').classList.remove('open'); syncModalLock(); }
 });
 
-function toggleFreeze() {
-  const frozen = document.body.classList.toggle('freeze-anim');
-  const b = document.getElementById('animToggleBtn');
-  if (b) b.textContent = frozen ? '0-FPS FROZEN' : 'ACTIVE';
-}
+// Safe left-edge swipe for Drawer (28px..64px zone avoids Android system Back)
+let swX = 0;
+document.addEventListener('touchstart', (e) => { swX = e.touches[0].clientX; }, { passive: true });
+document.addEventListener('touchend', (e) => {
+  if (settingsPage.classList.contains('open') || document.getElementById('lightbox').classList.contains('open')) return;
+  const dx = e.changedTouches[0].clientX - swX;
+  if (swX >= 28 && swX <= 68 && dx > 65 && !drawerScrim.classList.contains('open')) openDrawer();
+  else if (drawerScrim.classList.contains('open') && dx < -60) closeDrawer();
+}, { passive: true });
 
 function togglePill(btn, q) {
   if (Date.now() - lastPillMs < 500) return;
   lastPillMs = Date.now();
   const nowOn = btn.classList.toggle('active');
-  if (nowOn) ask(q);
-  else showToast(btn.textContent.trim() + ' OFF');
+  if (nowOn) ask(q); else showToast(btn.textContent.trim() + ' OFF');
 }
 
 function clearAttachment() {
-  if (pickedThumbUrl && pickedThumbUrl.startsWith('blob:')) {
-    try { URL.revokeObjectURL(pickedThumbUrl); } catch (_) {}
-  }
-  pickedFile = '';
-  pickedThumbUrl = '';
-  attThumb.src = '';
-  attThumb.style.display = 'none';
-  attName.textContent = '';
-  attBar.classList.remove('show');
-  syncInputMode();
+  if (pickedThumbUrl && pickedThumbUrl.startsWith('blob:')) { try { URL.revokeObjectURL(pickedThumbUrl); } catch (_) {} }
+  pickedFile = ''; pickedThumbUrl = ''; attThumb.src = ''; attThumb.style.display = 'none';
+  attName.textContent = ''; attBar.classList.remove('show'); syncInputMode();
 }
-
 function onPick(el) {
   if (!el.files || !el.files[0]) return;
-  const f = el.files[0];
-  clearAttachment();
+  const f = el.files[0]; clearAttachment();
   pickedFile = f.name + ' (' + Math.max(1, Math.round(f.size / 1024)) + ' KB)';
   attName.textContent = pickedFile;
-  if (f.type && f.type.startsWith('image/')) {
-    pickedThumbUrl = URL.createObjectURL(f);
-    attThumb.src = pickedThumbUrl;
-    attThumb.style.display = 'block';
-  }
-  attBar.classList.add('show');
-  syncInputMode();
-  el.value = '';
+  if (f.type && f.type.startsWith('image/')) { pickedThumbUrl = URL.createObjectURL(f); attThumb.src = pickedThumbUrl; attThumb.style.display = 'block'; }
+  attBar.classList.add('show'); syncInputMode(); el.value = '';
 }
+if (attThumb) attThumb.addEventListener('click', () => { if (attThumb.src) { document.getElementById('lbImg').src = attThumb.src; document.getElementById('lightbox').classList.add('open'); syncModalLock(); } });
 
-if (attThumb) {
-  attThumb.addEventListener('click', () => {
-    if (attThumb.src) {
-      document.getElementById('lbImg').src = attThumb.src;
-      document.getElementById('lightbox').classList.add('open');
-      syncModalLock();
-    }
-  });
-}
-
-function clearQuote() {
-  quotedText = '';
-  const qb = document.getElementById('quoteBar');
-  if (qb) qb.classList.remove('show');
-}
+function clearQuote() { quotedText = ''; const qb = document.getElementById('quoteBar'); if (qb) qb.classList.remove('show'); }
 
 function resetHome() {
   if (activeReplyTimeout) { clearTimeout(activeReplyTimeout); activeReplyTimeout = null; }
   if (activeStreamTimer) { clearInterval(activeStreamTimer); activeStreamTimer = null; }
-  sendLock = false;
-  actionOrb.classList.remove('locked', 'launching');
-  currentSessionId = null;
-  document.body.classList.remove('chat-active', 'island-active');
+  sendLock = false; actionOrb.classList.remove('locked'); currentSessionId = null;
+  document.body.classList.remove('chat-active');
   document.querySelectorAll('.msg-user, .msg-yuna-wrap').forEach(e => e.remove());
   document.querySelectorAll('#quickRail .rail-btn').forEach(b => b.classList.remove('active'));
-  clearAttachment();
-  clearQuote();
-  inp.value = '';
-  inp.style.height = 'auto';
-  syncInputMode();
-  setOrbState('IDLE', 'Ready • Tap orb to speak');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  clearAttachment(); clearQuote(); inp.value = ''; inp.style.height = 'auto'; syncInputMode();
+  setOrbState('IDLE', 'Ready • Tap orb to speak'); window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function saveCurrentSession(userTxt, botTxt) {
   if (!userTxt && !botTxt) return;
-  if (!currentSessionId) currentSessionId = Date.now();
-  let sec = sessions.find(s => s.id === currentSessionId);
-  if (!sec) {
-    const titleSrc = userTxt || botTxt || 'New Chat';
-    sec = { id: currentSessionId, title: titleSrc.slice(0, 36), msgs: [] };
-    sessions.unshift(sec);
+  if (!currentSessionId) {
+    if (userTxt && userTxt.startsWith('Screen Vision')) {
+      const existing = sessions.find(s => s.title === 'Screen Vision & Scan');
+      if (existing) { currentSessionId = existing.id; }
+    }
+    if (!currentSessionId) currentSessionId = Date.now();
   }
+  let sec = sessions.find(s => s.id === currentSessionId);
+  if (!sec) { sec = { id: currentSessionId, title: (userTxt || botTxt || 'Chat').slice(0, 36), msgs: [] }; sessions.unshift(sec); }
   if (userTxt) sec.msgs.push({ isUser: true, text: userTxt });
   if (botTxt) sec.msgs.push({ isUser: false, text: botTxt });
   sessions = sessions.slice(0, 15);
@@ -684,128 +735,65 @@ function saveCurrentSession(userTxt, botTxt) {
 }
 
 function restoreSession(id) {
-  const sec = sessions.find(s => s.id === id);
-  if (!sec) return;
-  resetHome();
-  currentSessionId = sec.id;
-  document.body.classList.add('chat-active', 'island-active');
+  const sec = sessions.find(s => s.id === id); if (!sec) return;
+  resetHome(); currentSessionId = sec.id; document.body.classList.add('chat-active');
   sec.msgs.forEach(m => {
-    if (m.isUser) {
-      const u = document.createElement('div');
-      u.className = 'msg-user';
-      u.textContent = m.text;
-      chat.appendChild(u);
-    } else {
-      addYunaStream('YUNA', m.text, 'RESTORED SESSION', null, true);
-    }
+    if (m.isUser) { const u = document.createElement('div'); u.className = 'msg-user'; u.textContent = m.text; chat.appendChild(u); }
+    else addYunaStream('YUNA', m.text, 'RESTORED SESSION', null, true);
   });
   setTimeout(() => window.scrollTo({ top: document.body.scrollHeight }), 40);
 }
 
 function renderHistory() {
-  const box = document.getElementById('historyList');
-  if (!box) return;
-  box.innerHTML = '';
+  const box = document.getElementById('historyList'); if (!box) return; box.innerHTML = '';
   const q = (document.getElementById('drawerSearch')?.value || '').toLowerCase().trim();
   const filtered = sessions.filter(s => s.title.toLowerCase().includes(q));
   if (!filtered.length) {
     const empty = document.createElement('div');
     empty.style.cssText = 'padding:18px 10px;font-size:12px;color:#64748B;text-align:center;';
-    empty.textContent = q ? 'No matching chats' : 'No saved chats yet';
-    box.appendChild(empty);
-    return;
+    empty.textContent = q ? 'No matching chats' : 'No saved chats yet'; box.appendChild(empty); return;
   }
   filtered.forEach(s => {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:4px;';
+    const row = document.createElement('div'); row.style.cssText = 'display:flex;align-items:center;gap:4px;';
     if (s.id === currentSessionId) row.className = 'hist-row-active';
-    const btn = document.createElement('button');
-    btn.className = 'svg-row-btn';
-    btn.style.flex = '1';
-    btn.textContent = s.title;
+    const btn = document.createElement('button'); btn.className = 'svg-row-btn'; btn.style.flex = '1'; btn.textContent = s.title;
     btn.onclick = () => { restoreSession(s.id); closeDrawer(); };
-    const del = document.createElement('button');
-    del.className = 'svg-row-btn hist-del-btn';
-    del.setAttribute('aria-label', 'Delete chat');
-    del.innerHTML = '✕';
-    del.style.color = '#94A3B8';
+    const del = document.createElement('button'); del.className = 'svg-row-btn hist-del-btn'; del.setAttribute('aria-label', 'Delete chat');
+    del.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
     del.onclick = (e) => {
-      e.stopPropagation();
-      const backup = [...sessions];
-      sessions = sessions.filter(x => x.id !== s.id);
-      localStorage.setItem('yuna_sessions', JSON.stringify(sessions));
-      renderHistory();
-      showToast('Chat deleted', () => {
-        sessions = backup;
-        localStorage.setItem('yuna_sessions', JSON.stringify(sessions));
-        renderHistory();
-      });
+      e.stopPropagation(); const backup = [...sessions];
+      sessions = sessions.filter(x => x.id !== s.id); localStorage.setItem('yuna_sessions', JSON.stringify(sessions)); renderHistory();
+      showToast('Chat deleted', () => { sessions = backup; localStorage.setItem('yuna_sessions', JSON.stringify(sessions)); renderHistory(); });
     };
-    row.appendChild(btn);
-    row.appendChild(del);
-    box.appendChild(row);
+    row.appendChild(btn); row.appendChild(del); box.appendChild(row);
   });
 }
 
 function clearSavedHistory() {
   if (!sessions.length) { showToast('History already empty'); return; }
-  const backup = [...sessions];
-  sessions = [];
-  localStorage.removeItem('yuna_sessions');
-  renderHistory();
-  showToast('Chat history cleared', () => {
-    sessions = backup;
-    localStorage.setItem('yuna_sessions', JSON.stringify(sessions));
-    renderHistory();
-  });
+  const backup = [...sessions]; sessions = []; localStorage.removeItem('yuna_sessions'); renderHistory();
+  showToast('Chat history cleared', () => { sessions = backup; localStorage.setItem('yuna_sessions', JSON.stringify(sessions)); renderHistory(); });
 }
 
-function ask(q) {
-  inp.value = q;
-  syncInputMode();
-  send();
-}
+function ask(q) { inp.value = q; syncInputMode(); send(); }
 
-const SAFE_DELEGATE_ALLOWLIST = new Set([
-  'OPEN_APP', 'DEEP_LINK_SEARCH', 'GLOBAL_BACK', 'GLOBAL_HOME',
-  'GLOBAL_RECENTS', 'GLOBAL_NOTIFICATIONS', 'GLOBAL_QUICK_SETTINGS',
-  'TORCH', 'BRIGHTNESS_UP', 'BRIGHTNESS_DOWN', 'NET_PANEL'
-]);
-
-function forceRefreshUi() {
-  const url = new URL(window.location.href);
-  url.searchParams.set('v', Date.now().toString());
-  window.location.replace(url.toString());
-}
-
-function redactSensitiveLocal(txt) {
-  return (txt || '')
-    .replace(/\b\d{4,8}\b/g, '[REDACTED_NUM]')
-    .replace(/\b(otp|cvv|pin|upi|password|mpin)\b/gi, '[REDACTED_KEY]');
-}
-
+const SAFE_DELEGATE_ALLOWLIST = new Set(['OPEN_APP','DEEP_LINK_SEARCH','GLOBAL_BACK','GLOBAL_HOME','GLOBAL_RECENTS','GLOBAL_NOTIFICATIONS','GLOBAL_QUICK_SETTINGS','TORCH','BRIGHTNESS_UP','BRIGHTNESS_DOWN','NET_PANEL']);
+function forceRefreshUi() { const u = new URL(window.location.href); u.searchParams.set('v', Date.now().toString()); window.location.replace(u.toString()); }
+function redactSensitiveLocal(txt) { return (txt || '').replace(/\b\d{4,8}\b/g, '[REDACTED_NUM]').replace(/\b(otp|cvv|pin|upi|password|mpin)\b/gi, '[REDACTED_KEY]'); }
 function execLocalOsAction(action, target) {
-  if (!SAFE_DELEGATE_ALLOWLIST.has(action)) {
-    return 'Blocked by YUNA Tier Guard: ' + action;
-  }
-  if (window.YunaBridge && window.YunaBridge.executeAction) {
-    try { return window.YunaBridge.executeAction(action, target || ''); } catch (_) {}
-  }
+  if (!SAFE_DELEGATE_ALLOWLIST.has(action)) return 'Blocked by YunaTierGuards: ' + action;
+  if (window.YunaBridge && window.YunaBridge.executeAction) { try { return window.YunaBridge.executeAction(action, target || ''); } catch (_) {} }
   return 'YUNA Local Action: ' + action + (target ? ' (' + target + ')' : '');
 }
 
 async function callPuyalCloud(promptText) {
   const safePrompt = redactSensitiveLocal(promptText);
-  const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), 9000);
+  const ctrl = new AbortController(); const tid = setTimeout(() => ctrl.abort(), 9000);
   try {
     const res = await fetch('https://puyal-edge-gateway.masskannan719.workers.dev/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: safePrompt, lang: voiceLang, mood: personaMood }),
-      signal: ctrl.signal
-    });
-    clearTimeout(tid);
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: safePrompt, lang: voiceLang, mood: personaMood }), signal: ctrl.signal
+    }); clearTimeout(tid);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     const rawReply = data.reply || data.response || data.text || JSON.stringify(data);
@@ -813,395 +801,188 @@ async function callPuyalCloud(promptText) {
       const parsed = typeof rawReply === 'string' && rawReply.trim().startsWith('{') ? JSON.parse(rawReply) : null;
       if (parsed && parsed.delegate_to === 'YUNA' && parsed.action) {
         const localNote = execLocalOsAction(parsed.action, parsed.target || '');
-        return {
-          title: 'PUYAL → YUNA',
-          reply: (parsed.say || 'சரி பாஸ், YUNA கிட்ட சொல்லி உடனே பண்றேன்!') + '\n[' + localNote + ']',
-          meta: 'CLOUD DELEGATED • LOCAL EXECUTED',
-          statusLabel: 'Ready • Tap orb to speak',
-          step: 'Cloud → YUNA Handoff'
-        };
+        return { title: 'PUYAL → YUNA', reply: (parsed.say || 'சரி பாஸ், YUNA கிட்ட சொல்லி உடனே பண்றேன்!') + '\n[' + localNote + ']', meta: 'CLOUD DELEGATED • LOCAL EXECUTED', statusLabel: 'Ready • Tap orb to speak', step: 'Cloud → YUNA' };
       }
     } catch (_) {}
-    return {
-      title: 'PUYAL • CLOUD',
-      reply: rawReply,
-      meta: 'CLOUDFLARE WORKER • GROQ',
-      statusLabel: 'PUYAL • CLOUD RESPONSE',
-      step: 'Cloud Edge Gateway'
-    };
-  } catch (_) {
-    clearTimeout(tid);
-    return null;
-  }
+    return { title: 'PUYAL • CLOUD', reply: rawReply, meta: 'CLOUDFLARE WORKER • GROQ', statusLabel: 'PUYAL • CLOUD RESPONSE', step: 'Cloud Gateway' };
+  } catch (_) { clearTimeout(tid); return null; }
 }
 
-function send() {
-  const q = inp.value.trim();
+function send(overrideText) {
+  const q = (overrideText !== undefined ? overrideText : inp.value).trim();
   if ((!q && !pickedFile) || sendLock) return;
-  sendLock = true;
-  actionOrb.classList.add('launching', 'locked');
-  setTimeout(() => { actionOrb.classList.remove('launching'); }, 200);
-
-  buzz(14);
-  closePlus(); closeMore();
+  sendLock = true; actionOrb.classList.add('locked'); buzz(14); closePlus(); closeMore();
   if (state === 'LISTENING') toggleVoice();
-  document.body.classList.add('chat-active', 'island-active');
+  document.body.classList.add('chat-active');
 
   const prefix = quotedText ? '> ' + quotedText + '\n' : '';
   const fullQ = prefix + q + (pickedFile ? (q ? ' [' : '[') + pickedFile + ']' : '');
-  const thumbCopy = pickedThumbUrl;
-  saveCurrentSession(fullQ, null);
+  const thumbCopy = pickedThumbUrl; saveCurrentSession(fullQ, null);
 
-  const u = document.createElement('div');
-  u.className = 'msg-user';
-  if (thumbCopy) {
-    const im = document.createElement('img');
-    im.className = 'msg-thumb';
-    im.src = thumbCopy;
-    u.appendChild(im);
-  }
-  if (fullQ) {
-    const txt = document.createElement('span');
-    txt.textContent = fullQ;
-    u.appendChild(txt);
-  }
+  const u = document.createElement('div'); u.className = 'msg-user';
+  if (thumbCopy) { const im = document.createElement('img'); im.className = 'msg-thumb'; im.src = thumbCopy; u.appendChild(im); }
+  if (fullQ) { const txt = document.createElement('span'); txt.textContent = fullQ; u.appendChild(txt); }
   chat.appendChild(u);
 
-  inp.value = '';
-  inp.style.height = 'auto';
-  clearQuote();
-  pickedFile = '';
-  pickedThumbUrl = '';
-  attThumb.src = '';
-  attThumb.style.display = 'none';
-  attName.textContent = '';
-  attBar.classList.remove('show');
-  syncInputMode();
+  if (overrideText === undefined) { inp.value = ''; inp.style.height = 'auto'; }
+  clearQuote(); clearAttachment(); syncInputMode();
 
+  // iOS Typing Dots Indicator
+  const typingWrap = document.createElement('div'); typingWrap.className = 'msg-yuna-wrap';
+  typingWrap.innerHTML = '<div class="msg-yuna"><div class="typing-dots"><span></span><span></span><span></span></div></div>';
+  chat.appendChild(typingWrap);
   setOrbState('THINKING', brainMode === 'CLOUD' ? 'PUYAL • CLOUD THINKING' : 'YUNA • PROCESSING');
   window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 
   if (activeReplyTimeout) clearTimeout(activeReplyTimeout);
   activeReplyTimeout = setTimeout(async () => {
     let res = null;
-    if (brainMode === 'CLOUD') {
-      res = await callPuyalCloud(fullQ);
-    }
+    if (brainMode === 'CLOUD') res = await callPuyalCloud(fullQ);
     if (!res) res = routeYunaPersona(fullQ);
-    sendLock = false;
-    actionOrb.classList.remove('locked');
+    typingWrap.remove(); sendLock = false; actionOrb.classList.remove('locked');
     setOrbState(res.stranger ? 'STRANGER' : 'IDLE', res.statusLabel);
-    addYunaStream(res.title, res.reply, res.meta, res.step, false);
-  }, 320);
+    addYunaStream(res.title, res.reply, res.meta, res.step, false, fullQ);
+  }, 360);
 }
 
 function yunaSvgIcon() {
-  return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-a)" stroke-width="1.85" stroke-linecap="round"><circle cx="12" cy="12" r="9" stroke-opacity="0.45"/><path d="M12 5a7 7 0 0 1 7 7"/><path d="M12 19a7 7 0 0 1-7-7"/><circle cx="12" cy="12" r="2.2" fill="var(--accent-a)"/></svg>';
+  return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-a)" stroke-width="1.85" stroke-linecap="round"><circle cx="12" cy="12" r="9" stroke-opacity="0.45"/><path d="M12 5a7 7 0 0 1 7 7"/><path d="M12 19a7 7 0 0 1-7-7"/><circle cx="12" cy="12" r="2.2" fill="var(--mint)"/></svg>';
 }
 
-function addYunaStream(title, body, sub, stepText, instant) {
+function addYunaStream(title, body, sub, stepText, instant, userQuery) {
   if (activeStreamTimer) clearInterval(activeStreamTimer);
   document.body.classList.add('chat-active');
-  const wrap = document.createElement('div');
-  wrap.className = 'msg-yuna-wrap';
-  wrap.dataset.replyText = body;
+  const wrap = document.createElement('div'); wrap.className = 'msg-yuna-wrap'; wrap.dataset.replyText = body;
+  if (userQuery) wrap.dataset.userQuery = userQuery;
 
-  const d = document.createElement('div');
-  d.className = 'msg-yuna';
-  const head = document.createElement('div');
-  head.className = 'msg-head';
-  head.innerHTML = yunaSvgIcon() + '<span>' + title + '</span>';
-  const span = document.createElement('span');
-  const subDiv = document.createElement('div');
-  subDiv.className = 'msg-sub';
-  subDiv.textContent = sub;
-  const tsDiv = document.createElement('div');
-  tsDiv.className = 'msg-ts';
-  tsDiv.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
+  const d = document.createElement('div'); d.className = 'msg-yuna';
+  const head = document.createElement('div'); head.className = 'msg-head'; head.innerHTML = yunaSvgIcon() + '<span>' + title + '</span>';
   d.appendChild(head);
-  if (stepText) {
-    const sc = document.createElement('div');
-    sc.className = 'step-chip';
-    sc.textContent = '⚡ ' + stepText;
-    d.appendChild(sc);
-  }
-  d.appendChild(span);
-  d.appendChild(subDiv);
-  d.appendChild(tsDiv);
+  if (stepText) { const sc = document.createElement('div'); sc.className = 'step-chip'; sc.textContent = '⚡ ' + stepText; d.appendChild(sc); }
+  const span = document.createElement('div'); span.className = 'msg-body'; d.appendChild(span);
+  const subDiv = document.createElement('div'); subDiv.className = 'msg-sub'; subDiv.textContent = sub; d.appendChild(subDiv);
+  const tsDiv = document.createElement('div'); tsDiv.className = 'msg-ts'; tsDiv.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); d.appendChild(tsDiv);
 
-  const acts = document.createElement('div');
-  acts.className = 'msg-actions';
+  const acts = document.createElement('div'); acts.className = 'msg-actions';
   acts.innerHTML = `
-    <button class="msg-act-btn" onclick="copyText(this)"><span>Copy</span></button>
-    <button class="msg-act-btn" onclick="speakText(this)"><span>Listen</span></button>
-    <button class="msg-act-btn" onclick="quoteMsg(this)"><span>Quote</span></button>
+    <button class="msg-act-btn" onclick="copyText(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--mint)" stroke-width="1.85" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span></button>
+    <button class="msg-act-btn" onclick="speakText(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent-a)" stroke-width="1.85" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg><span>Listen</span></button>
+    <button class="msg-act-btn" onclick="quoteMsg(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent-b)" stroke-width="1.85" stroke-linecap="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg><span>Quote</span></button>
+    <button class="msg-act-btn" onclick="regenMsg(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.85" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg><span>Regen</span></button>
   `;
-  wrap.appendChild(d);
-  wrap.appendChild(acts);
-  chat.appendChild(wrap);
+  wrap.appendChild(d); wrap.appendChild(acts); chat.appendChild(wrap);
 
-  if (instant) {
-    span.textContent = body;
-  } else {
+  if (instant) { span.textContent = body; }
+  else {
     saveCurrentSession(null, body);
-    const words = body.split(' ');
-    let idx = 0;
+    const words = body.split(' '); let idx = 0;
     activeStreamTimer = setInterval(() => {
       span.textContent += (idx ? ' ' : '') + words[idx++];
       window.scrollTo({ top: document.body.scrollHeight });
-      if (idx >= words.length) {
-        clearInterval(activeStreamTimer);
-        activeStreamTimer = null;
-      }
-    }, 28);
+      if (idx >= words.length) { clearInterval(activeStreamTimer); activeStreamTimer = null; }
+    }, 26);
   }
   window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 }
 
-function quoteMsg(btn) {
-  const txt = btn.closest('.msg-yuna-wrap')?.dataset.replyText || '';
-  if (!txt) return;
-  quotedText = txt.slice(0, 72);
-  document.getElementById('quoteTxt').textContent = quotedText;
-  document.getElementById('quoteBar').classList.add('show');
-  inp.focus();
-}
-
+function regenMsg(btn) { const q = btn.closest('.msg-yuna-wrap')?.dataset.userQuery; if (q) send(q); }
+function quoteMsg(btn) { const txt = btn.closest('.msg-yuna-wrap')?.dataset.replyText || ''; if (!txt) return; quotedText = txt.slice(0, 72); document.getElementById('quoteTxt').textContent = quotedText; document.getElementById('quoteBar').classList.add('show'); inp.focus(); }
 function copyText(btn) {
-  const txt = btn.closest('.msg-yuna-wrap')?.dataset.replyText || '';
-  const s = btn.querySelector('span');
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(txt).then(() => {
-      s.textContent = 'Copied'; showToast('Copied');
-      setTimeout(() => s.textContent = 'Copy', 1200);
-    }).catch(() => fallbackCopy(txt, s));
-  } else {
-    fallbackCopy(txt, s);
-  }
+  const txt = btn.closest('.msg-yuna-wrap')?.dataset.replyText || ''; const s = btn.querySelector('span');
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(() => { s.textContent = 'Copied'; showToast('Copied'); setTimeout(() => s.textContent = 'Copy', 1200); }).catch(() => fallbackCopy(txt, s));
+  else fallbackCopy(txt, s);
 }
 function fallbackCopy(txt, s) {
-  const ta = document.createElement('textarea');
-  ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  const ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
   document.body.appendChild(ta); ta.select();
   try { document.execCommand('copy'); s.textContent = 'Copied'; showToast('Copied'); } catch (_) { showToast('Copy unavailable'); }
-  document.body.removeChild(ta);
-  setTimeout(() => s.textContent = 'Copy', 1200);
+  document.body.removeChild(ta); setTimeout(() => s.textContent = 'Copy', 1200);
 }
-
 function shareFullChat() {
-  const msgs = Array.from(document.querySelectorAll('.msg-user, .msg-yuna-wrap')).map(el =>
-    el.classList.contains('msg-user') ? 'Kannan: ' + el.textContent : 'YUNA: ' + (el.dataset.replyText || '')
-  ).join('\n\n');
-  if (navigator.share) navigator.share({ title: 'YUNA Chat', text: msgs }).catch(() => {});
-  else fallbackCopy(msgs, { textContent: '' });
+  const msgs = Array.from(document.querySelectorAll('.msg-user, .msg-yuna-wrap')).map(el => el.classList.contains('msg-user') ? 'Kannan: ' + el.textContent : 'YUNA: ' + (el.dataset.replyText || '')).join('\n\n');
+  if (navigator.share) navigator.share({ title: 'YUNA Chat', text: msgs }).catch(() => {}); else fallbackCopy(msgs, { textContent: '' });
 }
-
 function speakText(btn) {
-  const txt = btn.closest('.msg-yuna-wrap')?.dataset.replyText || '';
-  const s = btn.querySelector('span');
+  const txt = btn.closest('.msg-yuna-wrap')?.dataset.replyText || ''; const s = btn.querySelector('span');
   if (!('speechSynthesis' in window)) { showToast('TTS unavailable'); return; }
-  if (window.speechSynthesis.speaking) {
-    window.speechSynthesis.cancel();
-    s.textContent = 'Listen';
-    return;
-  }
-  const chunks = txt.match(/[^.!?।\n]+[.!?।\n]?/g) || [txt];
-  let ci = 0;
-  s.textContent = 'Stop';
+  if (window.speechSynthesis.speaking) { window.speechSynthesis.cancel(); s.textContent = 'Listen'; return; }
+  const chunks = txt.match(/[^.!?।\n]+[.!?।\n]?/g) || [txt]; let ci = 0; s.textContent = 'Stop';
   const speakNext = () => {
     if (ci >= chunks.length) { s.textContent = 'Listen'; return; }
     const utt = new SpeechSynthesisUtterance(chunks[ci++].trim());
-    const voices = window.speechSynthesis.getVoices();
-    const taV = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('ta'));
-    if (taV) utt.voice = taV;
-    utt.onend = speakNext;
-    utt.onerror = () => { s.textContent = 'Listen'; };
+    const taV = window.speechSynthesis.getVoices().find(v => v.lang && v.lang.toLowerCase().startsWith('ta'));
+    if (taV) utt.voice = taV; utt.onend = speakNext; utt.onerror = () => { s.textContent = 'Listen'; };
     window.speechSynthesis.speak(utt);
-  };
-  speakNext();
+  }; speakNext();
 }
 
 function toggleBrainMode() {
-  brainMode = brainMode === 'LOCAL' ? 'CLOUD' : 'LOCAL';
-  localStorage.setItem('yuna_brain', brainMode);
-  const b = document.getElementById('modeBadge');
-  b.textContent = brainMode + ' ▾';
-  b.classList.toggle('mode-cloud', brainMode === 'CLOUD');
+  brainMode = brainMode === 'LOCAL' ? 'CLOUD' : 'LOCAL'; localStorage.setItem('yuna_brain', brainMode);
+  const b = document.getElementById('modeBadge'), mt = document.getElementById('modeTxt');
+  if (mt) mt.textContent = brainMode + ' ▾';
+  if (b) b.classList.toggle('mode-cloud', brainMode === 'CLOUD');
   showToast('Brain: ' + (brainMode === 'CLOUD' ? 'PUYAL Cloud' : 'YUNA Local'));
 }
-
-function enrollVoiceprint() {
-  const el = document.getElementById('vpStatus');
-  if (el) el.textContent = 'ENROLLED (0.85)';
-  showToast('Kannan Voiceprint active');
-}
-
-function toggleSetPill(el) {
-  const p = el.querySelector('.set-pill');
-  if (!p) return;
-  p.textContent = p.textContent === 'READY' ? 'ACTIVE' : 'READY';
-  const label = el.querySelector('span')?.textContent?.trim();
-  if (label) try { localStorage.setItem('yuna_set_' + label, p.textContent); } catch (_) {}
-}
-
+function enrollVoiceprint() { const el = document.getElementById('vpStatus'); if (el) el.textContent = 'ENROLLED (0.85)'; showToast('Kannan Voiceprint active'); }
 function triggerStrangerGuard() {
-  document.body.classList.remove('chat-active');
-  setOrbState('STRANGER', 'VOICE SHIELD • STRANGER BLOCKED');
-  addYunaStream('YUNA • SHIELD', 'ஏய்! இது எங்க அண்ணன் கண்ணன் போன், எடுக்காதீங்க! (Cosine 0.31 < 0.85)', '3D-SPEAKER BIOMETRIC SHIELD', 'Voice Shield', false);
+  document.body.classList.remove('chat-active'); setOrbState('STRANGER', 'VOICE SHIELD • STRANGER BLOCKED');
+  addYunaStream('YUNA • SHIELD', 'ஏய்! இது எங்க அண்ணன் கண்ணன் போன், எடுக்காதீங்க! (Cosine 0.31 < 0.85)', '3D-SPEAKER BIOMETRIC SHIELD', 'Voice Shield', false, null);
 }
 
 function routeYunaPersona(q) {
   const low = q.toLowerCase();
-  if (low.includes('stranger')) {
-    return { stranger: true, title: 'YUNA • SHIELD', reply: 'ஏய்! இது எங்க அண்ணன் கண்ணன் போன், எடுக்காதீங்க!', meta: 'VOICEPRINT GUARD', statusLabel: 'STRANGER BLOCKED', step: 'Voice Shield' };
-  }
+  if (low.includes('stranger')) return { stranger: true, title: 'YUNA • SHIELD', reply: 'ஏய்! இது எங்க அண்ணன் கண்ணன் போன், எடுக்காதீங்க!', meta: 'VOICEPRINT GUARD', statusLabel: 'STRANGER BLOCKED', step: 'Voice Shield' };
   if (low.includes('youtube') && (low.includes('போடு') || low.includes('play') || low.includes('search'))) {
     const query = q.replace(/youtube|ஓபன்|open|பண்ணு|போடு|play|search|-ல|ல/gi, '').trim() || 'trending tamil';
     execLocalOsAction('DEEP_LINK_SEARCH', 'youtube:' + query);
     return { title: 'YUNA • OS CONTROL', reply: 'YouTube-ல "' + query + '" இப்போ open பண்றேன் பாஸ்!', meta: 'LOCAL OS ACTION • PRIVACY LOCKED', statusLabel: 'Ready • Tap orb to speak', step: 'YouTube Deep Link' };
   }
-  if (low.includes('youtube') && (low.includes('open') || low.includes('ஓபன்'))) {
-    execLocalOsAction('OPEN_APP', 'com.google.android.youtube');
-    return { title: 'YUNA • OS CONTROL', reply: 'YouTube open பண்ணியாச்சு பாஸ்!', meta: 'LOCAL APP LAUNCH', statusLabel: 'Ready • Tap orb to speak', step: 'App Switcher' };
-  }
-  if (low.includes('chrome')) {
-    execLocalOsAction('OPEN_APP', 'com.android.chrome');
-    return { title: 'YUNA • OS CONTROL', reply: 'Chrome open பண்ணியாச்சு பாஸ்!', meta: 'LOCAL APP LAUNCH', statusLabel: 'Ready • Tap orb to speak', step: 'App Switcher' };
-  }
-  if (low.includes('back') || low.includes('பேக்')) {
-    execLocalOsAction('GLOBAL_BACK', '');
-    return { title: 'YUNA • NAVIGATION', reply: 'Back பண்ணியாச்சு பாஸ்!', meta: 'GLOBAL NAV', statusLabel: 'Ready • Tap orb to speak', step: 'Bottom Nav Back' };
-  }
-  if (low.includes('home') || low.includes('ஹோம்')) {
-    execLocalOsAction('GLOBAL_HOME', '');
-    return { title: 'YUNA • NAVIGATION', reply: 'Home screen-க்கு வந்தாச்சு பாஸ்!', meta: 'GLOBAL NAV', statusLabel: 'Ready • Tap orb to speak', step: 'Bottom Nav Home' };
-  }
-  if (low.includes('recent') || low.includes('ரீசண்ட்')) {
-    execLocalOsAction('GLOBAL_RECENTS', '');
-    return { title: 'YUNA • NAVIGATION', reply: 'Recent apps open பண்ணியாச்சு!', meta: 'GLOBAL NAV', statusLabel: 'Ready • Tap orb to speak', step: 'Bottom Nav Recents' };
-  }
-  if (low.includes('notification') || low.includes('நோட்டிபிகேஷன்')) {
-    execLocalOsAction('GLOBAL_NOTIFICATIONS', '');
-    return { title: 'YUNA • NAVIGATION', reply: 'Top Notification shade இறக்கியாச்சு!', meta: 'TOP NAV CONTROL', statusLabel: 'Ready • Tap orb to speak', step: 'Top Shade' };
-  }
-  if (low.includes('brightness') || low.includes('பிரைட்னஸ்')) {
-    const up = low.includes('கூட்டு') || low.includes('up') || low.includes('high') || low.includes('அதிகம்');
-    execLocalOsAction(up ? 'BRIGHTNESS_UP' : 'BRIGHTNESS_DOWN', '');
-    return { title: 'YUNA • HARDWARE', reply: up ? 'Brightness கூட்டியாச்சு பாஸ்!' : 'Brightness குறைச்சாச்சு பாஸ்!', meta: 'LOCAL DISPLAY CONTROL', statusLabel: 'Ready • Tap orb to speak', step: 'Brightness' };
-  }
-  if (low.includes('net') || low.includes('wifi') || low.includes('நெட்')) {
-    execLocalOsAction('NET_PANEL', '');
-    return { title: 'YUNA • NETWORK', reply: 'Internet / Wi-Fi Quick Panel open பண்ணியாச்சு!', meta: 'LOCAL CONNECTIVITY', statusLabel: 'Ready • Tap orb to speak', step: 'Net Panel' };
-  }
-  if (low.includes('torch')) {
-    execLocalOsAction('TORCH', '');
-    return { title: 'YUNA • LOCAL', reply: 'டார்ச் toggle பண்ணியாச்சு பாஸ்!', meta: 'HARDWARE ACTION', statusLabel: 'Ready • Tap orb to speak', step: 'Hardware Control' };
-  }
+  if (low.includes('youtube') && (low.includes('open') || low.includes('ஓபன்'))) { execLocalOsAction('OPEN_APP', 'com.google.android.youtube'); return { title: 'YUNA • OS CONTROL', reply: 'YouTube open பண்ணியாச்சு பாஸ்!', meta: 'LOCAL APP LAUNCH', statusLabel: 'Ready • Tap orb to speak', step: 'App Switcher' }; }
+  if (low.includes('chrome')) { execLocalOsAction('OPEN_APP', 'com.android.chrome'); return { title: 'YUNA • OS CONTROL', reply: 'Chrome open பண்ணியாச்சு பாஸ்!', meta: 'LOCAL APP LAUNCH', statusLabel: 'Ready • Tap orb to speak', step: 'App Switcher' }; }
+  if (low.includes('back') || low.includes('பேக்')) { execLocalOsAction('GLOBAL_BACK', ''); return { title: 'YUNA • NAVIGATION', reply: 'Back பண்ணியாச்சு பாஸ்!', meta: 'GLOBAL NAV', statusLabel: 'Ready • Tap orb to speak', step: 'Bottom Nav Back' }; }
+  if (low.includes('home') || low.includes('ஹோம்')) { execLocalOsAction('GLOBAL_HOME', ''); return { title: 'YUNA • NAVIGATION', reply: 'Home screen-க்கு வந்தாச்சு பாஸ்!', meta: 'GLOBAL NAV', statusLabel: 'Ready • Tap orb to speak', step: 'Bottom Nav Home' }; }
+  if (low.includes('recent') || low.includes('ரீசண்ட்')) { execLocalOsAction('GLOBAL_RECENTS', ''); return { title: 'YUNA • NAVIGATION', reply: 'Recent apps open பண்ணியாச்சு!', meta: 'GLOBAL NAV', statusLabel: 'Ready • Tap orb to speak', step: 'Bottom Nav Recents' }; }
+  if (low.includes('notification') || low.includes('நோட்டிபிகேஷன்')) { execLocalOsAction('GLOBAL_NOTIFICATIONS', ''); return { title: 'YUNA • NAVIGATION', reply: 'Top Notification shade இறக்கியாச்சு!', meta: 'TOP NAV CONTROL', statusLabel: 'Ready • Tap orb to speak', step: 'Top Shade' }; }
+  if (low.includes('brightness') || low.includes('பிரைட்னஸ்')) { const up = low.includes('கூட்டு') || low.includes('up') || low.includes('high') || low.includes('அதிகம்'); execLocalOsAction(up ? 'BRIGHTNESS_UP' : 'BRIGHTNESS_DOWN', ''); return { title: 'YUNA • HARDWARE', reply: up ? 'Brightness கூட்டியாச்சு பாஸ்!' : 'Brightness குறைச்சாச்சு பாஸ்!', meta: 'LOCAL DISPLAY CONTROL', statusLabel: 'Ready • Tap orb to speak', step: 'Brightness' }; }
+  if (low.includes('net') || low.includes('wifi') || low.includes('நெட்')) { execLocalOsAction('NET_PANEL', ''); return { title: 'YUNA • NETWORK', reply: 'Internet / Wi-Fi Quick Panel open பண்ணியாச்சு!', meta: 'LOCAL CONNECTIVITY', statusLabel: 'Ready • Tap orb to speak', step: 'Net Panel' }; }
+  if (low.includes('torch')) { execLocalOsAction('TORCH', ''); return { title: 'YUNA • LOCAL', reply: 'டார்ச் toggle பண்ணியாச்சு பாஸ்!', meta: 'HARDWARE ACTION', statusLabel: 'Ready • Tap orb to speak', step: 'Hardware Control' }; }
   if (low.includes('screen') || low.includes('vision')) {
-    let liveDom = '';
-    if (window.YunaBridge && window.YunaBridge.scanScreen) {
-      try { liveDom = window.YunaBridge.scanScreen(); } catch (_) {}
-    }
+    let liveDom = ''; if (window.YunaBridge && window.YunaBridge.scanScreen) { try { liveDom = window.YunaBridge.scanScreen(); } catch (_) {} }
     return { title: 'YUNA • VISION', reply: liveDom ? ('Screen Scan Result:\n' + liveDom) : 'Screen Vision: YUNA App active. வேற app-ல இருக்கும்போது side floating orb வழியா அந்த screen-ஐ வாசிப்பேன் பாஸ்!', meta: 'DOM + OCR VISION', statusLabel: 'Ready • Tap orb to speak', step: 'Screen Reader' };
   }
-  if (low.includes('wa') || low.includes('whatsapp')) {
-    return { title: 'YUNA • WA INTEL', reply: 'WhatsApp unread notifications எதுவும் pending இல்ல பாஸ்.', meta: 'NOTIFICATION LISTENER', statusLabel: 'Ready • Tap orb to speak', step: 'WA Intel' };
-  }
+  if (low.includes('wa') || low.includes('whatsapp')) return { title: 'YUNA • WA INTEL', reply: 'WhatsApp unread notifications எதுவும் pending இல்ல பாஸ்.', meta: 'NOTIFICATION LISTENER', statusLabel: 'Ready • Tap orb to speak', step: 'WA Intel' };
   if (low.includes('ஹாய்') || low === 'hi' || low.includes('hello') || low.includes('vanakkam')) {
-    return {
-      title: 'YUNA • LOCAL',
-      reply: personaMood === 'COMEDY' ? 'ஹாய் கண்ணன்! எப்படி இருக்கீங்க? சொல்லுங்க பாஸ், என்ன பண்ணலாம்?' : 'வணக்கம் கண்ணன்! சொல்லுங்க, என்ன உதவி வேணும்?',
-      meta: 'LOCAL PERSONA • ' + personaMood, statusLabel: 'Ready • Tap orb to speak', step: 'Local Brain'
-    };
+    return { title: 'YUNA • LOCAL', reply: personaMood === 'COMEDY' ? 'ஹாய் கண்ணன்! எப்படி இருக்கீங்க? சொல்லுங்க பாஸ், என்ன பண்ணலாம்?' : 'வணக்கம் கண்ணன்! சொல்லுங்க, என்ன உதவி வேணும்?', meta: 'LOCAL PERSONA • ' + personaMood, statusLabel: 'Ready • Tap orb to speak', step: 'Local Brain' };
   }
-  return {
-    title: 'YUNA • ' + brainMode,
-    reply: 'சரி பாஸ், "' + q + '"-க்கு உடனே check பண்ணிப் பார்க்கிறேன்! (Local + Cloud hybrid ready)',
-    meta: brainMode + ' ENGINE • TAMIL/TANGLISH', statusLabel: 'Ready • Tap orb to speak', step: brainMode === 'CLOUD' ? 'Cloud Gateway' : 'Local Rust Brain'
-  };
+  return { title: 'YUNA • ' + brainMode, reply: 'சரி பாஸ், "' + q + '"-க்கு உடனே check பண்ணிப் பார்க்கிறேன்! (Local + Cloud hybrid ready)', meta: brainMode + ' ENGINE • TAMIL/TANGLISH', statusLabel: 'Ready • Tap orb to speak', step: brainMode === 'CLOUD' ? 'Cloud Gateway' : 'Local Rust Brain' };
 }
 
 const moods = ['COMEDY', 'PRO', 'FOCUS'];
-function cycleMood() {
-  personaMood = moods[(moods.indexOf(personaMood) + 1) % moods.length];
-  localStorage.setItem('yuna_mood', personaMood);
-  document.getElementById('moodPill').textContent = personaMood;
-}
-
-const themes = ['CYAN-VIOLET', 'GOLD', 'EMERALD'];
-let themeIdx = 0;
-function cycleTheme() {
-  themeIdx = (themeIdx + 1) % themes.length;
-  document.body.classList.remove('theme-gold', 'theme-emerald');
-  if (themeIdx === 1) document.body.classList.add('theme-gold');
-  if (themeIdx === 2) document.body.classList.add('theme-emerald');
-  document.getElementById('themePill').textContent = themes[themeIdx];
-}
-
-const langs = [['ta-IN', 'TA'], ['en-IN', 'EN'], ['ta-IN', 'TA+EN']];
-let langIdx = 0;
-function cycleLangSet() {
-  langIdx = (langIdx + 1) % langs.length;
-  voiceLang = langs[langIdx][0];
-  localStorage.setItem('yuna_lang', voiceLang);
-  document.getElementById('langSetPill').textContent = langs[langIdx][1];
-}
-
-function toggleNightDim() {
-  const on = document.body.classList.toggle('night-dim');
-  document.getElementById('nightPill').textContent = on ? 'ON' : 'OFF';
-}
-
+function cycleMood() { personaMood = moods[(moods.indexOf(personaMood) + 1) % moods.length]; localStorage.setItem('yuna_mood', personaMood); document.getElementById('moodPill').textContent = personaMood; }
+const themes = ['CYAN-VIOLET', 'GOLD', 'EMERALD']; let themeIdx = 0;
+function cycleTheme() { themeIdx = (themeIdx + 1) % themes.length; document.body.classList.remove('theme-gold', 'theme-emerald'); if (themeIdx === 1) document.body.classList.add('theme-gold'); if (themeIdx === 2) document.body.classList.add('theme-emerald'); document.getElementById('themePill').textContent = themes[themeIdx]; }
+const langs = [['ta-IN', 'TA'], ['en-IN', 'EN'], ['ta-IN', 'TA+EN']]; let langIdx = 0;
+function cycleLangSet() { langIdx = (langIdx + 1) % langs.length; voiceLang = langs[langIdx][0]; localStorage.setItem('yuna_lang', voiceLang); document.getElementById('langSetPill').textContent = langs[langIdx][1]; }
+function toggleNightDim() { const on = document.body.classList.toggle('night-dim'); document.getElementById('nightPill').textContent = on ? 'ON' : 'OFF'; }
 function exportToObsidian() {
   const txt = sessions.map(s => '# ' + s.title + '\n' + s.msgs.map(m => (m.isUser ? '**Kannan:** ' : '**YUNA:** ') + m.text).join('\n')).join('\n\n');
-  const blob = new Blob([txt || '# YUNA Empty Session'], { type: 'text/markdown' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'YUNA_Second_Brain_Export.md';
-  a.click();
-  showToast('Exported Obsidian Markdown');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt || '# YUNA Empty Session'], { type: 'text/markdown' })); a.download = 'YUNA_Second_Brain_Export.md'; a.click(); showToast('Exported Obsidian Markdown');
 }
 
 if (window.visualViewport) {
-  const onVV = () => {
-    const vv = window.visualViewport;
-    const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-    dockWrap.style.transform = kb > 40 ? 'translateY(-' + kb + 'px)' : '';
-    document.body.classList.toggle('kb-open', kb > 80);
-  };
-  window.visualViewport.addEventListener('resize', onVV);
-  window.visualViewport.addEventListener('scroll', onVV);
+  const onVV = () => { const vv = window.visualViewport; const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop); dockWrap.style.transform = kb > 40 ? 'translateY(-' + kb + 'px)' : ''; document.body.classList.toggle('kb-open', kb > 80); };
+  window.visualViewport.addEventListener('resize', onVV); window.visualViewport.addEventListener('scroll', onVV);
 }
-
-window.addEventListener('scroll', () => {
-  const farUp = (document.body.scrollHeight - window.innerHeight - window.scrollY) > 160;
-  scrollDownBtn.classList.toggle('show', farUp && document.body.classList.contains('chat-active'));
-}, { passive: true });
+window.addEventListener('scroll', () => { const farUp = (document.body.scrollHeight - window.innerHeight - window.scrollY) > 160; scrollDownBtn.classList.toggle('show', farUp && document.body.classList.contains('chat-active')); }, { passive: true });
 
 (function init() {
-  const b = document.getElementById('modeBadge');
-  if (b) {
-    b.textContent = brainMode + ' ▾';
-    b.classList.toggle('mode-cloud', brainMode === 'CLOUD');
-  }
-  const mp = document.getElementById('moodPill');
-  if (mp) mp.textContent = personaMood;
-  const h = new Date().getHours();
-  const g = document.querySelector('.greet');
+  const b = document.getElementById('modeBadge'), mt = document.getElementById('modeTxt');
+  if (mt) mt.textContent = brainMode + ' ▾';
+  if (b) b.classList.toggle('mode-cloud', brainMode === 'CLOUD');
+  const mp = document.getElementById('moodPill'); if (mp) mp.textContent = personaMood;
+  const h = new Date().getHours(); const g = document.querySelector('.greet');
   if (g) g.textContent = h < 12 ? 'Kaalai Vanakkam Boss' : h < 17 ? 'Vanakkam Boss' : 'Maalai Vanakkam Boss';
 })();
-
-
-
-window.onYunaVoiceResult = function(text) {
-  if (!text) return;
-  inp.value = text;
-  syncInputMode();
-  autoGrowInp();
-  send();
-};
-
 </script>
 </body>
 </html>
