@@ -1,12 +1,12 @@
 package com.puyal.os.service
 
-import android.annotation.TargetApi
 import android.content.Intent
 import android.os.Build
 import android.service.quicksettings.TileService
+import androidx.annotation.RequiresApi
 import com.puyal.os.overlay.FloatingYunaService
 
-@TargetApi(Build.VERSION_CODES.N)
+@RequiresApi(Build.VERSION_CODES.N)
 class YunaTileService : TileService() {
     override fun onClick() {
         super.onClick()
