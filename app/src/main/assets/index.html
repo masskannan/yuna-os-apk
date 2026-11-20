@@ -2561,6 +2561,12 @@ window.onYunaVoiceResult = function(text) {
     return;
   }
   const clean = (text || '').trim();
+  const noiseHallucinations = /^(நன்றி\.?|thanks for watching\.?|subscribe\.?|mbc\.?|amara\.org\.?|\.\.\.)$/i;
+  if (clean && noiseHallucinations.test(clean)) {
+    showToast('சத்தம் மட்டுமே கேட்டது — மீண்டும் தெளிவாகப் பேசவும்');
+    if (window.onYunaVoiceEnded) window.onYunaVoiceEnded();
+    return;
+  }
   if (!clean) {
     showToast('குரல் தெளிவாகக் கேட்கவில்லை — மீண்டும் பேசவும்');
     if (window.onYunaVoiceEnded) window.onYunaVoiceEnded();
