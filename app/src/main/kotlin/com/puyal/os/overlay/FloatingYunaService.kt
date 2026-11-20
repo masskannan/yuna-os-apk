@@ -90,7 +90,7 @@ class FloatingYunaService : Service() {
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .build()
         if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(9169, notif, 0x40000000 or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            startForeground(9169, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
         } else {
             startForeground(9169, notif)
         }
