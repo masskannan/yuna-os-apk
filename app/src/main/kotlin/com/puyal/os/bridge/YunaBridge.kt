@@ -889,7 +889,6 @@ class YunaBridge(
     }
 
     private fun startMicLevelPoller() {
-        YunaMicRegistry.activeBridge = this
         micPollActive = true
         mainH.removeCallbacks(micPollRunnable)
         mainH.postDelayed(micPollRunnable, 120L)
