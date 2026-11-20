@@ -431,7 +431,7 @@ class YunaBridge(
             }
             val resp = conn.inputStream.bufferedReader().readText()
             JSONObject(resp).optString("text", "").trim()
-        } catch (_: Exception) { "" }
+        } catch (e: Exception) { "__ERR__:${e.javaClass.simpleName}: ${e.message?.take(60)}" }
     }
 
     @JavascriptInterface fun startVoice(lang: String) {
