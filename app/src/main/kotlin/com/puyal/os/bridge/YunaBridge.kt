@@ -829,4 +829,17 @@ class YunaBridge(
         if (muted) stopCloudWhisper()
     }
 
+
+    @JavascriptInterface
+    fun startFloatingOverlay(): String {
+        val i = android.content.Intent(ctx, com.puyal.os.overlay.FloatingYunaService::class.java)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) ctx.startForegroundService(i) else ctx.startService(i)
+        return "Floating YUNA Overlay Started"
+    }
+
+    @JavascriptInterface
+    fun stopFloatingOverlay() {
+        ctx.stopService(android.content.Intent(ctx, com.puyal.os.overlay.FloatingYunaService::class.java))
+    }
+
 }
