@@ -401,7 +401,7 @@
   #liveMicBar.active .gm-wave i:nth-child(3n) { animation-delay: 0.3s; background: #818CF8; }
 
 
-/* === BATCH 16.8.7: GEMINI LIVE + RIPPLE + 100DVH === */
+/* === BATCH 16.8.8: GEMINI LIVE + RIPPLE + 100DVH === */
 html, body { min-height: 100dvh; overscroll-behavior-y: contain; }
 .msg-user, .msg-ai { overflow-wrap: anywhere; word-break: break-word; unicode-bidi: plaintext; }
 .plus-orb, .wave-btn, .send-orb, .live-orb, .gl-btn {
@@ -463,7 +463,7 @@ body.live-mode #geminiLiveBar { display: flex !important; }
 body.live-mode #liveTopBanner { display: flex !important; }
 
 
-/* === BATCH 16.8.7.5: GEMINI 1:1 MEASUREMENTS + VOICE AMPLITUDE + DOCK FIX === */
+/* === BATCH 16.8.8.5: GEMINI 1:1 MEASUREMENTS + VOICE AMPLITUDE + DOCK FIX === */
 .dock-wrap {
   position: fixed !important; left: 0; right: 0;
   bottom: calc(14px + env(safe-area-inset-bottom)) !important;
@@ -522,7 +522,7 @@ body.live-mode #liveTopBanner { display: flex !important; }
 }
 
 
-/* === BATCH 16.8.7+ COMPLETE GEMINI PARITY === */
+/* === BATCH 16.8.8+ COMPLETE GEMINI PARITY === */
 body.mic-on #liveMicBar { display: flex !important; }
 body.mic-on #dockBar { display: none !important; }
 .msg-acts {
@@ -554,7 +554,7 @@ body.ai-busy #liveModeBtn, body.ai-busy #actionOrb { display: none !important; }
 body.ai-busy #aiStopBtn { display: flex !important; }
 
 
-/* === BATCH 16.8.7: CALM WAVE + DOCK VISIBILITY + DRAWER Z-INDEX === */
+/* === BATCH 16.8.8: CALM WAVE + DOCK VISIBILITY + DRAWER Z-INDEX === */
 .dock-wrap { z-index: 40 !important; }
 #drawer, .drawer { z-index: 140 !important; }
 body:not(.mic-on):not(.live-mode):not(.settings-open):not(.perms-open) #dockBar {
@@ -564,7 +564,7 @@ body:not(.mic-on):not(.live-mode):not(.settings-open):not(.perms-open) #dockBar 
 #glWaveFill { transition: height 0.18s cubic-bezier(0.22, 1, 0.36, 1) !important; }
 
 
-/* === BATCH 16.8.7 CONTRAST & VISIBILITY FIX === */
+/* === BATCH 16.8.8 CONTRAST & VISIBILITY FIX === */
 .dock, #liveMicBar {
   background: rgba(38, 43, 61, 0.96) !important;
   border: 1.5px solid rgba(148, 163, 184, 0.44) !important;
@@ -574,7 +574,7 @@ body:not(.mic-on):not(.live-mode):not(.settings-open):not(.perms-open) #dockBar 
 #inp::placeholder { color: #CBD5E1 !important; opacity: 0.85 !important; }
 
 
-/* === BATCH 16.8.7: SCRIM + 360PX SPLIT-SCREEN + DRAWER BLEED + GPU WAVE === */
+/* === BATCH 16.8.8: SCRIM + 360PX SPLIT-SCREEN + DRAWER BLEED + GPU WAVE === */
 #chatScrim {
   position: fixed; inset: 0; pointer-events: none; z-index: 1;
   background: linear-gradient(180deg, rgba(10,14,24,0.52) 0%, rgba(10,14,24,0.68) 50%, rgba(10,14,24,0.86) 100%);
@@ -596,6 +596,43 @@ body.drawer-open main#chat { overflow: hidden !important; pointer-events: none !
   #liveMicTimer { font-size: 11px !important; min-width: 34px !important; }
   .mic-bar-btn { width: 34px !important; height: 34px !important; flex-shrink: 0 !important; }
 }
+
+
+/* === BATCH 16.8.8: KILL DARK FOG + VOICE PREVIEW SHIMMER + TRUSTED CALL MODAL === */
+.dock-wrap::before { display: none !important; content: none !important; }
+#voicePreviewBar {
+  display: none; align-items: center; gap: 8px; width: 92%; max-width: 420px;
+  margin: 0 auto 8px; padding: 8px 12px; border-radius: 18px;
+  background: rgba(38, 43, 61, 0.96); border: 1.5px solid rgba(56, 189, 248, 0.52);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+#voicePreviewBar.open { display: flex !important; }
+#voicePreviewInput {
+  flex: 1; background: transparent; border: none; outline: none; font-size: 14px; font-weight: 500;
+  background-image: linear-gradient(90deg, #38BDF8 0%, #F8FAFC 45%, #F8FAFC 100%);
+  -webkit-background-clip: text; color: #F8FAFC;
+  animation: vpShimmer 1.4s ease-out;
+}
+@keyframes vpShimmer {
+  0% { color: #38BDF8; opacity: 0.45; transform: translateY(3px); }
+  100% { color: #F8FAFC; opacity: 1; transform: translateY(0); }
+}
+#yunaConfirmModal {
+  display: none; position: fixed; inset: 0; z-index: 165;
+  background: rgba(3, 7, 18, 0.72); align-items: flex-end; justify-content: center; padding: 16px 16px 88px;
+}
+#yunaConfirmModal.open { display: flex !important; }
+.yuna-cfm-card {
+  width: 100%; max-width: 390px; border-radius: 24px; padding: 18px;
+  background: #1E2436; border: 1.5px solid rgba(56, 189, 248, 0.45);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.65); color: #F8FAFC;
+}
+.yuna-cfm-btns { display: flex; gap: 10px; margin-top: 14px; }
+.yuna-cfm-btn {
+  flex: 1; height: 46px; border-radius: 23px; border: none; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.yuna-cfm-yes { background: #0EA5E9; color: #FFFFFF; }
+.yuna-cfm-no { background: rgba(148, 163, 184, 0.22); color: #E2E8F0; }
 
 </style>
 </head>
@@ -724,7 +761,7 @@ body.drawer-open main#chat { overflow: hidden !important; pointer-events: none !
       <div class="set-item" onclick="showCrashLog()"><span>Crash Log</span><span class="set-pill">VIEW</span></div>
     </div>
   </details>
-  <div style="text-align:center;font-family:monospace;font-size:10.5px;color:#64748B;margin-top:16px;">YUNA OS • Batch 16.8.7 Master UX</div>
+  <div style="text-align:center;font-family:monospace;font-size:10.5px;color:#64748B;margin-top:16px;">YUNA OS • Batch 16.8.8 Master UX</div>
 </div>
 
 <div id="permissionsPage">
@@ -821,6 +858,11 @@ body.drawer-open main#chat { overflow: hidden !important; pointer-events: none !
 </div>
 
 <div class="dock-wrap">
+  <div id="voicePreviewBar">
+    <input id="voicePreviewInput" type="text" placeholder="குரல் உரையைச் சரிபார்க்கவும்..." />
+    <button class="mic-bar-btn" style="background:rgba(148,163,184,0.22);color:#E2E8F0;" onclick="closeVoicePreview()" aria-label="Cancel">✕</button>
+    <button class="mic-bar-btn mic-bar-send" onclick="sendVoicePreview()" aria-label="Send">➤</button>
+  </div>
   <div id="liveMicBar">
     <span id="liveMicTimer" style="font-variant-numeric:tabular-nums;font-size:12px;color:#7DD3FC;min-width:44px;">0:00</span>
     <div class="gm-wave" id="gmWaveBars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
@@ -896,11 +938,11 @@ const scrollDownBtn = document.getElementById('scrollDownBtn');
 
 let pickedFile = '', pickedThumbUrl = '', state = 'IDLE', sendLock = false;
 let activeStreamTimer = null, activeReplyTimeout = null, lastPillMs = 0, quotedText = '';
-if (localStorage.getItem('yuna_ui_ver') !== '16.8.7') {
+if (localStorage.getItem('yuna_ui_ver') !== '16.8.8') {
   try {
     localStorage.setItem('yuna_brain', 'CLOUD');
     localStorage.setItem('yuna_mood', 'EXECUTIVE');
-    localStorage.setItem('yuna_ui_ver', '16.8.7');
+    localStorage.setItem('yuna_ui_ver', '16.8.8');
   } catch (_) {}
 }
 let brainMode = localStorage.getItem('yuna_brain') || 'CLOUD';
@@ -2048,7 +2090,7 @@ function verifyOwnerViaBiometric() {
 }
 
 
-// === BATCH 16.8.7: LIVE MODE, BARGE-IN, BACK INTERCEPT, SELF-CHECK ===
+// === BATCH 16.8.8: LIVE MODE, BARGE-IN, BACK INTERCEPT, SELF-CHECK ===
 let yunaLiveActive = false;
 let yunaLiveMuted = false;
 let yunaLiveScreenShare = false;
@@ -2169,7 +2211,7 @@ window.runYunaSelfCheck = async function() {
 };
 
 
-// === BATCH 16.8.7.5: VOICE AMPLITUDE SYNC & DOCK POSITION GUARD ===
+// === BATCH 16.8.8.5: VOICE AMPLITUDE SYNC & DOCK POSITION GUARD ===
 const yunaBellWeights = [0.28, 0.42, 0.60, 0.78, 0.92, 1.0, 0.92, 0.78, 0.60, 0.42, 0.28];
 let yunaSmoothAmp = 0.05;
 let yunaMicSec = 0;
@@ -2222,7 +2264,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 
-// === BATCH 16.8.7+ SPEAKER 1-TAP/2-TAP + SHARE + AI STOP ===
+// === BATCH 16.8.8+ SPEAKER 1-TAP/2-TAP + SHARE + AI STOP ===
 let spkTapTimer = null;
 function handleSpeakerTap(btn) {
   if (spkTapTimer) {
@@ -2255,7 +2297,7 @@ function stopAllGeneration() {
 }
 
 
-// === BATCH 16.8.7 VOICE CAPTURE FINISH/CANCEL + SOUND RESET ===
+// === BATCH 16.8.8 VOICE CAPTURE FINISH/CANCEL + SOUND RESET ===
 window.finishVoiceCapture = function() {
   stopMicClock();
   document.body.classList.remove('mic-on');
@@ -2287,7 +2329,7 @@ try {
 } catch (_) {}
 
 
-// === BATCH 16.8.7: LOG10 WAVE, AMP=0 FALLBACK, CHUNK BUFFER, 0MS SPEAKER, BACK STACK ===
+// === BATCH 16.8.8: LOG10 WAVE, AMP=0 FALLBACK, CHUNK BUFFER, 0MS SPEAKER, BACK STACK ===
 window.__yunaStopInFlight = false;
 window.__yunaChunkBuffer = {};
 window.__activeTtsBtn = null;
@@ -2440,6 +2482,113 @@ window.handleYunaBackPress = function() {
   return 'EXIT';
 };
 
+
+// === BATCH 16.8.8: VOICE PREVIEW EDIT + WHISPER ERR + TRUSTED CONTACT CALL ===
+window.__yunaHoldPreview = false;
+window.__pendingConfirmResolve = null;
+
+window.showVoicePreview = function(txt) {
+  const bar = document.getElementById('voicePreviewBar');
+  const inpEl = document.getElementById('voicePreviewInput');
+  if (!bar || !inpEl) return;
+  inpEl.value = txt || '';
+  bar.classList.add('open');
+  inpEl.style.animation = 'none';
+  void inpEl.offsetWidth;
+  inpEl.style.animation = 'vpShimmer 1.4s ease-out';
+};
+window.closeVoicePreview = function() {
+  window.__yunaHoldPreview = false;
+  const bar = document.getElementById('voicePreviewBar');
+  if (bar) bar.classList.remove('open');
+};
+window.sendVoicePreview = function() {
+  const inpEl = document.getElementById('voicePreviewInput');
+  const txt = (inpEl ? inpEl.value : '').trim();
+  window.closeVoicePreview();
+  if (txt) { inp.value = txt; syncInputMode(); autoGrowInp(); send(); }
+};
+
+// Override pauseOrResumeVoice so Pause holds transcript for inspection/editing
+const _origPause = typeof pauseOrResumeVoice === 'function' ? pauseOrResumeVoice : null;
+window.pauseOrResumeVoice = function() {
+  window.__yunaHoldPreview = true;
+  if (_origPause) { try { _origPause(); } catch (_) {} }
+  showToast('⏸ சரிபார்க்க இடைநிறுத்தப்பட்டது — Send தட்டவும்');
+};
+
+// Override onYunaVoiceResult to surface __ERR__ and support Pause-to-Edit Preview
+window.onYunaVoiceResult = function(text) {
+  window.__yunaStopInFlight = false;
+  stopMicClock();
+  document.body.classList.remove('mic-on');
+  const db = document.getElementById('dockBar');
+  if (db) db.classList.remove('mic-on');
+  if (window.resetMicWaveState) window.resetMicWaveState();
+
+  if (text && String(text).startsWith('__ERR__:')) {
+    showToast('Whisper பிழை: ' + String(text).slice(8));
+    if (window.onYunaVoiceEnded) window.onYunaVoiceEnded();
+    return;
+  }
+  const clean = (text || '').trim();
+  if (!clean) {
+    showToast('குரல் தெளிவாகக் கேட்கவில்லை — மீண்டும் பேசவும்');
+    if (window.onYunaVoiceEnded) window.onYunaVoiceEnded();
+    return;
+  }
+  if (window.__yunaHoldPreview) {
+    window.__yunaHoldPreview = false;
+    window.showVoicePreview(clean);
+    return;
+  }
+  inp.value = clean; syncInputMode(); autoGrowInp(); send();
+};
+
+// Trusted Contact Call Skill + Confirm Modal
+window.getTrustedCalls = function() {
+  try { return JSON.parse(localStorage.getItem('yuna_trusted_calls') || '{}'); } catch (_) { return {}; }
+};
+window.saveTrustedCall = function(key, phone) {
+  try {
+    const m = window.getTrustedCalls();
+    m[String(key).toLowerCase().trim()] = phone;
+    localStorage.setItem('yuna_trusted_calls', JSON.stringify(m));
+  } catch (_) {}
+};
+window.askYunaConfirm = function(title, body, onResult) {
+  const m = document.getElementById('yunaConfirmModal');
+  const t = document.getElementById('yunaCfmTitle');
+  const b = document.getElementById('yunaCfmBody');
+  if (!m || !t || !b) { onResult(true, true); return; }
+  t.textContent = title;
+  b.textContent = body;
+  window.__pendingConfirmResolve = onResult;
+  m.classList.add('open');
+  if (typeof speakOutput === 'function') speakOutput(body);
+};
+window.resolveYunaConfirm = function(ok) {
+  const m = document.getElementById('yunaConfirmModal');
+  const tr = document.getElementById('yunaCfmTrust');
+  if (m) m.classList.remove('open');
+  const cb = window.__pendingConfirmResolve;
+  window.__pendingConfirmResolve = null;
+  if (cb) cb(!!ok, !!(tr && tr.checked));
+};
+
 </script>
+<div id="yunaConfirmModal">
+  <div class="yuna-cfm-card">
+    <div id="yunaCfmTitle" style="font-size:15px;font-weight:700;color:#7DD3FC;">📞 உறுதிப்படுத்தல்</div>
+    <div id="yunaCfmBody" style="font-size:14px;margin-top:8px;line-height:1.5;color:#E2E8F0;"></div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;color:#94A3B8;">
+      <input type="checkbox" id="yunaCfmTrust" checked /> இனி இவருக்குக் கேட்காமல் நேரடியாகச் செய் (Trusted)
+    </label>
+    <div class="yuna-cfm-btns">
+      <button class="yuna-cfm-btn yuna-cfm-no" onclick="resolveYunaConfirm(false)">✕ வேண்டாம்</button>
+      <button class="yuna-cfm-btn yuna-cfm-yes" onclick="resolveYunaConfirm(true)">✔ ஆம், செய்</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

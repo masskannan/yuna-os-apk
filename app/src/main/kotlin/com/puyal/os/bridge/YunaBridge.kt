@@ -200,7 +200,7 @@ class YunaBridge(
             ctx.contentResolver.query(uri, arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME), null, null, null)?.use { c ->
                 if (c.moveToFirst()) c.getString(0) ?: "" else ""
             } ?: ""
-        } catch (_: Exception) { "" }
+        } catch (e: Exception) { "__ERR__:${e.javaClass.simpleName}: ${e.message?.take(60)}" }
     }
 
     private fun setSpeakerphone(on: Boolean): String {
@@ -928,4 +928,35 @@ object YunaMicRegistry {
     fun abortActiveMic() {
         try { activeBridge?.abortMicOnPause() } catch (_: Exception) {}
     }
+
+    @JavascriptInterface
+    fun getSyncedContactsJson(): String {
+        return try {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.READ_CONTACTS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                return "[]"
+            }
+            val arr = org.json.JSONArray()
+            val cur = ctx.contentResolver.query(
+                android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(
+                    android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                    android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER
+                ),
+                null, null,
+                android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC"
+            )
+            val seen = HashSet<String>()
+            cur?.use {
+                while (it.moveToNext() && arr.length() < 150) {
+                    val name = it.getString(0)?.trim() ?: continue
+                    val num = it.getString(1)?.replace(Regex("[^0-9+]"), "") ?: continue
+                    if (name.isNotEmpty() && num.length >= 7 && seen.add(name.lowercase())) {
+                        arr.put(org.json.JSONObject().put("name", name).put("phone", num))
+                    }
+                }
+            }
+            arr.toString()
+        } catch (_: Exception) { "[]" }
+    }
+
 }
