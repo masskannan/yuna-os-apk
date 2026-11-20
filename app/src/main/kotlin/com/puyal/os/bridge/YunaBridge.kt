@@ -920,14 +920,6 @@ class YunaBridge(
         if (sttState.get() == SttState.RECORDING) cancelCloudWhisper()
     }
 
-}
-
-
-object YunaMicRegistry {
-    @Volatile var activeBridge: YunaBridge? = null
-    fun abortActiveMic() {
-        try { activeBridge?.abortMicOnPause() } catch (_: Exception) {}
-    }
 
     @JavascriptInterface
     fun getSyncedContactsJson(): String {
@@ -946,10 +938,10 @@ object YunaMicRegistry {
                 android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC"
             )
             val seen = HashSet<String>()
-            cur?.use {
-                while (it.moveToNext() && arr.length() < 150) {
-                    val name = it.getString(0)?.trim() ?: continue
-                    val num = it.getString(1)?.replace(Regex("[^0-9+]"), "") ?: continue
+            cur?.use { c ->
+                while (c.moveToNext() && arr.length() < 150) {
+                    val name = c.getString(0)?.trim() ?: continue
+                    val num = c.getString(1)?.replace(Regex("[^0-9+]"), "") ?: continue
                     if (name.isNotEmpty() && num.length >= 7 && seen.add(name.lowercase())) {
                         arr.put(org.json.JSONObject().put("name", name).put("phone", num))
                     }
@@ -958,5 +950,16 @@ object YunaMicRegistry {
             arr.toString()
         } catch (_: Exception) { "[]" }
     }
+
+}
+
+
+object YunaMicRegistry {
+    @Volatile var activeBridge: YunaBridge? = null
+    fun abortActiveMic() {
+        try { activeBridge?.abortMicOnPause() } catch (_: Exception) {}
+    }
+
+    
 
 }
