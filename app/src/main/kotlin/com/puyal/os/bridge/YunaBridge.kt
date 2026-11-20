@@ -158,7 +158,7 @@ class YunaBridge(
     private fun isCallAudioActive(): Boolean {
         return try {
             val m = audioMgr.mode
-            m == AudioManager.MODE_IN_CALL || m == AudioManager.MODE_IN_COMMUNICATION
+            m == AudioManager.MODE_IN_CALL
         } catch (_: Exception) { false }
     }
 
@@ -513,7 +513,10 @@ class YunaBridge(
     fun getDetailedPermissions(): String {
         ensureCallStateListener()
         val overlay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(ctx) else true
-        val acc = PuyalAccessService.instance != null
+        val acc = PuyalAccessService.instance != null || try {
+            val es = Settings.Secure.getString(ctx.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: ""
+            es.contains(ctx.packageName)
+        } catch (_: Exception) { false }
         val mic = ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         val contacts = ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
         val call = ContextCompat.checkSelfPermission(ctx, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED
@@ -790,4 +793,40 @@ class YunaBridge(
             if (up) "திரை பிரகாசம் கூட்டப்பட்டது." else "திரை பிரகாசம் குறைக்கப்பட்டது."
         } catch (e: Exception) { "பிரகாசப் பிழை: ${e.message}" }
     }
+
+    @Volatile private var liveMuted: Boolean = false
+    @Volatile private var liveActive: Boolean = false
+    @Volatile private var lastLiveBaseUrl: String = ""
+
+    @JavascriptInterface
+    fun startLiveSession(baseUrl: String) {
+        liveActive = true
+        liveMuted = false
+        if (baseUrl.isNotBlank()) lastLiveBaseUrl = baseUrl
+        stopSpeaking()
+        startCloudWhisper(lastLiveBaseUrl)
+    }
+
+    @JavascriptInterface
+    fun stopLiveSession() {
+        liveActive = false
+        liveMuted = false
+        stopCloudWhisper()
+        stopSpeaking()
+    }
+
+    @JavascriptInterface
+    fun bargeInLive() {
+        stopSpeaking()
+        if (liveActive && !liveMuted) {
+            try { startCloudWhisper(lastLiveBaseUrl) } catch (_: Exception) {}
+        }
+    }
+
+    @JavascriptInterface
+    fun setLiveMuted(muted: Boolean) {
+        liveMuted = muted
+        if (muted) stopCloudWhisper()
+    }
+
 }
