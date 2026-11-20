@@ -854,7 +854,7 @@ class YunaBridge(
             if (!micPollActive) return
             val amp = try { recorder?.maxAmplitude ?: 0 } catch (_: Exception) { 0 }
             val norm = (amp / 14000.0).coerceIn(0.05, 1.0)
-            try { webView.evaluateJavascript("window.onYunaMicLevel&&window.onYunaMicLevel($norm)", null) } catch (_: Exception) {}
+            try { onMicLevel(norm.toFloat()) } catch (_: Exception) {}
             if (amp > 900) {
                 heardSpeech = true
                 speechMs += 60L
