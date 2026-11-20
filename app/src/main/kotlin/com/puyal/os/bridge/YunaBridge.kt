@@ -25,6 +25,8 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
 import android.os.Handler
+import java.util.concurrent.atomic.AtomicReference
+import android.os.SystemClock
 import android.os.Looper
 import android.provider.AlarmClock
 import android.provider.CalendarContract
@@ -372,6 +374,7 @@ class YunaBridge(
                 mr.setOutputFile(out.absolutePath)
                 mr.prepare()
                 mr.start()
+                startMicLevelPoller()
                 startMicLevelPoller()
                 recorder = mr
                 isRecordingWhisper = true
@@ -847,27 +850,38 @@ class YunaBridge(
 
     @Volatile private var micPollActive: Boolean = false
     private val micPollRunnable = object : Runnable {
+        private val calSamples = ArrayList<Int>(5)
+        private var noiseFloor = 500
+        private var speechConsec = 0
         private var heardSpeech = false
-        private var speechMs = 0L
         private var silenceMs = 0L
         override fun run() {
             if (!micPollActive) return
             val amp = try { recorder?.maxAmplitude ?: 0 } catch (_: Exception) { 0 }
-            val norm = (amp / 14000.0).coerceIn(0.05, 1.0)
-            try { onMicLevel(norm.toFloat()) } catch (_: Exception) {}
-            if (amp > 900) {
-                heardSpeech = true
-                speechMs += 60L
-                silenceMs = 0L
-            } else if (heardSpeech) {
-                silenceMs += 60L
-                if (speechMs >= 420L && silenceMs >= 1800L) {
-                    micPollActive = false
-                    heardSpeech = false
-                    speechMs = 0L
+            try { onMicLevel(amp.toFloat()) } catch (_: Exception) {}
+            if (calSamples.size < 5) {
+                calSamples.add(amp)
+                if (calSamples.size == 5) {
+                    noiseFloor = calSamples.sorted()[2]
+                }
+            } else {
+                val speechThresh = maxOf(900, (noiseFloor * 1.85f).toInt()).coerceAtMost(4500)
+                val silenceThresh = maxOf(650, (noiseFloor * 1.25f).toInt())
+                if (amp > speechThresh) {
+                    speechConsec++
                     silenceMs = 0L
-                    stopCloudWhisper()
-                    return
+                    if (speechConsec >= 2) heardSpeech = true
+                } else {
+                    speechConsec = 0
+                    if (heardSpeech && amp < silenceThresh) {
+                        silenceMs += 60L
+                        if (silenceMs >= 1800L) {
+                            micPollActive = false
+                            calSamples.clear(); heardSpeech = false; silenceMs = 0L
+                            stopCloudWhisper()
+                            return
+                        }
+                    }
                 }
             }
             mainH.postDelayed(this, 60L)
@@ -875,6 +889,7 @@ class YunaBridge(
     }
 
     private fun startMicLevelPoller() {
+        YunaMicRegistry.activeBridge = this
         micPollActive = true
         mainH.removeCallbacks(micPollRunnable)
         mainH.postDelayed(micPollRunnable, 120L)
@@ -885,4 +900,33 @@ class YunaBridge(
         mainH.removeCallbacks(micPollRunnable)
     }
 
+
+    private enum class SttState { IDLE, RECORDING, STOPPING }
+    private val sttState = AtomicReference(SttState.IDLE)
+    private var useSlotA = true
+
+    @JavascriptInterface
+    fun cancelCloudWhisper() {
+        sttState.set(SttState.IDLE)
+        stopMicLevelPoller()
+        mainH.post {
+            try { recorder?.stop() } catch (_: Exception) {}
+            try { recorder?.release() } catch (_: Exception) {}
+            recorder = null
+            try { recFile?.delete() } catch (_: Exception) {}
+        }
+    }
+
+    fun abortMicOnPause() {
+        if (sttState.get() == SttState.RECORDING) cancelCloudWhisper()
+    }
+
+}
+
+
+object YunaMicRegistry {
+    @Volatile var activeBridge: YunaBridge? = null
+    fun abortActiveMic() {
+        try { activeBridge?.abortMicOnPause() } catch (_: Exception) {}
+    }
 }
