@@ -56,9 +56,7 @@ class PuyalAccessService : AccessibilityService() {
     fun scanNow(): String = scanScreenText()
 
     fun scanScreenText(): String {
-        val pkg = rootInActiveWindow?.packageName?.toString() ?: ""
-        val blocked = setOf("com.google.android.apps.nbu.paisa.user", "com.phonepe.app", "net.one97.paytm", "in.org.npci.upiapp")
-        if (pkg in blocked) return "பாதுகாப்பு: வங்கி/UPI திரையைப் படிக்க முடியாது." 
+
         val pkg = rootInActiveWindow?.packageName?.toString() ?: ""
         val blocked = setOf("com.google.android.apps.nbu.paisa.user", "com.phonepe.app", "net.one97.paytm", "in.org.npci.upiapp")
         if (pkg in blocked) return "பாதுகாப்பு: வங்கி/UPI திரையைப் படிக்க முடியாது." 
