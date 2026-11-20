@@ -4,7 +4,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
@@ -25,6 +24,7 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
@@ -40,6 +40,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
 import java.util.concurrent.Executors
+import kotlin.math.abs
 
 class FloatingYunaService : Service() {
     private lateinit var wm: WindowManager
@@ -88,8 +89,8 @@ class FloatingYunaService : Service() {
             .setContentText("YouTube & பிற செயலிகள் மேல் தயார்")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .build()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(9169, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+        if (Build.VERSION.SDK_INT >= 34) {
+            startForeground(9169, notif, 0x40000000 or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
         } else {
             startForeground(9169, notif)
         }
@@ -121,9 +122,7 @@ class FloatingYunaService : Service() {
                 return super.dispatchKeyEvent(event)
             }
             override fun onTouchEvent(event: MotionEvent?): Boolean {
-                if (event?.action == MotionEvent.ACTION_OUTSIDE) {
-                    setInputFocusMode(false)
-                }
+                if (event?.action == MotionEvent.ACTION_OUTSIDE) setInputFocusMode(false)
                 return super.onTouchEvent(event)
             }
         }
@@ -134,13 +133,45 @@ class FloatingYunaService : Service() {
             setStroke(2, Color.parseColor("#6638BDF8"))
         }
 
+        val slop = ViewConfiguration.get(this).scaledTouchSlop
+        var downX = 0f
+        var downY = 0f
+        var startX = 0
+        var startY = 0
+        var dragging = false
+
         orbBtn = TextView(this).apply {
             text = "✦ YUNA"
             setTextColor(Color.parseColor("#E0F2FE"))
             textSize = 13f
             setPadding(28, 18, 28, 18)
             background = bgPill
-            setOnClickListener { toggleExpanded(true) }
+            setOnTouchListener { _, ev ->
+                when (ev.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        downX = ev.rawX; downY = ev.rawY
+                        startX = params.x; startY = params.y
+                        dragging = false
+                        true
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        val dx = (ev.rawX - downX).toInt()
+                        val dy = (ev.rawY - downY).toInt()
+                        if (abs(dx) > slop || abs(dy) > slop) dragging = true
+                        if (dragging) {
+                            params.x = startX + dx
+                            params.y = startY + dy
+                            wm.updateViewLayout(rootView, params)
+                        }
+                        true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        if (!dragging) toggleExpanded(true) else clampToSafeWindowInsets()
+                        true
+                    }
+                    else -> false
+                }
+            }
         }
 
         miniPanel = LinearLayout(this).apply {

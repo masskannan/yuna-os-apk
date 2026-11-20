@@ -49,7 +49,49 @@ import java.util.Locale
 class YunaBridge(
     private val ctx: Context,
     private val onVoiceReq: (String) -> Unit,
-    private val onStopVoiceReq: () -> Unit = {},
+    private val onStopVoiceReq: () -> Unit = {
+
+    @android.webkit.JavascriptInterface
+    fun isExternalCallActive(): Boolean {
+        return try {
+            com.puyal.os.voice.ExternalAudioGuard.isCallOrVoipActive(ctx)
+        } catch (_: Throwable) { false }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun hasOnnxVoiceModel(): Boolean {
+        return try {
+            java.io.File(ctx.filesDir, "onnx/ta_female.onnx").exists()
+        } catch (_: Throwable) { false }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun renderPdfPagesBase64(uriString: String): String {
+        return try {
+            val uri = android.net.Uri.parse(uriString)
+            val pfd = ctx.contentResolver.openFileDescriptor(uri, "r") ?: return "[]"
+            val renderer = android.graphics.pdf.PdfRenderer(pfd)
+            val maxPages = minOf(renderer.pageCount, 5)
+            val out = org.json.JSONArray()
+            for (i in 0 until maxPages) {
+                val page = renderer.openPage(i)
+                val bmp = android.graphics.Bitmap.createBitmap(
+                    minOf(page.width, 1024), minOf(page.height, 1448),
+                    android.graphics.Bitmap.Config.ARGB_8888
+                )
+                page.render(bmp, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                page.close()
+                val baos = java.io.ByteArrayOutputStream()
+                bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 78, baos)
+                bmp.recycle()
+                out.put(android.util.Base64.encodeToString(baos.toByteArray(), android.util.Base64.NO_WRAP))
+            }
+            renderer.close()
+            pfd.close()
+            out.toString()
+        } catch (_: Throwable) { "[]" }
+    }
+},
     private val onBiometricReq: () -> Unit = {},
     private val onTtsDone: () -> Unit = {},
     private val onMicLevel: (Float) -> Unit = {},
@@ -572,7 +614,7 @@ class YunaBridge(
         return try {
             val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
             cm.primaryClip?.getItemAt(0)?.coerceToText(ctx)?.toString()?.trim()?.take(1200) ?: ""
-        } catch (_: Exception) { "" }
+        } catch (e: Exception) { "__ERR__:${e.javaClass.simpleName}: ${e.message?.take(60)}" }
     }
 
     @JavascriptInterface

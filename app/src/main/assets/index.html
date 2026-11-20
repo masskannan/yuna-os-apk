@@ -2672,6 +2672,28 @@ window.filterDrawerChats = function(q) {
   });
 };
 
+
+
+// === Phase 4: Stage 3 Vision (/vision) + Batch 17 RAG Hook ===
+window.callYunaVision = async function(imageBase64, mimeType, promptText) {
+  if (!cloudUrl) { showToast('Vision-க்கு இணையம் / Cloud URL தேவை'); return null; }
+  try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 20000);
+    const r = await fetch(cloudUrl.replace(/\/+$/, '') + '/vision', {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64, mimeType: mimeType || 'image/jpeg', prompt: promptText || 'இதைத் தமிழில் விளக்குக.' })
+    });
+    clearTimeout(tid);
+    const d = await r.json();
+    return d && d.reply ? d.reply : null;
+  } catch (_) {
+    return null;
+  }
+};
+
 </script>
 <div id="yunaConfirmModal">
   <div class="yuna-cfm-card">
