@@ -59,6 +59,9 @@ class PuyalAccessService : AccessibilityService() {
         val pkg = rootInActiveWindow?.packageName?.toString() ?: ""
         val blocked = setOf("com.google.android.apps.nbu.paisa.user", "com.phonepe.app", "net.one97.paytm", "in.org.npci.upiapp")
         if (pkg in blocked) return "பாதுகாப்பு: வங்கி/UPI திரையைப் படிக்க முடியாது." 
+        val pkg = rootInActiveWindow?.packageName?.toString() ?: ""
+        val blocked = setOf("com.google.android.apps.nbu.paisa.user", "com.phonepe.app", "net.one97.paytm", "in.org.npci.upiapp")
+        if (pkg in blocked) return "பாதுகாப்பு: வங்கி/UPI திரையைப் படிக்க முடியாது." 
         val root = rootInActiveWindow ?: return "திரையில் உள்ளடக்கம் எதுவும் கண்டறியப்படவில்லை."
         val sb = StringBuilder()
         fun walk(node: AccessibilityNodeInfo?, depth: Int) {
