@@ -372,6 +372,7 @@ class YunaBridge(
                 mr.setOutputFile(out.absolutePath)
                 mr.prepare()
                 mr.start()
+                startMicLevelPoller()
                 recorder = mr
                 isRecordingWhisper = true
                 Thread {
@@ -393,6 +394,7 @@ class YunaBridge(
 
     @JavascriptInterface
     fun stopCloudWhisper() {
+        stopMicLevelPoller()
         if (!isRecordingWhisper) return
         isRecordingWhisper = false
         mainH.post {
@@ -840,6 +842,47 @@ class YunaBridge(
     @JavascriptInterface
     fun stopFloatingOverlay() {
         ctx.stopService(android.content.Intent(ctx, com.puyal.os.overlay.FloatingYunaService::class.java))
+    }
+
+
+    @Volatile private var micPollActive: Boolean = false
+    private val micPollRunnable = object : Runnable {
+        private var heardSpeech = false
+        private var speechMs = 0L
+        private var silenceMs = 0L
+        override fun run() {
+            if (!micPollActive) return
+            val amp = try { recorder?.maxAmplitude ?: 0 } catch (_: Exception) { 0 }
+            val norm = (amp / 14000.0).coerceIn(0.05, 1.0)
+            try { webView.evaluateJavascript("window.onYunaMicLevel&&window.onYunaMicLevel($norm)", null) } catch (_: Exception) {}
+            if (amp > 900) {
+                heardSpeech = true
+                speechMs += 60L
+                silenceMs = 0L
+            } else if (heardSpeech) {
+                silenceMs += 60L
+                if (speechMs >= 420L && silenceMs >= 1800L) {
+                    micPollActive = false
+                    heardSpeech = false
+                    speechMs = 0L
+                    silenceMs = 0L
+                    stopCloudWhisper()
+                    return
+                }
+            }
+            mainH.postDelayed(this, 60L)
+        }
+    }
+
+    private fun startMicLevelPoller() {
+        micPollActive = true
+        mainH.removeCallbacks(micPollRunnable)
+        mainH.postDelayed(micPollRunnable, 120L)
+    }
+
+    private fun stopMicLevelPoller() {
+        micPollActive = false
+        mainH.removeCallbacks(micPollRunnable)
     }
 
 }
