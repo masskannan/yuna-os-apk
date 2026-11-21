@@ -1011,6 +1011,10 @@ async function toggleVoice() {
     dockBar.classList.remove('mic-on'); document.body.classList.remove('mic-on'); micBtn.classList.remove('active');
     inp.placeholder = 'Ask YUNA...'; if (vs) vs.textContent = 'OFF'; return;
   }
+  if (window.YunaBridge && window.YunaBridge.isExternalCallActive && window.YunaBridge.isExternalCallActive()) {
+    showToast('போன் கால் ஓடுகிறது — கால் முடிந்ததும் மைக் பேசவும்');
+    return;
+  }
   setOrbState('LISTENING', 'Listening • Speak Tamil / English');
   dockBar.classList.add('mic-on'); document.body.classList.add('mic-on'); startMicClock(); micBtn.classList.add('active');
   inp.placeholder = 'Listening... Speak now'; if (vs) vs.textContent = 'ON';
@@ -1402,7 +1406,16 @@ function send(overrideText) {
       if (isInstantLocal || !cloudUrl) {
         res = routeYunaPersona(fullQ);
       } else {
-        const cRes = await callYunaCloudRemote(fullQ);
+        let cRes = null;
+        if (!thumbCopy && typeof window.handlePdfVisionIfPresent === 'function') {
+          const pdfTxt = await window.handlePdfVisionIfPresent(q);
+          if (pdfTxt) cRes = { title: 'YUNA • PDF VISION', reply: pdfTxt, meta: 'PDF 5-PAGE VISION', statusLabel: 'Ready', step: 'PDF Vision' };
+        }
+        if (!cRes && thumbCopy && typeof window.callYunaVision === 'function') {
+          const vTxt = await window.callYunaVision(thumbCopy, 'image/jpeg', q || 'இந்தப் படத்தைத் தமிழில் விளக்குக.');
+          if (vTxt) cRes = { title: 'YUNA • VISION', reply: vTxt, meta: 'PLAN D VISION', statusLabel: 'Ready', step: 'Vision' };
+        }
+        if (!cRes) cRes = await callYunaCloudRemote(fullQ);
         if (cRes) { res = cRes; }
         else {
           res = routeYunaPersona(fullQ);
@@ -1679,7 +1692,12 @@ async function callYunaCloudRemote(promptText) {
   activeCloudAbort = new AbortController();
   const tid = setTimeout(() => { try { activeCloudAbort.abort(); } catch (_) {} }, 15000);
   try {
-    const r = await fetch(cloudUrl, { method: 'POST', signal: activeCloudAbort.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: promptText, sessionId: yunaCloudSid, contacts: (() => { try { return (window.YunaBridge && window.YunaBridge.getSyncedContactsJson) ? JSON.parse(window.YunaBridge.getSyncedContactsJson() || '[]').slice(0, 80).map(c => c.name).filter(Boolean) : []; } catch (_) { return []; } })() }) });
+    let enrichedPrompt = promptText;
+    if (typeof window.queryYunaRag === 'function' && (promptText.length > 22 || /நினைவு|முன்பு|லோடு|சொன்னேன்/.test(promptText))) {
+      const ragCtx = await window.queryYunaRag(promptText);
+      if (ragCtx) enrichedPrompt = ragCtx + promptText;
+    }
+    const r = await fetch(cloudUrl, { method: 'POST', signal: activeCloudAbort.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: enrichedPrompt, sessionId: yunaCloudSid, contacts: (() => { try { return (window.YunaBridge && window.YunaBridge.getSyncedContactsJson) ? JSON.parse(window.YunaBridge.getSyncedContactsJson() || '[]').slice(0, 80).map(c => c.name).filter(Boolean) : []; } catch (_) { return []; } })() }) });
     clearTimeout(tid);
     const d = await r.json();
     const list = Array.isArray(d.actions) ? d.actions.slice(0, 4) : (d.action && d.action !== 'NONE' ? [{ action: d.action, target: d.target || '' }] : []);
@@ -1691,7 +1709,18 @@ async function callYunaCloudRemote(promptText) {
         return 'TRUSTED_CALL_GATE';
       }
       if (item.action === 'OPEN_APP_DYNAMIC' && window.YunaBridge && window.YunaBridge.openAppByName) {
-        return window.YunaBridge.openAppByName(item.target || '');
+        let appTgt = String(item.target || '').trim();
+        if (/^(gpay|ஜிபே)$/i.test(appTgt)) appTgt = 'Google Pay';
+        if (/youtube/i.test(appTgt) && window.YunaBridge.startFloatingOverlay) {
+          try { window.YunaBridge.startFloatingOverlay(); } catch (_) {}
+          setTimeout(() => { try { window.YunaBridge.openAppByName(appTgt); } catch (_) {} }, 300);
+          return 'YouTube + Floating YUNA தொடங்குகிறது';
+        }
+        let resApp = window.YunaBridge.openAppByName(appTgt);
+        if (String(resApp).toLowerCase().includes('not found') && appTgt === 'Google Pay') {
+          resApp = window.YunaBridge.openAppByName('GPay');
+        }
+        return resApp;
       }
       return execLocalOsAction(item.action, item.target || '');
     };
@@ -2681,7 +2710,23 @@ window.filterDrawerChats = function(q) {
 
 
 // === Phase 4: Stage 3 Vision (/vision) + Batch 17 RAG Hook ===
-window.callYunaVision = async function(imageBase64, mimeType, promptText) {
+window.queryYunaRag = async function(qText) {
+  if (!cloudUrl || !qText || qText.length < 12) return '';
+  try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 1200);
+    const r = await fetch(cloudUrl.replace(/\/+$/, '') + '/rag/query', {
+      method: 'POST', signal: ctrl.signal, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: qText })
+    });
+    clearTimeout(tid);
+    const d = await r.json();
+    const hits = (d && Array.isArray(d.matches)) ? d.matches.slice(0, 3).map(m => m.text || (m.metadata && m.metadata.text) || '').filter(Boolean) : [];
+    return hits.length ? ('[நினைவு: ' + hits.join(' | ').slice(0, 350) + '] ') : '';
+  } catch (_) { return ''; }
+};
+
+window.callYunaVision = async function(imageOrArray, mimeType, promptText) {
   if (!cloudUrl) { showToast('Vision-க்கு இணையம் / Cloud URL தேவை'); return null; }
   try {
     const ctrl = new AbortController();
@@ -2690,7 +2735,7 @@ window.callYunaVision = async function(imageBase64, mimeType, promptText) {
       method: 'POST',
       signal: ctrl.signal,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageBase64, mimeType: mimeType || 'image/jpeg', prompt: promptText || 'இதைத் தமிழில் விளக்குக.' })
+      body: JSON.stringify(Array.isArray(imageOrArray) ? { images: imageOrArray.slice(0, 5).map(b => ({ base64: b, mimeType: mimeType || 'image/jpeg' })), prompt: promptText || 'இந்தப் பக்கங்களைத் தமிழில் சுருக்கமாக விளக்குக.' } : { imageBase64: imageOrArray, mimeType: mimeType || 'image/jpeg', prompt: promptText || 'இதைத் தமிழில் விளக்குக.' })
     });
     clearTimeout(tid);
     const d = await r.json();
@@ -2699,6 +2744,120 @@ window.callYunaVision = async function(imageBase64, mimeType, promptText) {
     return null;
   }
 };
+
+
+
+// === Plan D v2: Pre-Warm Worker TLS & Isolate (/health) ===
+function prewarmCloudWorker() {
+  if (!cloudUrl) return;
+  try { fetch(cloudUrl.replace(/\/+$/, '') + '/health', { method: 'GET' }).catch(() => {}); } catch (_) {}
+}
+window.addEventListener('DOMContentLoaded', prewarmCloudWorker);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) prewarmCloudWorker(); });
+
+
+
+// === Plan D v2 Zero-Bug Layer (Singleton AudioContext + Honest Action Sync) ===
+window._yunaAudioCtx = null;
+window.playYunaEarcon = function(kind) {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!window._yunaAudioCtx) window._yunaAudioCtx = new AC();
+    const ctx = window._yunaAudioCtx;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = kind === 'done' ? 660 : 520;
+    gain.gain.setValueAtTime(0.035, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.08);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.09);
+  } catch (_) {}
+};
+
+(function hookZeroBugActions() {
+  const origVr = window.onYunaVoiceResult;
+  if (typeof origVr === 'function') {
+    window.onYunaVoiceResult = function(text) {
+      if (text) window.playYunaEarcon('done');
+      return origVr.apply(this, arguments);
+    };
+  }
+  const origExec = window.execLocalOsAction;
+  if (typeof origExec === 'function') {
+    window.execLocalOsAction = function(action, target) {
+      const a = String(action || '').toUpperCase();
+      if (a === 'NOTE' && target && cloudUrl) {
+        const sidQ = encodeURIComponent(typeof yunaCloudSid !== 'undefined' ? yunaCloudSid : 'default');
+        fetch(cloudUrl.replace(/\/+$/, '') + '/rag/upsert', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: target, tag: 'note' })
+        }).catch(() => {});
+        fetch(cloudUrl.replace(/\/+$/, '') + '/notes?sid=' + sidQ, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: target, at: new Date().toLocaleTimeString() })
+        }).then(r => showToast(r.ok ? 'குறிப்பு சேமிக்கப்பட்டது' : 'குறிப்பு சேமிக்க முடியவில்லை'))
+          .catch(() => showToast('குறிப்பு சேமிப்பு தோல்வி'));
+        return 'குறிப்பு சேமிக்கப்படுகிறது...';
+      }
+      if (a === 'LOADS' && cloudUrl) {
+        fetch(cloudUrl.replace(/\/+$/, '') + '/loads?q=' + encodeURIComponent(target || ''))
+          .then(r => r.json())
+          .then(d => {
+            const list = (d && Array.isArray(d.loads) && d.loads.length)
+              ? d.loads.slice(0, 5).map(l => `• ${l.route} (${l.vehicle} | ${l.rate})`).join('\n')
+              : 'தற்போது பொருந்தும் லோடுகள் இல்லை.';
+            if (typeof addYunaStream === 'function') addYunaStream('YUNA • LOADS', list, 'D1 LOADS', 'LOADS', false, null);
+          }).catch(() => {});
+        return 'லோடு விவரங்கள் தேடப்படுகின்றன...';
+      }
+      if (/^(MOBILE_DATA_ON|MOBILE_DATA_OFF|HOTSPOT_ON|HOTSPOT_OFF|RINGER_SILENT|RINGER_VIBRATE|BRIGHTNESS_UP|BRIGHTNESS_DOWN)$/.test(a)) {
+        if (window.YunaBridge && window.YunaBridge.openAppByName) {
+          try { window.YunaBridge.openAppByName('Settings'); } catch (_) {}
+        }
+        return 'அமைப்புகள் (Settings) திறக்கப்பட்டது';
+      }
+      if (a === 'VISION') {
+        const plusBtn = document.getElementById('plusBtn');
+        if (plusBtn) plusBtn.click();
+        return 'படம் அல்லது PDF தேர்ந்தெடுக்கவும்';
+      }
+      return origExec.apply(this, arguments);
+    };
+  }
+})();
+
+
+
+// === v17.0.0 Upgrade: 2.2s Race TTS + PDF Vision Bridge ===
+(function upgradeV17() {
+  const fInp = document.getElementById('fileInp');
+  if (fInp) {
+    fInp.addEventListener('change', (ev) => {
+      const f = ev.target && ev.target.files && ev.target.files[0];
+      window._pickedRawFile = f || null;
+    });
+  }
+  const origSend = window.send;
+  // Ensure clean PDF handling via YunaBridge.renderPdfPagesBase64 if available
+  window.handlePdfVisionIfPresent = async function(promptText) {
+    const f = window._pickedRawFile;
+    if (!f || !/\.pdf$/i.test(f.name || '')) return null;
+    window._pickedRawFile = null;
+    if (window.YunaBridge && window.YunaBridge.renderPdfPagesBase64 && f.webkitRelativePath !== undefined) {
+      try {
+        const rawJson = window.YunaBridge.renderPdfPagesBase64(f.name);
+        const pages = JSON.parse(rawJson || '[]');
+        if (Array.isArray(pages) && pages.length && typeof window.callYunaVision === 'function') {
+          return await window.callYunaVision(pages, 'image/jpeg', promptText || 'இந்த PDF-ஐத் தமிழில் சுருக்கமாக விளக்குக.');
+        }
+      } catch (_) {}
+    }
+    return null;
+  };
+})();
 
 </script>
 <div id="yunaConfirmModal">

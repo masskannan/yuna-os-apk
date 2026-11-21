@@ -917,7 +917,7 @@ class YunaBridge(
                     speechConsec = 0
                     if (heardSpeech && amp < silenceThresh) {
                         silenceMs += 60L
-                        if (silenceMs >= 1800L) {
+                        if (silenceMs >= 1100L) {
                             micPollActive = false
                             calSamples.clear(); heardSpeech = false; silenceMs = 0L
                             stopCloudWhisper()
