@@ -457,7 +457,8 @@ class YunaBridge(
             val bufBytes = maxOf(AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT), 4096)
             var ar: AudioRecord? = null
             try {
-                ar = AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufBytes * 2)
+                val prefSource = if (liveActive) MediaRecorder.AudioSource.VOICE_COMMUNICATION else MediaRecorder.AudioSource.VOICE_RECOGNITION
+                ar = AudioRecord(prefSource, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufBytes * 2)
                 if (ar.state != AudioRecord.STATE_INITIALIZED) {
                     ar.release()
                     ar = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufBytes * 2)
@@ -471,9 +472,10 @@ class YunaBridge(
                 }
                 planBAudioRecord = ar
                 val sid = ar.audioSessionId
-                try { if (NoiseSuppressor.isAvailable()) planBNs = NoiseSuppressor.create(sid)?.apply { enabled = true } } catch (_: Exception) {}
-                try { if (AcousticEchoCanceler.isAvailable()) planBAec = AcousticEchoCanceler.create(sid)?.apply { enabled = true } } catch (_: Exception) {}
-                try { if (AutomaticGainControl.isAvailable()) planBAgc = AutomaticGainControl.create(sid)?.apply { enabled = true } } catch (_: Exception) {}
+                if (liveActive) {
+                    try { if (NoiseSuppressor.isAvailable()) planBNs = NoiseSuppressor.create(sid)?.apply { enabled = true } } catch (_: Exception) {}
+                    try { if (AcousticEchoCanceler.isAvailable()) planBAec = AcousticEchoCanceler.create(sid)?.apply { enabled = true } } catch (_: Exception) {}
+                }
 
                 ar.startRecording()
                 val pcmOut = ByteArrayOutputStream()
@@ -485,6 +487,8 @@ class YunaBridge(
                 var silenceFrames = 0
                 var zeroFrames = 0
                 var totalFrames = 0
+                var noiseFloorSum = 0.0
+                var noiseFloorAvg = 90.0
                 val startMs = System.currentTimeMillis()
                 var lastDbMs = 0L
 
@@ -503,7 +507,7 @@ class YunaBridge(
                         frameBytes[i * 2 + 1] = ((boosted ushr 8) and 0xFF).toByte()
                     }
                     if (peak == 0) zeroFrames++
-                    if (totalFrames == 15 && zeroFrames >= 14) {
+                    if (totalFrames == 25 && zeroFrames >= 24) {
                         mainH.post { android.widget.Toast.makeText(ctx, "மைக் வேறு செயலியில் பூட்டப்பட்டுள்ளது (Zero PCM)", android.widget.Toast.LENGTH_SHORT).show() }
                         break
                     }
@@ -515,7 +519,9 @@ class YunaBridge(
                     }
 
                     val copy = frameBytes.copyOf(read * 2)
-                    val isSpeech = rms > 220.0
+                    if (totalFrames <= 6) { noiseFloorSum += rms; if (totalFrames == 6) noiseFloorAvg = noiseFloorSum / 6.0 }
+                    val dynThresh = maxOf(190.0, noiseFloorAvg * 2.1).coerceAtMost(2800.0)
+                    val isSpeech = rms > dynThresh
                     if (!speechStarted) {
                         ringBuf.addLast(copy)
                         if (ringBuf.size > 10) ringBuf.removeFirst()
@@ -1125,20 +1131,21 @@ class YunaBridge(
     private val sttState = AtomicReference(SttState.IDLE)
     private var useSlotA = true
 
+    @Synchronized
     @JavascriptInterface
     fun cancelCloudWhisper() {
         sttState.set(SttState.IDLE)
         stopMicLevelPoller()
-        mainH.post {
-            try { recorder?.stop() } catch (_: Exception) {}
-            try { recorder?.release() } catch (_: Exception) {}
-            recorder = null
-            try { recFile?.delete() } catch (_: Exception) {}
-        }
+        planBUtteranceId.incrementAndGet()
+        planBRecording.set(false)
+        isRecordingWhisper = false
+        try { recFile?.delete() } catch (_: Exception) {}
     }
 
     fun abortMicOnPause() {
-        if (sttState.get() == SttState.RECORDING) cancelCloudWhisper()
+        if (planBRecording.get() || isRecordingWhisper || sttState.get() == SttState.RECORDING) {
+            cancelCloudWhisper()
+        }
     }
 
 

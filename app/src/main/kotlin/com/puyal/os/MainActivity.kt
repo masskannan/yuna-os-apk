@@ -157,6 +157,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             )
+            com.puyal.os.bridge.YunaMicRegistry.activeBridge = b
             nw.addJavascriptInterface(b, "YunaBridge")
             nw.loadUrl("file:///android_asset/index.html")
         } catch (_: Exception) {}
@@ -164,6 +165,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         isAppInForeground = false
+        com.puyal.os.bridge.YunaMicRegistry.abortActiveMic()
         try { if (::webView.isInitialized && !needsWebViewRecovery) webView.onPause() } catch (_: Exception) {}
         super.onPause()
     }
@@ -319,9 +321,18 @@ class MainActivity : ComponentActivity() {
         } catch (_: Exception) {}
     }
 
-    
+    override fun onResume() {
+        try { webView.postDelayed({ webView.evaluateJavascript("window.snapDockToBottom&&window.snapDockToBottom()", null) }, 120L) } catch (_: Exception) {}
+        super.onResume()
+        sendBroadcast(Intent("com.puyal.os.ACTION_YUNA_FG").setPackage(packageName))
+    }
 
-    
+    override fun onPause() {
+        com.puyal.os.bridge.YunaMicRegistry.abortActiveMic()
+        super.onPause()
+        stopHeadlessVoice()
+        sendBroadcast(Intent("com.puyal.os.ACTION_YUNA_BG").setPackage(packageName))
+    }
 
     override fun onDestroy() {
         try { speechRec?.destroy() } catch (_: Exception) {}

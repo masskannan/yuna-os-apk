@@ -90,7 +90,7 @@ class FloatingYunaService : Service() {
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .build()
         if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(9169, notif, 0x40000000 or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            startForeground(9169, notif, 0x40000000 or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
         } else {
             startForeground(9169, notif)
         }
@@ -228,7 +228,7 @@ class FloatingYunaService : Service() {
 
         rootView.addView(orbBtn)
         rootView.addView(miniPanel)
-        wm.addView(rootView, params)
+        mainH.postDelayed({ try { wm.addView(rootView, params) } catch (_: Exception) {} }, 800L)
     }
 
     private fun toggleExpanded(expand: Boolean) {
@@ -349,6 +349,7 @@ class FloatingYunaService : Service() {
     }
 
     override fun onDestroy() {
+        try { mainH.removeCallbacksAndMessages(null) } catch (_: Exception) {}
         super.onDestroy()
         try { mediaPlayer?.release() } catch (_: Exception) {}
         try { localTts?.shutdown() } catch (_: Exception) {}
