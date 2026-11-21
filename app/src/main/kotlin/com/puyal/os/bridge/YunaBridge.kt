@@ -489,6 +489,8 @@ class YunaBridge(
                 var totalFrames = 0
                 var noiseFloorSum = 0.0
                 var noiseFloorAvg = 90.0
+                var hpPrevIn = 0.0
+                var hpPrevOut = 0.0
                 val startMs = System.currentTimeMillis()
                 var lastDbMs = 0L
 
@@ -499,7 +501,11 @@ class YunaBridge(
                     var sumSq = 0.0
                     var peak = 0
                     for (i in 0 until read) {
-                        val boosted = (frame[i].toInt() * 2).coerceIn(-32768, 32767)
+                        val rawS = frame[i].toDouble()
+                        hpPrevOut = 0.969 * (hpPrevOut + rawS - hpPrevIn)
+                        hpPrevIn = rawS
+                        val gained = hpPrevOut * 1.8
+                        val boosted = if (gained > 24000.0) (24000.0 + (gained - 24000.0) * 0.25).toInt().coerceAtMost(32767) else if (gained < -24000.0) (-24000.0 + (gained + 24000.0) * 0.25).toInt().coerceAtLeast(-32768) else gained.toInt()
                         val absV = kotlin.math.abs(boosted)
                         if (absV > peak) peak = absV
                         sumSq += boosted * boosted
@@ -611,6 +617,17 @@ class YunaBridge(
         } catch (_: Exception) { "ERR" }
     }
 
+    @JavascriptInterface
+    fun getInstalledAppsList(): String {
+        return try {
+            val pm = ctx.packageManager
+            pm.getInstalledApplications(0)
+                .filter { pm.getLaunchIntentForPackage(it.packageName) != null }
+                .mapNotNull { pm.getApplicationLabel(it)?.toString()?.trim() }
+                .distinct().sorted().take(40).joinToString(", ")
+        } catch (_: Exception) { "" }
+    }
+
     private fun uploadAudioToWhisper(endpoint: String, audio: File): String {
         return try {
             val boundary = "----YunaAudio" + UUID.randomUUID().toString().replace("-", "")
@@ -622,6 +639,13 @@ class YunaBridge(
                 setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
             }
             conn.outputStream.use { os ->
+                val cHint = try {
+                    val arr = org.json.JSONArray(getSyncedContactsJson())
+                    (0 until minOf(arr.length(), 20)).mapNotNull { arr.optJSONObject(it)?.optString("name")?.trim() }.filter { it.isNotEmpty() }.joinToString(", ")
+                } catch (_: Exception) { "" }
+                if (cHint.isNotEmpty()) {
+                    os.write(("--$boundary\r\nContent-Disposition: form-data; name=\"contacts_hint\"\r\n\r\n$cHint\r\n").toByteArray())
+                }
                 os.write(("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"yuna_mic.wav\"\r\nContent-Type: audio/wav\r\n\r\n").toByteArray())
                 audio.inputStream().use { it.copyTo(os) }
                 os.write(("\r\n--$boundary--\r\n").toByteArray())
@@ -719,8 +743,28 @@ class YunaBridge(
     fun openAppByName(query: String): String {
         val q = query.trim().lowercase()
         if (q.isEmpty()) return "NOT_FOUND:empty"
+        val exactMap = mapOf(
+            "gpay" to "com.google.android.apps.nbu.paisa.user",
+            "google pay" to "com.google.android.apps.nbu.paisa.user",
+            "ஜிபே" to "com.google.android.apps.nbu.paisa.user",
+            "youtube" to "com.google.android.youtube",
+            "யூடியூப்" to "com.google.android.youtube",
+            "whatsapp" to "com.whatsapp",
+            "வாட்ஸ்அப்" to "com.whatsapp",
+            "phonepe" to "com.phonepe.app",
+            "paytm" to "net.one97.paytm",
+            "google maps" to "com.google.android.apps.maps",
+            "maps" to "com.google.android.apps.maps",
+            "instagram" to "com.instagram.android",
+            "chrome" to "com.android.chrome"
+        )
         return try {
             val pm = ctx.packageManager
+            val mappedPkg = exactMap[q]
+            if (mappedPkg != null) {
+                val mi = pm.getLaunchIntentForPackage(mappedPkg)?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                if (mi != null) { ctx.startActivity(mi); return "$query திறக்கப்பட்டது." }
+            }
             val apps = pm.getInstalledApplications(0)
             var exactPkg: String? = null
             var startPkg: String? = null
@@ -732,7 +776,7 @@ class YunaBridge(
                 val low = lbl.lowercase()
                 if (low == q) { exactPkg = ai.packageName; chosenLabel = lbl; break }
                 if (startPkg == null && low.startsWith(q)) { startPkg = ai.packageName; chosenLabel = lbl }
-                if (partPkg == null && (low.contains(q) || q.contains(low))) { partPkg = ai.packageName; chosenLabel = lbl }
+                if (partPkg == null && low.contains(q)) { partPkg = ai.packageName; chosenLabel = lbl }
             }
             val pkg = exactPkg ?: startPkg ?: partPkg ?: return "NOT_FOUND:$query"
             val intent = pm.getLaunchIntentForPackage(pkg)?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) ?: return "NOT_FOUND:$query"

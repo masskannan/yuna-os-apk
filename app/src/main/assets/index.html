@@ -1350,13 +1350,17 @@ function clearSavedHistory() {
 
 function ask(q) { inp.value = q; syncInputMode(); send(); }
 
-const SAFE_DELEGATE_ALLOWLIST = new Set(['OPEN_APP','OPEN_CAMERA','DEEP_LINK_SEARCH','TYPE_SEARCH','GLOBAL_BACK','GLOBAL_HOME','GLOBAL_RECENTS','CLEAR_RECENTS','GLOBAL_NOTIFICATIONS','GLOBAL_QUICK_SETTINGS','TOGGLE_WIFI','TOGGLE_DATA','TOGGLE_BT','TORCH','TORCH_ON','TORCH_OFF','BRIGHTNESS_UP','BRIGHTNESS_DOWN','VOLUME_UP','VOLUME_DOWN','VOLUME_MUTE','MEDIA_NEXT','MEDIA_PLAY_PAUSE','SCROLL_DOWN','SCROLL_UP','LOCK_SCREEN','SCREENSHOT','NET_PANEL','DIAL','SPEAKER_ON','SPEAKER_OFF','WHO_IS_CALLING']);
+const SAFE_DELEGATE_ALLOWLIST = new Set(['OPEN_APP','OPEN_CAMERA','CAMERA_SHUTTER','DEEP_LINK_SEARCH','TYPE_SEARCH','GLOBAL_BACK','GLOBAL_HOME','GLOBAL_RECENTS','CLEAR_RECENTS','CLEAR_ALL_APPS','GLOBAL_NOTIFICATIONS','OPEN_NOTIFICATIONS','GLOBAL_QUICK_SETTINGS','OPEN_QUICK_SETTINGS','TOGGLE_WIFI','TOGGLE_DATA','TOGGLE_BT','TOGGLE_HOTSPOT','TOGGLE_LOCATION','TOGGLE_AIRPLANE','TOGGLE_ROTATE','TOGGLE_DND','TORCH','TORCH_ON','TORCH_OFF','BRIGHTNESS_UP','BRIGHTNESS_DOWN','BRIGHTNESS_AUTO','VOLUME_UP','VOLUME_DOWN','VOLUME_MUTE','VOLUME_MAX','MEDIA_NEXT','MEDIA_PLAY_PAUSE','SCROLL_DOWN','SCROLL_UP','LOCK_SCREEN','SCREENSHOT','NET_PANEL','DIAL','SPEAKER_ON','SPEAKER_OFF','WHO_IS_CALLING','SET_ALARM','SET_TIMER','SET_REMINDER','ADD_CALENDAR_EVENT','OPEN_MAPS_NAV','GET_BATTERY_TIME','YT_SKIP_AD','YT_FIRST_VIDEO','YT_FORWARD_10','YT_FULLSCREEN','NOTE','LOADS','VISION']);
 function forceRefreshUi() { const u = new URL(window.location.href); u.searchParams.set('v', Date.now().toString()); window.location.replace(u.toString()); }
 function redactSensitiveLocal(txt) {
   if (window.YunaBridge && window.YunaBridge.checkSensitive) { try { if (window.YunaBridge.checkSensitive(txt || '')) return '[REDACTED_BY_RUST_SHIELD]'; } catch (_) {} } return (txt || '').replace(/\b\d{4,8}\b/g, '[REDACTED_NUM]').replace(/\b(otp|cvv|pin|upi|password|mpin)\b/gi, '[REDACTED_KEY]'); }
 function execLocalOsAction(action, target) {
-  if (!SAFE_DELEGATE_ALLOWLIST.has(action)) return 'Blocked by YunaTierGuards: ' + action;
-  if (window.YunaBridge && window.YunaBridge.executeAction) { try { return window.YunaBridge.executeAction(action, target || ''); } catch (_) {} }
+  let act = String(action || '').toUpperCase();
+  if (act === 'OPEN_NOTIFICATIONS') act = 'GLOBAL_NOTIFICATIONS';
+  else if (act === 'OPEN_QUICK_SETTINGS') act = 'GLOBAL_QUICK_SETTINGS';
+  else if (act === 'CLEAR_ALL_APPS') act = 'CLEAR_RECENTS';
+  if (!SAFE_DELEGATE_ALLOWLIST.has(act)) return 'Blocked by YunaTierGuards: ' + act;
+  if (window.YunaBridge && window.YunaBridge.executeAction) { try { return window.YunaBridge.executeAction(act, target || ''); } catch (_) {} }
   return 'YUNA Local Action: ' + action + (target ? ' (' + target + ')' : '');
 }
 
@@ -2915,6 +2919,26 @@ window.yunaVoiceDebugLog = [];
     window.handleTrustedCallSkill = window.callWithTrustCheck;
   }
   
+
+  const _origSend = window.send;
+  if (typeof _origSend === 'function') {
+    window.send = function() {
+      const val = (typeof inp !== 'undefined' && inp && inp.value) ? inp.value.trim() : '';
+      if (/^(?:என்\s*போன்ல\s*என்ன.*ஆப்ஸ்|installed\s*apps|list\s*apps|ஆப்ஸ்\s*லிஸ்ட்)/i.test(val) && window.YunaBridge && window.YunaBridge.getInstalledAppsList) {
+        try {
+          const listStr = window.YunaBridge.getInstalledAppsList();
+          if (listStr) {
+            if (typeof addUserMsg === 'function') addUserMsg(val);
+            if (typeof inp !== 'undefined' && inp) { inp.value = ''; if (typeof syncInputMode === 'function') syncInputMode(); }
+            if (typeof addYunaMsg === 'function') addYunaMsg('உங்கள் போனில் உள்ள முக்கிய செயலிகள்:\n' + listStr);
+            return;
+          }
+        } catch(_){}
+      }
+      return _origSend.apply(this, arguments);
+    };
+  }
+
   window.onYunaAppResumed = function() {
     if (typeof sendLock !== 'undefined') sendLock = false;
     window.__yunaStopInFlight = false;
