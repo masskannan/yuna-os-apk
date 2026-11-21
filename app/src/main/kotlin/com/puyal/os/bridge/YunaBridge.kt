@@ -483,6 +483,7 @@ class YunaBridge(
                 val frame = ShortArray(512)
                 val frameBytes = ByteArray(1024)
                 var speechStarted = false
+                var speechStartMs = 0L
                 var speechFrames = 0
                 var silenceFrames = 0
                 var zeroFrames = 0
@@ -535,6 +536,7 @@ class YunaBridge(
                             speechFrames++
                             if (speechFrames >= 2) {
                                 speechStarted = true
+                                speechStartMs = nowMs
                                 while (ringBuf.isNotEmpty()) pcmOut.write(ringBuf.removeFirst())
                             }
                         } else {
@@ -548,7 +550,9 @@ class YunaBridge(
                         } else {
                             silenceFrames++
                         }
-                        if ((liveActive && silenceFrames >= 26) || (nowMs - startMs > 15000)) {
+                        val speechDurMs = if (speechStartMs > 0L) (nowMs - speechStartMs) else 0L
+                        val hangoverFrames = if (speechDurMs >= 2200L) 34 else 22
+                        if ((liveActive && silenceFrames >= hangoverFrames) || (nowMs - startMs > 20000L)) {
                             break
                         }
                     }
@@ -615,6 +619,75 @@ class YunaBridge(
             File(ctx.filesDir, "yuna_offline_queue.txt").appendText(prompt.take(500) + "\n")
             "QUEUED"
         } catch (_: Exception) { "ERR" }
+    }
+
+    private val activeTtsGen = AtomicInteger(0)
+    private val confirmedActionIds = java.util.Collections.synchronizedSet(HashSet<String>())
+    private val cancelledActionIds = java.util.Collections.synchronizedSet(HashSet<String>())
+
+    @JavascriptInterface
+    fun stopTts(generationId: String): Boolean {
+        activeTtsGen.incrementAndGet()
+        try { stopSpeaking() } catch (_: Exception) {}
+        return true
+    }
+
+    @JavascriptInterface
+    fun cancelVoiceTurn(turnId: String) {
+        cancelCloudWhisper()
+    }
+
+    @JavascriptInterface
+    fun submitVoiceTurn(audioBase64: String, turnId: String): String {
+        return try {
+            val base = recEndpoint.replace(Regex("/stt$"), "")
+            val url = (if (base.isNotEmpty()) base else "https://yuna-ai-gateway.masskannan719.workers.dev") + "/voice-turn"
+            val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                connectTimeout = 10000
+                readTimeout = 25000
+                setRequestProperty("Content-Type", "application/json")
+            }
+            val payload = org.json.JSONObject()
+                .put("turn_id", turnId)
+                .put("audio", org.json.JSONObject().put("encoding", "wav").put("sample_rate", 16000).put("data_base64", audioBase64))
+                .toString()
+            conn.outputStream.use { it.write(payload.toByteArray()) }
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            stream?.bufferedReader()?.readText() ?: "{}"
+        } catch (e: Exception) {
+            org.json.JSONObject().put("ok", false).put("error", e.message ?: "err").toString()
+        }
+    }
+
+    @JavascriptInterface
+    fun confirmAction(actionInstanceId: String): Boolean {
+        if (cancelledActionIds.contains(actionInstanceId)) return false
+        confirmedActionIds.add(actionInstanceId)
+        return true
+    }
+
+    @JavascriptInterface
+    fun rejectAction(actionInstanceId: String): Boolean {
+        cancelledActionIds.add(actionInstanceId)
+        return true
+    }
+
+    @JavascriptInterface
+    fun provideScreenContext(contextId: String, source: String, content: String): String {
+        return org.json.JSONObject().put("screen_context_id", contextId).put("source", source).put("user_authorized", true).toString()
+    }
+
+    @JavascriptInterface
+    fun getVoiceCapabilities(): String {
+        return org.json.JSONObject()
+            .put("sample_rate", 16000)
+            .put("adaptive_hangover", true)
+            .put("barge_in", true)
+            .put("unified_voice_turn", true)
+            .toString()
     }
 
     @JavascriptInterface

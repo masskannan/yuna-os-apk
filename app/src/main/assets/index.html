@@ -2997,6 +2997,32 @@ window.yunaVoiceDebugLog = [];
   };
 })();
 </script>
+<script>
+// === Phase 4: Voice State Machine & Stale TTS Generation Guard ===
+window.yunaTtsGenId = 0;
+window.yunaActiveTurnId = '';
+window.emitYunaEvent = function(name, detail) {
+  try { window.dispatchEvent(new CustomEvent(name, { detail: detail || {} })); } catch (_) {}
+};
+window.setYunaVoiceState = function(st) {
+  window.yunaVoiceState = st;
+  window.emitYunaEvent('yuna:voice-state', { state: st, turnId: window.yunaActiveTurnId, ts: Date.now() });
+};
+(function() {
+  const origBarge = window.bargeInLiveTurn;
+  window.bargeInLiveTurn = function() {
+    window.yunaTtsGenId++;
+    window.setYunaVoiceState('BARGE_IN');
+    try { if (window.YunaBridge && window.YunaBridge.stopTts) window.YunaBridge.stopTts(String(window.yunaTtsGenId)); } catch (_) {}
+    if (typeof origBarge === 'function') {
+      try { origBarge(); } catch (_) {}
+    } else {
+      try { if (typeof stopAllSpeechImmediate === 'function') stopAllSpeechImmediate(); } catch (_) {}
+      try { if (window.YunaBridge && window.YunaBridge.startCloudWhisper && typeof cloudUrl !== 'undefined') window.YunaBridge.startCloudWhisper(cloudUrl); } catch (_) {}
+    }
+  };
+})();
+</script>
 </body>
 
 </html>
