@@ -605,7 +605,7 @@ class YunaBridge(
         } catch (_: Exception) { "ERR" }
     }
 
-    private private fun uploadAudioToWhisper(endpoint: String, audio: File): String {
+    private fun uploadAudioToWhisper(endpoint: String, audio: File): String {
         return try {
             val boundary = "----YunaAudio" + UUID.randomUUID().toString().replace("-", "")
             val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
