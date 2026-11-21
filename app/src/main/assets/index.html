@@ -873,7 +873,7 @@ html, body { overflow-x: hidden !important; }
     <span id="liveMicTimer" style="font-variant-numeric:tabular-nums;font-size:12px;color:#7DD3FC;min-width:44px;">0:00</span>
     <div class="gm-wave" id="gmWaveBars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
     <div style="display:flex;gap:5px;align-items:center;">
-      <button class="mic-bar-btn" style="background:rgba(148,163,184,0.2);color:#E2E8F0;" onclick="pauseOrResumeVoice()" id="gmPauseBtn">⏸</button>
+      <button class="mic-bar-btn" style="background:rgba(148,163,184,0.2);color:#E2E8F0;" onclick="pauseOrResumeVoice()" id="gmPauseBtn" aria-label="Pause to Preview"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 0 5px rgba(56,189,248,0.75));"><defs><linearGradient id="fpG" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#38BDF8"/><stop offset="100%" stop-color="#A78BFA"/></linearGradient></defs><circle cx="12" cy="12" r="10.2" stroke="url(#fpG)" stroke-width="1.35" stroke-dasharray="4 2.2"/><rect x="8.3" y="7.5" width="2.5" height="9" rx="1.25" fill="url(#fpG)"/><rect x="13.2" y="7.5" width="2.5" height="9" rx="1.25" fill="url(#fpG)"/></svg></button>
       <button class="mic-bar-btn mic-bar-cancel" onclick="cancelVoiceCapture()">✕</button>
       <button class="mic-bar-btn mic-bar-send" onclick="finishVoiceCapture()">➤</button>
     </div>
@@ -992,7 +992,7 @@ function stopMicHardware() {
   document.body.classList.remove('mic-on');
   document.body.classList.remove('mic-edge-glow');
   voicePaused = false;
-  const pb = document.getElementById('voicePauseBtn'); if (pb) pb.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>';
+  const pb = document.getElementById('voicePauseBtn'); const gmPb = document.getElementById('gmPauseBtn'); if (pb) pb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 0 5px rgba(56,189,248,0.75));"><defs><linearGradient id="fpG" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#38BDF8"/><stop offset="100%" stop-color="#A78BFA"/></linearGradient></defs><circle cx="12" cy="12" r="10.2" stroke="url(#fpG)" stroke-width="1.35" stroke-dasharray="4 2.2"/><rect x="8.3" y="7.5" width="2.5" height="9" rx="1.25" fill="url(#fpG)"/><rect x="13.2" y="7.5" width="2.5" height="9" rx="1.25" fill="url(#fpG)"/></svg>'; if (gmPb) gmPb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 0 5px rgba(56,189,248,0.75));"><defs><linearGradient id="fpG" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#38BDF8"/><stop offset="100%" stop-color="#A78BFA"/></linearGradient></defs><circle cx="12" cy="12" r="10.2" stroke="url(#fpG)" stroke-width="1.35" stroke-dasharray="4 2.2"/><rect x="8.3" y="7.5" width="2.5" height="9" rx="1.25" fill="url(#fpG)"/><rect x="13.2" y="7.5" width="2.5" height="9" rx="1.25" fill="url(#fpG)"/></svg>';
   if (window.YunaBridge && window.YunaBridge.stopCloudWhisper) { try { window.YunaBridge.stopCloudWhisper(); } catch (_) {} }
   if (window.YunaBridge && window.YunaBridge.stopVoice) { try { window.YunaBridge.stopVoice(); } catch (_) {} }
   if (micRaf) { cancelAnimationFrame(micRaf); micRaf = null; }
@@ -1128,15 +1128,21 @@ function pauseOrResumeVoice() {
   const pb = document.getElementById('voicePauseBtn');
   if (!voicePaused) {
     voicePaused = true;
+    window.__yunaHoldPreview = true;
+    const gmPb = document.getElementById('gmPauseBtn'); if (pb) pb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 0 6px rgba(0,229,255,0.85));"><defs><linearGradient id="fplG" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#00E5FF"/><stop offset="100%" stop-color="#8B5CF6"/></linearGradient></defs><circle cx="12" cy="12" r="10.2" stroke="url(#fplG)" stroke-width="1.45"/><path d="M9.5 7.4L17.2 12L9.5 16.6V7.4Z" fill="url(#fplG)"/></svg>'; if (gmPb) gmPb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 0 6px rgba(0,229,255,0.85));"><defs><linearGradient id="fplG" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#00E5FF"/><stop offset="100%" stop-color="#8B5CF6"/></linearGradient></defs><circle cx="12" cy="12" r="10.2" stroke="url(#fplG)" stroke-width="1.45"/><path d="M9.5 7.4L17.2 12L9.5 16.6V7.4Z" fill="url(#fplG)"/></svg>';
+    setOrbState('IDLE', 'உரை தயாராகிறது...');
+    if (window.YunaBridge && window.YunaBridge.finishVoiceCapture) {
+      try { window.YunaBridge.finishVoiceCapture(); } catch (_) {}
+      showToast('பேசிய உரை மேலே வருகிறது — சரிபார்த்து ➤ அழுத்தவும்');
+      return;
+    }
     if (window.YunaBridge && window.YunaBridge.stopCloudWhisper) { try { window.YunaBridge.stopCloudWhisper(); } catch (_) {} }
     if (window.YunaBridge && window.YunaBridge.stopVoice) { try { window.YunaBridge.stopVoice(); } catch (_) {} }
-    if (pb) pb.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>';
-    setOrbState('IDLE', 'Voice Paused • Tap ▶ or ➤');
   } else {
     voicePaused = false;
     if (cloudUrl && window.YunaBridge && window.YunaBridge.startCloudWhisper) { try { window.YunaBridge.startCloudWhisper(cloudUrl); } catch (_) {} }
     else if (window.YunaBridge && window.YunaBridge.startVoice) { try { window.YunaBridge.startVoice(voiceLang); } catch (_) {} }
-    if (pb) pb.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>';
+    const gmPb = document.getElementById('gmPauseBtn'); if (pb) pb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 0 5px rgba(56,189,248,0.75));"><defs><linearGradient id="fpG" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#38BDF8"/><stop offset="100%" stop-color="#A78BFA"/></linearGradient></defs><circle cx="12" cy="12" r="10.2" stroke="url(#fpG)" stroke-width="1.35" stroke-dasharray="4 2.2"/><rect x="8.3" y="7.5" width="2.5" height="9" rx="1.25" fill="url(#fpG)"/><rect x="13.2" y="7.5" width="2.5" height="9" rx="1.25" fill="url(#fpG)"/></svg>'; if (gmPb) gmPb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 0 5px rgba(56,189,248,0.75));"><defs><linearGradient id="fpG" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#38BDF8"/><stop offset="100%" stop-color="#A78BFA"/></linearGradient></defs><circle cx="12" cy="12" r="10.2" stroke="url(#fpG)" stroke-width="1.35" stroke-dasharray="4 2.2"/><rect x="8.3" y="7.5" width="2.5" height="9" rx="1.25" fill="url(#fpG)"/><rect x="13.2" y="7.5" width="2.5" height="9" rx="1.25" fill="url(#fpG)"/></svg>';
     setOrbState('LISTENING', 'Listening • Speak Tamil / English');
   }
 }
@@ -1168,8 +1174,13 @@ window.onYunaVoicePartial = function(text) {
 window.onYunaVoiceResult = function(text) {
   if (!text) { showToast('குரல் தெளிவாகக் கேட்கவில்லை — மீண்டும் பேசவும்'); window.onYunaVoiceEnded(); return; }
   voicePaused = false;
-  const pb = document.getElementById('voicePauseBtn'); if (pb) pb.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>';
-  if (typeof state !== 'undefined' && state === 'LISTENING') { setOrbState('IDLE', 'Ready'); } inp.value = text; syncInputMode(); autoGrowInp(); send();
+  const pb = document.getElementById('voicePauseBtn'); const gmPb = document.getElementById('gmPauseBtn'); if (pb) pb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 0 5px rgba(56,189,248,0.75));"><defs><linearGradient id="fpG" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#38BDF8"/><stop offset="100%" stop-color="#A78BFA"/></linearGradient></defs><circle cx="12" cy="12" r="10.2" stroke="url(#fpG)" stroke-width="1.35" stroke-dasharray="4 2.2"/><rect x="8.3" y="7.5" width="2.5" height="9" rx="1.25" fill="url(#fpG)"/><rect x="13.2" y="7.5" width="2.5" height="9" rx="1.25" fill="url(#fpG)"/></svg>'; if (gmPb) gmPb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 0 5px rgba(56,189,248,0.75));"><defs><linearGradient id="fpG" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#38BDF8"/><stop offset="100%" stop-color="#A78BFA"/></linearGradient></defs><circle cx="12" cy="12" r="10.2" stroke="url(#fpG)" stroke-width="1.35" stroke-dasharray="4 2.2"/><rect x="8.3" y="7.5" width="2.5" height="9" rx="1.25" fill="url(#fpG)"/><rect x="13.2" y="7.5" width="2.5" height="9" rx="1.25" fill="url(#fpG)"/></svg>';
+  if (typeof state !== 'undefined' && state === 'LISTENING') { setOrbState('IDLE', 'Ready'); }
+  if (window.__yunaHoldPreview) {
+    window.__yunaHoldPreview = false;
+    if (typeof window.showVoicePreview === 'function') { window.showVoicePreview(text); return; }
+  }
+  inp.value = text; syncInputMode(); autoGrowInp(); send();
 };
 
 document.addEventListener('visibilitychange', () => {
