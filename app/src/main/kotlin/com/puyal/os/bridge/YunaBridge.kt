@@ -60,13 +60,6 @@ class YunaBridge(
     private val ctx: Context,
     private val onVoiceReq: (String) -> Unit,
     private val onStopVoiceReq: () -> Unit = {
-    private val planBRecording = AtomicBoolean(false)
-    private val planBUtteranceId = AtomicInteger(0)
-    @Volatile private var planBAudioRecord: AudioRecord? = null
-    @Volatile private var planBNs: NoiseSuppressor? = null
-    @Volatile private var planBAec: AcousticEchoCanceler? = null
-    @Volatile private var planBAgc: AutomaticGainControl? = null
-
 
     @android.webkit.JavascriptInterface
     fun isExternalCallActive(): Boolean {
@@ -409,6 +402,34 @@ class YunaBridge(
     private var recEndpoint: String = ""
     @Volatile private var isRecordingWhisper = false
 
+    private val planBRecording = AtomicBoolean(false)
+    private val planBUtteranceId = AtomicInteger(0)
+    @Volatile private var planBAudioRecord: AudioRecord? = null
+    @Volatile private var planBNs: NoiseSuppressor? = null
+    @Volatile private var planBAec: AcousticEchoCanceler? = null
+    @Volatile private var planBAgc: AutomaticGainControl? = null
+
+    private fun writeWav16k(file: File, pcm: ByteArray) {
+        val totalDataLen = pcm.size + 36
+        val byteRate = 16000 * 2
+        val header = byteArrayOf(
+            'R'.code.toByte(), 'I'.code.toByte(), 'F'.code.toByte(), 'F'.code.toByte(),
+            (totalDataLen and 0xff).toByte(), ((totalDataLen shr 8) and 0xff).toByte(), ((totalDataLen shr 16) and 0xff).toByte(), ((totalDataLen shr 24) and 0xff).toByte(),
+            'W'.code.toByte(), 'A'.code.toByte(), 'V'.code.toByte(), 'E'.code.toByte(),
+            'f'.code.toByte(), 'm'.code.toByte(), 't'.code.toByte(), ' '.code.toByte(),
+            16, 0, 0, 0, 1, 0, 1, 0,
+            (16000 and 0xff).toByte(), ((16000 shr 8) and 0xff).toByte(), 0, 0,
+            (byteRate and 0xff).toByte(), ((byteRate shr 8) and 0xff).toByte(), ((byteRate shr 16) and 0xff).toByte(), ((byteRate shr 24) and 0xff).toByte(),
+            2, 0, 16, 0,
+            'd'.code.toByte(), 'a'.code.toByte(), 't'.code.toByte(), 'a'.code.toByte(),
+            (pcm.size and 0xff).toByte(), ((pcm.size shr 8) and 0xff).toByte(), ((pcm.size shr 16) and 0xff).toByte(), ((pcm.size shr 24) and 0xff).toByte()
+        )
+        FileOutputStream(file).use { fos ->
+            fos.write(header)
+            fos.write(pcm)
+        }
+    }
+
     @JavascriptInterface
     fun startCloudWhisper(baseUrl: String) {
         if (isCallAudioActive()) {
@@ -456,7 +477,7 @@ class YunaBridge(
 
                 ar.startRecording()
                 val pcmOut = ByteArrayOutputStream()
-                val ringBuf = ArrayDeque<ByteArray>()
+                val ringBuf = kotlin.collections.ArrayDeque<ByteArray>()
                 val frame = ShortArray(512)
                 val frameBytes = ByteArray(1024)
                 var speechStarted = false
@@ -493,7 +514,7 @@ class YunaBridge(
                     if (nowMs - lastDbMs > 90) {
                         lastDbMs = nowMs
                         val uiDb = ((db + 60) * 100 / 60).coerceIn(0, 100)
-                        mainH.post { onMicLevel(uiDb) }
+                        mainH.post { onMicLevel(uiDb.toFloat()) }
                     }
 
                     val copy = frameBytes.copyOf(read * 2)
@@ -1129,25 +1150,4 @@ object YunaMicRegistry {
 
     
 
-
-    private fun writeWav16k(file: File, pcm: ByteArray) {
-        val totalDataLen = pcm.size + 36
-        val byteRate = 16000 * 2
-        val header = byteArrayOf(
-            'R'.code.toByte(), 'I'.code.toByte(), 'F'.code.toByte(), 'F'.code.toByte(),
-            (totalDataLen and 0xff).toByte(), ((totalDataLen shr 8) and 0xff).toByte(), ((totalDataLen shr 16) and 0xff).toByte(), ((totalDataLen shr 24) and 0xff).toByte(),
-            'W'.code.toByte(), 'A'.code.toByte(), 'V'.code.toByte(), 'E'.code.toByte(),
-            'f'.code.toByte(), 'm'.code.toByte(), 't'.code.toByte(), ' '.code.toByte(),
-            16, 0, 0, 0, 1, 0, 1, 0,
-            (16000 and 0xff).toByte(), ((16000 shr 8) and 0xff).toByte(), 0, 0,
-            (byteRate and 0xff).toByte(), ((byteRate shr 8) and 0xff).toByte(), ((byteRate shr 16) and 0xff).toByte(), ((byteRate shr 24) and 0xff).toByte(),
-            2, 0, 16, 0,
-            'd'.code.toByte(), 'a'.code.toByte(), 't'.code.toByte(), 'a'.code.toByte(),
-            (pcm.size and 0xff).toByte(), ((pcm.size shr 8) and 0xff).toByte(), ((pcm.size shr 16) and 0xff).toByte(), ((pcm.size shr 24) and 0xff).toByte()
-        )
-        FileOutputStream(file).use { fos ->
-            fos.write(header)
-            fos.write(pcm)
-        }
-    }
 }
