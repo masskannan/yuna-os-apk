@@ -321,18 +321,9 @@ class MainActivity : ComponentActivity() {
         } catch (_: Exception) {}
     }
 
-    override fun onResume() {
-        try { webView.postDelayed({ webView.evaluateJavascript("window.snapDockToBottom&&window.snapDockToBottom()", null) }, 120L) } catch (_: Exception) {}
-        super.onResume()
-        sendBroadcast(Intent("com.puyal.os.ACTION_YUNA_FG").setPackage(packageName))
-    }
+    
 
-    override fun onPause() {
-        com.puyal.os.bridge.YunaMicRegistry.abortActiveMic()
-        super.onPause()
-        stopHeadlessVoice()
-        sendBroadcast(Intent("com.puyal.os.ACTION_YUNA_BG").setPackage(packageName))
-    }
+    
 
     override fun onDestroy() {
         try { speechRec?.destroy() } catch (_: Exception) {}
