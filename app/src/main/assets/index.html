@@ -1724,7 +1724,7 @@ async function callYunaCloudRemote(promptText) {
         if (/^(gpay|ஜிபே)$/i.test(appTgt)) appTgt = 'Google Pay';
         if (/youtube/i.test(appTgt) && window.YunaBridge.startFloatingOverlay) {
           try { window.YunaBridge.startFloatingOverlay(); } catch (_) {}
-          setTimeout(() => { try { window.YunaBridge.openAppByName(appTgt); } catch (_) {} }, 300);
+          setTimeout(() => { try { window.YunaBridge.openAppByName(appTgt); } catch (_) {} }, 150);
           return 'YouTube + Floating YUNA தொடங்குகிறது';
         }
         let resApp = window.YunaBridge.openAppByName(appTgt);
@@ -2914,6 +2914,12 @@ window.yunaVoiceDebugLog = [];
   if (typeof window.callWithTrustCheck === 'function') {
     window.handleTrustedCallSkill = window.callWithTrustCheck;
   }
+  
+  window.onYunaAppResumed = function() {
+    if (typeof sendLock !== 'undefined') sendLock = false;
+    window.__yunaStopInFlight = false;
+  };
+
   window.speakMsg = function(btn) {
     const wrap = btn && btn.closest ? btn.closest('.msg-yuna-wrap') : null;
     const txt = (wrap && wrap.dataset && wrap.dataset.replyText) ? wrap.dataset.replyText : '';

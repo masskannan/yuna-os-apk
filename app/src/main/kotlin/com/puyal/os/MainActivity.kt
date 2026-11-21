@@ -31,6 +31,8 @@ class MainActivity : ComponentActivity() {
     private var speechRec: SpeechRecognizer? = null
     private var lastRmsMs = 0L
     private var pageLoaded = false
+    private var needsWebViewRecovery = false
+    private var isAppInForeground = true
     private var pendingQuickVoice = false
     private var pendingProcessText: String? = null
 
@@ -66,53 +68,6 @@ class MainActivity : ComponentActivity() {
             }
         }
         webView.webViewClient = object : WebViewClient() {
-            override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-                runOnUiThread {
-                    try {
-                        pageLoaded = false
-                        (view?.parent as? ViewGroup)?.removeView(view)
-                        view?.destroy()
-                        val nw = WebView(this@MainActivity)
-                        webView = nw
-                        setContentView(nw)
-                        nw.settings.apply {
-                            javaScriptEnabled = true
-                            domStorageEnabled = true
-                            mediaPlaybackRequiresUserGesture = false
-                            allowFileAccess = true
-                            cacheMode = WebSettings.LOAD_DEFAULT
-                            mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) safeBrowsingEnabled = true
-                        }
-                        nw.webChromeClient = object : WebChromeClient() {
-                            override fun onPermissionRequest(request: PermissionRequest?) {
-                                runOnUiThread { request?.grant(request.resources) }
-                            }
-                        }
-                        nw.webViewClient = this
-                        val b = YunaBridge(
-                            ctx = this@MainActivity,
-                            onVoiceReq = { lang -> startHeadlessVoice(lang, false) },
-                            onStopVoiceReq = { stopHeadlessVoice() },
-                            onBiometricReq = { verifyBiometricOwner() },
-                            onTtsDone = { webView.evaluateJavascript("if(window.onYunaTtsDone)window.onYunaTtsDone();", null) },
-                            onMicLevel = { db -> webView.evaluateJavascript("if(window.onYunaMicLevel)window.onYunaMicLevel($db);", null) },
-                            onVoiceDone = { txt ->
-                                if (txt.isNotEmpty()) {
-                                    val safe = JSONObject.quote(txt)
-                                    webView.evaluateJavascript("if(window.onYunaVoiceResult)window.onYunaVoiceResult($safe);", null)
-                                } else {
-                                    webView.evaluateJavascript("if(window.onYunaVoiceEnded)window.onYunaVoiceEnded();", null)
-                                }
-                            }
-                        )
-                        nw.addJavascriptInterface(b, "YunaBridge")
-                        nw.loadUrl("file:///android_asset/index.html")
-                    } catch (_: Exception) {}
-                }
-                return true
-            }
-
             override fun onPageFinished(view: WebView?, url: String?) {
                 pageLoaded = true
                 pendingProcessText?.let { pt -> pendingProcessText = null; val safe = JSONObject.quote(pt); webView.evaluateJavascript("if(window.onYunaProcessText)window.onYunaProcessText($safe);", null) }
@@ -145,6 +100,96 @@ class MainActivity : ComponentActivity() {
         requestRuntimePerms()
         startCoreServiceSafe()
         handleQuickVoiceIntent(intent)
+    }
+
+    private fun rebuildWebViewSafely() {
+        try {
+            pageLoaded = false
+            needsWebViewRecovery = false
+            if (::webView.isInitialized) {
+                try { (webView.parent as? ViewGroup)?.removeView(webView); webView.destroy() } catch (_: Exception) {}
+            }
+            val nw = WebView(this)
+            webView = nw
+            setContentView(nw)
+            nw.settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                mediaPlaybackRequiresUserGesture = false
+                allowFileAccess = true
+                cacheMode = WebSettings.LOAD_DEFAULT
+                mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) safeBrowsingEnabled = true
+            }
+            nw.webChromeClient = object : WebChromeClient() {
+                override fun onPermissionRequest(request: PermissionRequest?) {
+                    runOnUiThread { request?.grant(request.resources) }
+                }
+            }
+            nw.webViewClient = object : WebViewClient() {
+                override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
+                    pageLoaded = false
+                    try { (view?.parent as? ViewGroup)?.removeView(view); view?.destroy() } catch (_: Exception) {}
+                    if (isAppInForeground) {
+                        runOnUiThread { rebuildWebViewSafely() }
+                    } else {
+                        needsWebViewRecovery = true
+                    }
+                    return true
+                }
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    pageLoaded = true
+                }
+            }
+            val b = YunaBridge(
+                ctx = this,
+                onVoiceReq = { lang -> startHeadlessVoice(lang, false) },
+                onStopVoiceReq = { stopHeadlessVoice() },
+                onBiometricReq = { verifyBiometricOwner() },
+                onTtsDone = { webView.evaluateJavascript("if(window.onYunaTtsDone)window.onYunaTtsDone();", null) },
+                onMicLevel = { db -> webView.evaluateJavascript("if(window.onYunaMicLevel)window.onYunaMicLevel($db);", null) },
+                onVoiceDone = { txt ->
+                    if (txt.isNotEmpty()) {
+                        val safe = JSONObject.quote(txt)
+                        webView.evaluateJavascript("if(window.onYunaVoiceResult)window.onYunaVoiceResult($safe);", null)
+                    } else {
+                        webView.evaluateJavascript("if(window.onYunaVoiceEnded)window.onYunaVoiceEnded();", null)
+                    }
+                }
+            )
+            nw.addJavascriptInterface(b, "YunaBridge")
+            nw.loadUrl("file:///android_asset/index.html")
+        } catch (_: Exception) {}
+    }
+
+    override fun onPause() {
+        isAppInForeground = false
+        try { if (::webView.isInitialized && !needsWebViewRecovery) webView.onPause() } catch (_: Exception) {}
+        super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        isAppInForeground = true
+        try { stopService(Intent(this, Class.forName("com.puyal.os.overlay.FloatingYunaService"))) } catch (_: Exception) {}
+        try {
+            if (!needsWebViewRecovery && ::webView.isInitialized) {
+                webView.onResume()
+                webView.resumeTimers()
+                if (!pageLoaded || webView.url.isNullOrBlank()) {
+                    webView.loadUrl("file:///android_asset/index.html")
+                } else {
+                    webView.evaluateJavascript("if(window.onYunaAppResumed)window.onYunaAppResumed();", null)
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && needsWebViewRecovery) {
+            window.decorView.post { rebuildWebViewSafely() }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
