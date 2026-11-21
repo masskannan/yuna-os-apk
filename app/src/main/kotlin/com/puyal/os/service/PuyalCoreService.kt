@@ -80,7 +80,7 @@ class PuyalCoreService : Service() {
                     .setContentText("Side Orb & Voice Ready")
                     .setSmallIcon(android.R.drawable.ic_btn_speak_now)
                     .build()
-                startForeground(777, notif)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) startForeground(777, notif, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE) else startForeground(777, notif)
             }
         } catch (_: Exception) {}
     }

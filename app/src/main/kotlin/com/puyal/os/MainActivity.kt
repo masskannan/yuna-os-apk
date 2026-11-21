@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
         }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                webView.evaluateJavascript("(function(){const s=document.getElementById('settingsPage'),d=document.getElementById('drawerScrim'),p=document.getElementById('plusScrim'),l=document.getElementById('lightbox');if(l&&l.classList.contains('open')){l.classList.remove('open');return '1';}if(s&&s.classList.contains('open')){closeSettings();return '1';}if(d&&d.classList.contains('open')){closeDrawer();return '1';}if(p&&p.classList.contains('open')){closePlus();return '1';}return '0';})()") { res ->
+                webView.evaluateJavascript("(function(){const s=document.getElementById('settingsPage'),d=document.getElementById('drawerScrim'),p=document.getElementById('plusScrim'),l=document.getElementById('lightbox');if(typeof window.handleYunaBackPress==='function'&&window.handleYunaBackPress()){return '1';}const pp=document.getElementById('permissionsPage'),cm=document.getElementById('yunaConfirmModal');if(cm&&cm.classList.contains('open')){cm.classList.remove('open');return '1';}if(pp&&pp.classList.contains('open')){pp.classList.remove('open');return '1';}if(l&&l.classList.contains('open')){l.classList.remove('open');return '1';}if(s&&s.classList.contains('open')){closeSettings();return '1';}if(d&&d.classList.contains('open')){closeDrawer();return '1';}if(p&&p.classList.contains('open')){closePlus();return '1';}return '0';})()") { res ->
                     if (res?.contains("1") != true) { isEnabled = false; onBackPressedDispatcher.onBackPressed() }
                 }
             }
@@ -84,7 +84,11 @@ class MainActivity : ComponentActivity() {
                             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) safeBrowsingEnabled = true
                         }
-                        nw.webChromeClient = object : WebChromeClient() { override fun onPermissionRequest(request: PermissionRequest?) { runOnUiThread { request?.grant(request.resources) } } }
+                        nw.webChromeClient = object : WebChromeClient() {
+                            override fun onPermissionRequest(request: PermissionRequest?) {
+                                runOnUiThread { request?.grant(request.resources) }
+                            }
+                        }
                         nw.webViewClient = this
                         val b = YunaBridge(
                             ctx = this@MainActivity,

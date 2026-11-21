@@ -466,7 +466,7 @@ class YunaBridge(
                     mainH.post { android.widget.Toast.makeText(ctx, "மைக் வன்பொருள் தயாராக இல்லை", android.widget.Toast.LENGTH_SHORT).show() }
                     planBRecording.set(false)
                     isRecordingWhisper = false
-                    mainH.post { onVoiceDone("") }
+                    mainH.post { onVoiceDone("__ERR__:AudioRecord init failed") }
                     return@Thread
                 }
                 planBAudioRecord = ar
@@ -495,7 +495,6 @@ class YunaBridge(
                     var sumSq = 0.0
                     var peak = 0
                     for (i in 0 until read) {
-                        // Adaptive soft boost (+6dB) for distant speech with clipping guard
                         val boosted = (frame[i].toInt() * 2).coerceIn(-32768, 32767)
                         val absV = kotlin.math.abs(boosted)
                         if (absV > peak) peak = absV
@@ -509,19 +508,17 @@ class YunaBridge(
                         break
                     }
                     val rms = kotlin.math.sqrt(sumSq / read)
-                    val db = if (rms > 1.0) (20.0 * kotlin.math.log10(rms / 32768.0)).toInt().coerceIn(-60, 0) else -60
                     val nowMs = System.currentTimeMillis()
-                    if (nowMs - lastDbMs > 90) {
+                    if (nowMs - lastDbMs > 85) {
                         lastDbMs = nowMs
-                        val uiDb = ((db + 60) * 100 / 60).coerceIn(0, 100)
-                        mainH.post { onMicLevel(uiDb.toFloat()) }
+                        mainH.post { onMicLevel(peak.toFloat()) }
                     }
 
                     val copy = frameBytes.copyOf(read * 2)
-                    val isSpeech = rms > 420.0
+                    val isSpeech = rms > 220.0
                     if (!speechStarted) {
                         ringBuf.addLast(copy)
-                        if (ringBuf.size > 10) ringBuf.removeFirst() // ~320ms pre-speech buffer
+                        if (ringBuf.size > 10) ringBuf.removeFirst()
                         if (isSpeech) {
                             speechFrames++
                             if (speechFrames >= 2) {
@@ -539,7 +536,6 @@ class YunaBridge(
                         } else {
                             silenceFrames++
                         }
-                        // Auto-stop after ~850ms silence in Live mode (or 15s max utterance)
                         if ((liveActive && silenceFrames >= 26) || (nowMs - startMs > 15000)) {
                             break
                         }
@@ -550,7 +546,7 @@ class YunaBridge(
                 planBRecording.set(false)
                 isRecordingWhisper = false
                 val pcmData = pcmOut.toByteArray()
-                if (speechFrames >= 8 && pcmData.size > 3200 && planBUtteranceId.get() == uid) {
+                if (speechFrames >= 4 && pcmData.size > 1600 && planBUtteranceId.get() == uid) {
                     writeWav16k(out, pcmData)
                     val txt = uploadAudioToWhisper(recEndpoint, out)
                     if (planBUtteranceId.get() == uid) {
@@ -562,7 +558,7 @@ class YunaBridge(
             } catch (e: Exception) {
                 planBRecording.set(false)
                 isRecordingWhisper = false
-                mainH.post { onVoiceDone("") }
+                mainH.post { onVoiceDone("__ERR__:" + (e.message ?: "Mic error")) }
             } finally {
                 try { planBNs?.release() } catch (_: Exception) {}
                 try { planBAec?.release() } catch (_: Exception) {}
@@ -572,6 +568,7 @@ class YunaBridge(
                 try { ar?.release() } catch (_: Exception) {}
                 planBAudioRecord = null
                 try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) audioMgr.clearCommunicationDevice()
                     if (audioMgr.mode == AudioManager.MODE_IN_COMMUNICATION) {
                         @Suppress("DEPRECATION") audioMgr.stopBluetoothSco()
                         audioMgr.mode = AudioManager.MODE_NORMAL
@@ -581,6 +578,7 @@ class YunaBridge(
         }.start()
     }
 
+    @Synchronized
     @JavascriptInterface
     fun stopCloudWhisper() {
         stopMicLevelPoller()
@@ -588,7 +586,26 @@ class YunaBridge(
         isRecordingWhisper = false
     }
 
-    private fun uploadAudioToWhisper(endpoint: String, audio: File): String {
+    @JavascriptInterface
+    fun finishVoiceCapture() {
+        stopCloudWhisper()
+    }
+
+    @JavascriptInterface
+    fun checkSensitive(txt: String): Boolean {
+        val s = txt.lowercase()
+        return Regex("\\b\\d{4,8}\\b").containsMatchIn(s) || Regex("\\b(otp|cvv|pin|mpin|upi|password)\\b").containsMatchIn(s)
+    }
+
+    @JavascriptInterface
+    fun enqueueCloudTask(prompt: String): String {
+        return try {
+            File(ctx.filesDir, "yuna_offline_queue.txt").appendText(prompt.take(500) + "\n")
+            "QUEUED"
+        } catch (_: Exception) { "ERR" }
+    }
+
+    private private fun uploadAudioToWhisper(endpoint: String, audio: File): String {
         return try {
             val boundary = "----YunaAudio" + UUID.randomUUID().toString().replace("-", "")
             val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
@@ -599,13 +616,23 @@ class YunaBridge(
                 setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
             }
             conn.outputStream.use { os ->
-                os.write("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"yuna_mic.m4a\"\r\nContent-Type: audio/mp4\r\n\r\n".toByteArray())
+                os.write(("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"yuna_mic.wav\"\r\nContent-Type: audio/wav\r\n\r\n").toByteArray())
                 audio.inputStream().use { it.copyTo(os) }
-                os.write("\r\n--$boundary--\r\n".toByteArray())
+                os.write(("\r\n--$boundary--\r\n").toByteArray())
             }
-            val resp = conn.inputStream.bufferedReader().readText()
-            JSONObject(resp).optString("text", "").trim()
-        } catch (e: Exception) { "__ERR__:${e.javaClass.simpleName}: ${e.message?.take(60)}" }
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            val body = stream?.bufferedReader()?.readText() ?: ""
+            if (code !in 200..299) return "__ERR__:HTTP $code"
+            val j = org.json.JSONObject(body)
+            val txt = j.optString("text", "").trim()
+            if (txt.isNotEmpty()) txt else {
+                val err = j.optString("error", "").trim()
+                if (err.isNotEmpty()) "__ERR__:$err" else ""
+            }
+        } catch (e: Exception) {
+            "__ERR__:" + (e.message ?: "Upload failed")
+        }
     }
 
     @JavascriptInterface fun startVoice(lang: String) {
@@ -614,16 +641,22 @@ class YunaBridge(
     @JavascriptInterface fun stopVoice() { mainH.post { onStopVoiceReq() } }
     @JavascriptInterface fun startBluetoothMic() {
         try {
-            val hasBtInput = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                audioMgr.getDevices(AudioManager.GET_DEVICES_INPUTS).any {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val bt = audioMgr.availableCommunicationDevices.firstOrNull {
                     it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO || it.type == AudioDeviceInfo.TYPE_BLE_HEADSET
                 }
-            } else {
-                @Suppress("DEPRECATION") audioMgr.isBluetoothScoOn
-            }
-            if (hasBtInput && audioMgr.isBluetoothScoAvailableOffCall) {
-                audioMgr.mode = AudioManager.MODE_IN_COMMUNICATION
-                @Suppress("DEPRECATION") audioMgr.startBluetoothSco()
+                if (bt != null) {
+                    audioMgr.mode = AudioManager.MODE_IN_COMMUNICATION
+                    audioMgr.setCommunicationDevice(bt)
+                }
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val hasBt = audioMgr.getDevices(AudioManager.GET_DEVICES_INPUTS).any {
+                    it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO || it.type == AudioDeviceInfo.TYPE_BLE_HEADSET
+                }
+                if (hasBt && audioMgr.isBluetoothScoAvailableOffCall) {
+                    audioMgr.mode = AudioManager.MODE_IN_COMMUNICATION
+                    @Suppress("DEPRECATION") audioMgr.startBluetoothSco()
+                }
             }
         } catch (_: Exception) {}
     }

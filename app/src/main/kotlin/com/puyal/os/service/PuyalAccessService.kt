@@ -68,7 +68,7 @@ class PuyalAccessService : AccessibilityService() {
             val d = node.contentDescription?.toString()?.trim()
             if (!t.isNullOrEmpty()) sb.append(t).append(" | ")
             else if (!d.isNullOrEmpty()) sb.append("[").append(d).append("] | ")
-            for (i in 0 until node.childCount) walk(node.getChild(i), depth + 1)
+            for (i in 0 until node.childCount) { val ch = node.getChild(i); if (ch != null) { walk(ch, depth + 1); if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) { try { @Suppress("DEPRECATION") ch.recycle() } catch (_: Exception) {} } } }
         }
         walk(root, 0)
         return if (sb.isEmpty()) "திரையில் படிக்கக்கூடிய உரை இல்லை." else sb.toString().take(1500)
