@@ -1,4 +1,14 @@
 package com.puyal.os.bridge
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicBoolean
+import java.io.FileOutputStream
+import java.io.ByteArrayOutputStream
+import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.NoiseSuppressor
+import android.media.AudioDeviceInfo
+import android.media.AudioRecord
+import android.media.AudioFormat
 
 import android.Manifest
 import android.app.role.RoleManager
@@ -50,6 +60,13 @@ class YunaBridge(
     private val ctx: Context,
     private val onVoiceReq: (String) -> Unit,
     private val onStopVoiceReq: () -> Unit = {
+    private val planBRecording = AtomicBoolean(false)
+    private val planBUtteranceId = AtomicInteger(0)
+    @Volatile private var planBAudioRecord: AudioRecord? = null
+    @Volatile private var planBNs: NoiseSuppressor? = null
+    @Volatile private var planBAec: AcousticEchoCanceler? = null
+    @Volatile private var planBAgc: AutomaticGainControl? = null
+
 
     @android.webkit.JavascriptInterface
     fun isExternalCallActive(): Boolean {
@@ -394,66 +411,160 @@ class YunaBridge(
 
     @JavascriptInterface
     fun startCloudWhisper(baseUrl: String) {
-        if (isCallAudioActive()) { mainH.post { android.widget.Toast.makeText(ctx, "அழைப்பு நடக்கிறது — மைக் பாதுகாக்கப்பட்டது", android.widget.Toast.LENGTH_SHORT).show(); onTtsDone() }; return }
+        if (isCallAudioActive()) {
+            mainH.post {
+                android.widget.Toast.makeText(ctx, "அழைப்பு நடக்கிறது — மைக் பாதுகாக்கப்பட்டது", android.widget.Toast.LENGTH_SHORT).show()
+                onTtsDone()
+            }
+            return
+        }
         if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             onVoiceReq("ta-IN")
             return
         }
-        mainH.post {
+        if (planBRecording.get()) return
+
+        val uid = planBUtteranceId.incrementAndGet()
+        recEndpoint = baseUrl.trimEnd('/') + "/stt"
+        val out = File(ctx.cacheDir, "yuna_mic.wav")
+        recFile = out
+        planBRecording.set(true)
+        isRecordingWhisper = true
+
+        Thread {
+            val sampleRate = 16000
+            val bufBytes = maxOf(AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT), 4096)
+            var ar: AudioRecord? = null
             try {
-                try { recorder?.stop() } catch (_: Exception) {}
-                try { recorder?.release() } catch (_: Exception) {}
-                val out = File(ctx.cacheDir, "yuna_mic.m4a")
-                recFile = out
-                recEndpoint = baseUrl.trimEnd('/') + "/stt"
-                val mr = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaRecorder(ctx) else @Suppress("DEPRECATION") MediaRecorder()
-                mr.setAudioSource(MediaRecorder.AudioSource.MIC)
-                mr.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-                mr.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                mr.setAudioSamplingRate(16000)
-                mr.setAudioEncodingBitRate(32000)
-                mr.setMaxDuration(20000)
-                mr.setOutputFile(out.absolutePath)
-                mr.prepare()
-                mr.start()
-                startMicLevelPoller()
-                startMicLevelPoller()
-                recorder = mr
-                isRecordingWhisper = true
-                Thread {
-                    while (isRecordingWhisper) {
-                        try {
-                            val amp = recorder?.maxAmplitude ?: 0
-                            val db = (amp / 3276.7f).coerceIn(0f, 10f)
-                            mainH.post { onMicLevel(db) }
-                            Thread.sleep(75)
-                        } catch (_: Exception) { break }
+                ar = AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufBytes * 2)
+                if (ar.state != AudioRecord.STATE_INITIALIZED) {
+                    ar.release()
+                    ar = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufBytes * 2)
+                }
+                if (ar.state != AudioRecord.STATE_INITIALIZED) {
+                    mainH.post { android.widget.Toast.makeText(ctx, "மைக் வன்பொருள் தயாராக இல்லை", android.widget.Toast.LENGTH_SHORT).show() }
+                    planBRecording.set(false)
+                    isRecordingWhisper = false
+                    mainH.post { onVoiceDone("") }
+                    return@Thread
+                }
+                planBAudioRecord = ar
+                val sid = ar.audioSessionId
+                try { if (NoiseSuppressor.isAvailable()) planBNs = NoiseSuppressor.create(sid)?.apply { enabled = true } } catch (_: Exception) {}
+                try { if (AcousticEchoCanceler.isAvailable()) planBAec = AcousticEchoCanceler.create(sid)?.apply { enabled = true } } catch (_: Exception) {}
+                try { if (AutomaticGainControl.isAvailable()) planBAgc = AutomaticGainControl.create(sid)?.apply { enabled = true } } catch (_: Exception) {}
+
+                ar.startRecording()
+                val pcmOut = ByteArrayOutputStream()
+                val ringBuf = ArrayDeque<ByteArray>()
+                val frame = ShortArray(512)
+                val frameBytes = ByteArray(1024)
+                var speechStarted = false
+                var speechFrames = 0
+                var silenceFrames = 0
+                var zeroFrames = 0
+                var totalFrames = 0
+                val startMs = System.currentTimeMillis()
+                var lastDbMs = 0L
+
+                while (planBRecording.get() && planBUtteranceId.get() == uid) {
+                    val read = ar.read(frame, 0, frame.size)
+                    if (read <= 0) { Thread.sleep(10); continue }
+                    totalFrames++
+                    var sumSq = 0.0
+                    var peak = 0
+                    for (i in 0 until read) {
+                        // Adaptive soft boost (+6dB) for distant speech with clipping guard
+                        val boosted = (frame[i].toInt() * 2).coerceIn(-32768, 32767)
+                        val absV = kotlin.math.abs(boosted)
+                        if (absV > peak) peak = absV
+                        sumSq += boosted * boosted
+                        frameBytes[i * 2] = (boosted and 0xFF).toByte()
+                        frameBytes[i * 2 + 1] = ((boosted ushr 8) and 0xFF).toByte()
                     }
-                }.start()
-            } catch (_: Exception) {
+                    if (peak == 0) zeroFrames++
+                    if (totalFrames == 15 && zeroFrames >= 14) {
+                        mainH.post { android.widget.Toast.makeText(ctx, "மைக் வேறு செயலியில் பூட்டப்பட்டுள்ளது (Zero PCM)", android.widget.Toast.LENGTH_SHORT).show() }
+                        break
+                    }
+                    val rms = kotlin.math.sqrt(sumSq / read)
+                    val db = if (rms > 1.0) (20.0 * kotlin.math.log10(rms / 32768.0)).toInt().coerceIn(-60, 0) else -60
+                    val nowMs = System.currentTimeMillis()
+                    if (nowMs - lastDbMs > 90) {
+                        lastDbMs = nowMs
+                        val uiDb = ((db + 60) * 100 / 60).coerceIn(0, 100)
+                        mainH.post { onMicLevel(uiDb) }
+                    }
+
+                    val copy = frameBytes.copyOf(read * 2)
+                    val isSpeech = rms > 420.0
+                    if (!speechStarted) {
+                        ringBuf.addLast(copy)
+                        if (ringBuf.size > 10) ringBuf.removeFirst() // ~320ms pre-speech buffer
+                        if (isSpeech) {
+                            speechFrames++
+                            if (speechFrames >= 2) {
+                                speechStarted = true
+                                while (ringBuf.isNotEmpty()) pcmOut.write(ringBuf.removeFirst())
+                            }
+                        } else {
+                            speechFrames = 0
+                        }
+                    } else {
+                        pcmOut.write(copy)
+                        if (isSpeech) {
+                            speechFrames++
+                            silenceFrames = 0
+                        } else {
+                            silenceFrames++
+                        }
+                        // Auto-stop after ~850ms silence in Live mode (or 15s max utterance)
+                        if ((liveActive && silenceFrames >= 26) || (nowMs - startMs > 15000)) {
+                            break
+                        }
+                    }
+                    if (!speechStarted && nowMs - startMs > 12000) break
+                }
+
+                planBRecording.set(false)
                 isRecordingWhisper = false
-                onVoiceReq("ta-IN")
+                val pcmData = pcmOut.toByteArray()
+                if (speechFrames >= 8 && pcmData.size > 3200 && planBUtteranceId.get() == uid) {
+                    writeWav16k(out, pcmData)
+                    val txt = uploadAudioToWhisper(recEndpoint, out)
+                    if (planBUtteranceId.get() == uid) {
+                        mainH.post { onVoiceDone(txt) }
+                    }
+                } else {
+                    if (planBUtteranceId.get() == uid) mainH.post { onVoiceDone("") }
+                }
+            } catch (e: Exception) {
+                planBRecording.set(false)
+                isRecordingWhisper = false
+                mainH.post { onVoiceDone("") }
+            } finally {
+                try { planBNs?.release() } catch (_: Exception) {}
+                try { planBAec?.release() } catch (_: Exception) {}
+                try { planBAgc?.release() } catch (_: Exception) {}
+                planBNs = null; planBAec = null; planBAgc = null
+                try { ar?.stop() } catch (_: Exception) {}
+                try { ar?.release() } catch (_: Exception) {}
+                planBAudioRecord = null
+                try {
+                    if (audioMgr.mode == AudioManager.MODE_IN_COMMUNICATION) {
+                        @Suppress("DEPRECATION") audioMgr.stopBluetoothSco()
+                        audioMgr.mode = AudioManager.MODE_NORMAL
+                    }
+                } catch (_: Exception) {}
             }
-        }
+        }.start()
     }
 
     @JavascriptInterface
     fun stopCloudWhisper() {
         stopMicLevelPoller()
-        if (!isRecordingWhisper) return
+        planBRecording.set(false)
         isRecordingWhisper = false
-        mainH.post {
-            try { recorder?.stop() } catch (_: Exception) {}
-            try { recorder?.release() } catch (_: Exception) {}
-            recorder = null
-            val f = recFile ?: return@post
-            val ep = recEndpoint
-            if (!f.exists() || f.length() < 1000) { onVoiceDone(""); return@post }
-            Thread {
-                val txt = uploadAudioToWhisper(ep, f)
-                mainH.post { onVoiceDone(txt) }
-            }.start()
-        }
     }
 
     private fun uploadAudioToWhisper(endpoint: String, audio: File): String {
@@ -480,7 +591,21 @@ class YunaBridge(
         if (isCallAudioActive()) { mainH.post { android.widget.Toast.makeText(ctx, "அழைப்பு நடக்கிறது — மைக் பாதுகாக்கப்பட்டது", android.widget.Toast.LENGTH_SHORT).show(); onTtsDone() }; return }
         mainH.post { onVoiceReq(lang.ifBlank { "ta-IN" }) } }
     @JavascriptInterface fun stopVoice() { mainH.post { onStopVoiceReq() } }
-    @JavascriptInterface fun startBluetoothMic() { try { if (audioMgr.isBluetoothScoAvailableOffCall) { audioMgr.mode = AudioManager.MODE_IN_COMMUNICATION; audioMgr.startBluetoothSco() } } catch (_: Exception) {} }
+    @JavascriptInterface fun startBluetoothMic() {
+        try {
+            val hasBtInput = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                audioMgr.getDevices(AudioManager.GET_DEVICES_INPUTS).any {
+                    it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO || it.type == AudioDeviceInfo.TYPE_BLE_HEADSET
+                }
+            } else {
+                @Suppress("DEPRECATION") audioMgr.isBluetoothScoOn
+            }
+            if (hasBtInput && audioMgr.isBluetoothScoAvailableOffCall) {
+                audioMgr.mode = AudioManager.MODE_IN_COMMUNICATION
+                @Suppress("DEPRECATION") audioMgr.startBluetoothSco()
+            }
+        } catch (_: Exception) {}
+    }
     @JavascriptInterface fun scanScreen(): String = PuyalAccessService.instance?.scanScreenText() ?: "திரையைப் படிக்க அணுகல்தன்மை (Accessibility) அனுமதியை இயக்கவும்."
     @JavascriptInterface fun clickOnScreen(target: String): String = PuyalAccessService.instance?.clickByText(target) ?: "அணுகல்தன்மை (Accessibility) அனுமதியை இயக்கவும்."
     @JavascriptInterface fun getWaSummary(): String = PuyalNotifService.getSummary()
@@ -1004,4 +1129,25 @@ object YunaMicRegistry {
 
     
 
+
+    private fun writeWav16k(file: File, pcm: ByteArray) {
+        val totalDataLen = pcm.size + 36
+        val byteRate = 16000 * 2
+        val header = byteArrayOf(
+            'R'.code.toByte(), 'I'.code.toByte(), 'F'.code.toByte(), 'F'.code.toByte(),
+            (totalDataLen and 0xff).toByte(), ((totalDataLen shr 8) and 0xff).toByte(), ((totalDataLen shr 16) and 0xff).toByte(), ((totalDataLen shr 24) and 0xff).toByte(),
+            'W'.code.toByte(), 'A'.code.toByte(), 'V'.code.toByte(), 'E'.code.toByte(),
+            'f'.code.toByte(), 'm'.code.toByte(), 't'.code.toByte(), ' '.code.toByte(),
+            16, 0, 0, 0, 1, 0, 1, 0,
+            (16000 and 0xff).toByte(), ((16000 shr 8) and 0xff).toByte(), 0, 0,
+            (byteRate and 0xff).toByte(), ((byteRate shr 8) and 0xff).toByte(), ((byteRate shr 16) and 0xff).toByte(), ((byteRate shr 24) and 0xff).toByte(),
+            2, 0, 16, 0,
+            'd'.code.toByte(), 'a'.code.toByte(), 't'.code.toByte(), 'a'.code.toByte(),
+            (pcm.size and 0xff).toByte(), ((pcm.size shr 8) and 0xff).toByte(), ((pcm.size shr 16) and 0xff).toByte(), ((pcm.size shr 24) and 0xff).toByte()
+        )
+        FileOutputStream(file).use { fos ->
+            fos.write(header)
+            fos.write(pcm)
+        }
+    }
 }
