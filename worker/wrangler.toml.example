@@ -1,5 +1,5 @@
 name = "yuna-ai-gateway"
-main = "puyal_cloud_worker_v18.js"
+main = "puyal_cloud_worker_v19.js"
 compatibility_date = "2025-01-01"
 
 [ai]

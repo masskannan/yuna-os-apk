@@ -2870,6 +2870,29 @@ window.playYunaEarcon = function(kind) {
   };
 })();
 
+
+
+// === Plan B Light DSP UI: 4-State Earcons + Debug Trace ===
+window.playYunaEarcon = function(kind) {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!window._yunaAudioCtx) window._yunaAudioCtx = new AC();
+    const ctx = window._yunaAudioCtx;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    const freqs = { start: 520, thinking: 440, done: 680, error: 280 };
+    osc.frequency.value = freqs[kind] || 560;
+    gain.gain.setValueAtTime(0.035, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.09);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.1);
+  } catch (_) {}
+};
+window.yunaVoiceDebugLog = [];
+
 </script>
 <div id="yunaConfirmModal">
   <div class="yuna-cfm-card">
