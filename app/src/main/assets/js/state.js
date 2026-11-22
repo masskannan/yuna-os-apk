@@ -1,0 +1,12 @@
+'use strict';
+/* i18n strings, language state */
+/* ---- i18n ---- */
+const STR={ta:{hello:'வணக்கம்',helloSub:'எப்படி உதவலாம்?',ph:'YUNA-விடம் கேளுங்கள்…',projects:'திட்டங்கள்',code:'குறியீடு',creations:'படைப்புகள்',memory:'நினைவகம்',history:'வரலாறு',newChat:'புதிய உரையாடல்',settings:'அமைப்புகள்',perms:'அனுமதிகள்',aImg:'படங்கள்',aCam:'கேமரா',aVoice:'குரல்',aFile:'கோப்புகள்',lang:'மொழி',theme:'தோற்றம்',auto:'தானியங்கி',float:'மிதக்கும் பந்து',export:'குறிப்பாக ஏற்று',ver:'பதிப்பு',
+ LISTEN:'கேட்கிறேன்…',THINK:'யோசிக்கிறேன்…',SEARCH:'தேடுகிறேன்…',READ:'படிக்கிறேன்…',WRITE:'எழுதுகிறேன்…',SPEAK:'பேசுகிறேன்…',MUTE:'முடக்கப்பட்டது',TYPE:'தட்டச்சு…',ERROR:'பிழை',live:'யூனா நேரலை',
+ noNet:'இணைப்பு இல்லை',retry:'மீண்டும்',micOff:'மைக் நிறுத்தப்பட்டது',cancel:'இந்தப் பதிவை அழிக்கவா?',still:'இன்னும் வேலை நடக்கிறது',stop:'நிறுத்து',on:'இயக்கத்தில்',off:'அணை',soon:'விரைவில்',noUrl:'Cloud URL அமைக்கப்படவில்லை',today:'இன்று',yesterday:'நேற்று',earlier:'முந்தையவை',search:'தேடு…',all:'எல்லா வரலாறும்',undo:'திரும்பப்பெறு',deleted:'நீக்கப்பட்டது',copied:'நகலெடுக்கப்பட்டது',describe:'இதை விளக்கு',pdfFail:'இந்தக் கோப்பைச் சேர்க்க முடியவில்லை',attMax:'அதிகபட்சம் 4 இணைப்புகள்',histEmpty:'உரையாடல்கள் இல்லை'},
+ en:{hello:'Hello',helloSub:'How can I help?',ph:'Ask YUNA…',projects:'Projects',code:'Code',creations:'Creations',memory:'Memory',history:'History',newChat:'New chat',settings:'Settings',perms:'Permissions',aImg:'Images',aCam:'Camera',aVoice:'Voice',aFile:'Files',lang:'Language',theme:'Theme',auto:'Auto',float:'Floating ball',export:'Export as note',ver:'Version',
+ LISTEN:'Listening…',THINK:'Thinking…',SEARCH:'Searching…',READ:'Reading…',WRITE:'Writing…',SPEAK:'Speaking…',MUTE:'Muted',TYPE:'Typing…',ERROR:'Error',live:'YUNA Live',
+ noNet:'No connection',retry:'Retry',micOff:'Mic stopped',cancel:'Discard this recording?',still:'Still working',stop:'Stop',on:'on',off:'Off',soon:'Coming soon',noUrl:'Cloud URL is not set',today:'Today',yesterday:'Yesterday',earlier:'Earlier',search:'Search…',all:'All history',undo:'Undo',deleted:'Deleted',copied:'Copied',describe:'Explain this',pdfFail:'Could not add this file',attMax:'Maximum 4 attachments',histEmpty:'No conversations'}};
+let L=ls.g('yuna_ui_lang')==='en'?'en':'ta';
+const t=k=>(STR[L]&&STR[L][k])||STR.en[k]||k;
+function applyLang(){document.documentElement.lang=L;$$('[data-i]').forEach(e=>e.textContent=t(e.dataset.i));$$('[data-ph]').forEach(e=>e.placeholder=t(e.dataset.ph));typeof setLiveLabel==='function'&&setLiveLabel(liveState);typeof relabel==='function'&&relabel()}

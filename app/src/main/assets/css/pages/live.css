@@ -1,0 +1,44 @@
+/* Live mode + orb */
+#live{--bg:#070d12;--ink:#e8f4f6;--mute:#8aa3ab;--glass:rgba(255,255,255,.07);--line:rgba(255,255,255,.12);color:var(--ink);position:fixed;inset:0;z-index:30;background:radial-gradient(ellipse at 50% 35%,#0d2630,#070d12 70%);display:none;flex-direction:column;align-items:center}
+#live.on{display:flex}
+#liveTopBanner{align-self:stretch;display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px}
+#liveTopBanner span{flex:1;text-align:center}
+#liveTranscriptBox{align-self:stretch;margin:8px 20px 0;max-height:132px;overflow:hidden;text-align:center;transition:opacity .2s}
+.orb-stage{position:relative;width:min(280px,74vw);height:min(280px,74vw);display:flex;align-items:center;justify-content:center;margin-top:2vh;transition:transform .28s,opacity .22s}
+.orb-aura{position:absolute;width:176px;height:176px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--accent-a) 34%,transparent) 0%,rgba(139,92,246,.24) 55%,transparent 78%);filter:blur(18px);z-index:1;animation:auraSurge 4.2s ease-in-out infinite}
+@keyframes auraSurge{0%,100%{transform:scale(.95);opacity:.7}50%{transform:scale(1.06);opacity:.95}}
+.orb-core-clip{position:relative;z-index:2;width:40%;height:40%;border-radius:50%;overflow:hidden;box-shadow:0 0 28px color-mix(in srgb,var(--accent-a) 36%,transparent),0 0 46px rgba(139,92,246,.3);transition:transform .2s,box-shadow .2s}
+.orb-img{display:block;width:100%;height:100%;border-radius:50%;object-fit:cover;mix-blend-mode:screen;animation:earthSpin 40s linear infinite,powerSurge 4.2s ease-in-out infinite}
+@keyframes earthSpin{to{transform:rotate(360deg)}}
+@keyframes powerSurge{0%,100%{filter:brightness(.98) contrast(1.06)}50%{filter:brightness(1.12) contrast(1.12)}}
+.orb-water-ripple{position:absolute;width:100%;height:100%;border-radius:50%;border:2px solid var(--accent-a);opacity:0;pointer-events:none;z-index:5}
+@keyframes waterDrop{0%{transform:scale(.86);opacity:.9}100%{transform:scale(1.48);opacity:0}}
+.hud-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;z-index:3;pointer-events:none}
+#yunaTamilOrbSvg text{font-family:"Noto Sans Tamil",system-ui,sans-serif;font-weight:500}
+.sp{transform-origin:160px 160px;transform-box:view-box;animation:orbCW var(--t,110s) linear infinite}
+.ccw{animation-name:orbCCW}
+@keyframes orbCW{to{transform:rotate(360deg)}}@keyframes orbCCW{to{transform:rotate(-360deg)}}
+.rim,.rim-scale{transform-origin:160px 160px;transform-box:view-box}
+.s-listen .orb-water-ripple{animation:waterDrop 1.6s ease-out infinite}
+.s-listen .rim-scale{animation:orbBr 1.2s ease-in-out infinite}
+.s-think .sp{animation-duration:10s}.s-think .sp.rim{animation-duration:200s}
+.s-speak .orb-core-clip{box-shadow:0 0 48px #2DD4BF;animation:coreSpeakPulse .9s ease-in-out infinite}
+@keyframes coreSpeakPulse{0%,100%{transform:scale(1.03)}50%{transform:scale(1.08)}}
+.s-mute{opacity:.4}.s-mute .sp,.s-mute .rim-scale,.s-mute .orb-img,.s-mute .orb-aura{animation-play-state:paused}.s-mute .orb-img{filter:grayscale(1)}
+.s-type{transform:scale(.6)}.s-error{opacity:.45}
+@keyframes orbBr{50%{transform:scale(1.025)}}
+.pz{animation:orbPz .9s ease-in-out infinite}@keyframes orbPz{50%{opacity:.25}}
+.lit{fill:#fff!important;filter:drop-shadow(0 0 5px #2DD4BF)}
+#yunaUyirMei{min-height:24px;color:#2DD4BF;font-size:17px;font-weight:500}
+@media(prefers-reduced-motion:reduce){.sp,.rim-scale,.pz,.orb-img,.orb-aura,.orb-water-ripple{animation:none!important}}
+#orbSub{margin:4px 0;color:var(--cy);font-size:18px}
+.lt-u,.lt-y{display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;line-height:1.45}
+.lt-u{-webkit-line-clamp:3;color:var(--mute);font-size:15px}
+.lt-y{-webkit-line-clamp:4;font-size:16px;margin-top:4px}
+#liveBar{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);display:flex;gap:16px}
+#liveBar button{min-width:56px;min-height:56px;background:var(--glass);border:1px solid var(--line);font-size:20px}
+#liveBar .end{background:var(--rose);color:#fff}
+#liveMiniPill{display:none;position:fixed;z-index:31;right:12px;top:calc(env(safe-area-inset-top,0px) + 64px);min-height:56px;padding:0 18px;border-radius:99px;background:var(--glass);backdrop-filter:blur(18px);border:1px solid var(--cy)}
+#typeSheet{position:absolute;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 100px);display:none}
+#typeSheet.on{display:block}
+#typeSheet input{width:100%;min-height:48px;border-radius:24px;border:1px solid var(--line);background:var(--glass);color:inherit;padding:0 18px;font:inherit}

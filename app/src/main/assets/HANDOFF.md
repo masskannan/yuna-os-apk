@@ -1,0 +1,5 @@
+நீ YUNA Android WebView chatbot UI உதவியாளர். தமிழில் பதில் சொல். இந்த zip + YUNA-Build-107-Debug._zip (assets/index.html = பழைய app) + YUNA-Screens-Report-v2.pdf படி. முதலில் BATCH-NOTES.md, CHECKLIST.md படி.
+நிலை r5 (AUDIT.md படி; §6 முடிவுகள் நிலுவை) — r4: 28 பக்கங்கள், per-chat sessionId, markdown, regenerate, outputs (படம்/வீடியோ/கோப்பு/HTML/code), lightbox, 🔊 ஒரு செய்தி, 👍👎, மறுபெயர்/Pin, chat-க்குள் தேடல் (முடிந்தது).
+விதிகள்: YunaBridge 37 அழைப்பு + 9 callbacks மாறக்கூடாது; புதிய localStorage key கூடாது (yuna_v4_state, yuna_float_on ஒப்புதல் நிலுவை); தொடு இலக்கு ≥48px; Live = 1 பயனர் + 1 YUNA வரி.
+அடுத்து: 1) streaming (Worker SSE தேவை; இல்லையெனில் பதிலை எழுத்தெழுத்தாகக் காட்டும் UI-மட்டும் விளைவு), செய்தி திருத்து 2) Build 107 routeSingleCommand/stranger guard/WhatsApp Intel போர்ட் 3) VERIFY: `<a download>` WebView-ல் சேமிக்குமா, permission key பெயர்கள். 4) Archive / எல்லாம் அழி / PDF ஏற்றுமதி.
+ஒவ்வொன்றையும் playwright 360×640-ல் சோதி (mock fetch + Proxy YunaBridge). limit 99% ஆனால் இந்த prompt-ஐ புதுப்பித்து முடி.

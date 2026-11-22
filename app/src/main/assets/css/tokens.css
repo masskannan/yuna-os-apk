@@ -1,0 +1,3 @@
+/* design tokens */
+:root{--kb:0px;--bg:#070d12;--ink:#e8f4f6;--mute:#8aa3ab;--cy:#22d3ee;--teal:#14b8a6;--rose:#fb7185;--gl:255,255,255;--glass-a:.07;--glass:rgba(var(--gl),var(--glass-a));--line:rgba(255,255,255,.12);--dock:76px;--accent-a:#38BDF8}
+@media(prefers-color-scheme:light){:root{--bg:#f4f9fa;--ink:#0b1c22;--mute:#58737b;--gl:10,40,50;--line:rgba(10,40,50,.14)}}
