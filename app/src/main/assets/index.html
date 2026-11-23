@@ -2919,9 +2919,16 @@ async function callYunaCloudRemote(promptText) {
       const ragCtx = await window.queryYunaRag(promptText);
       if (ragCtx) enrichedPrompt = ragCtx + promptText;
     }
-    const r = await fetch(cloudUrl, { method: 'POST', signal: activeCloudAbort.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: enrichedPrompt, sessionId: yunaCloudSid, contacts: (() => { try { return (window.YunaBridge && window.YunaBridge.getSyncedContactsJson) ? JSON.parse(window.YunaBridge.getSyncedContactsJson() || '[]').slice(0, 80).map(c => c.name).filter(Boolean) : []; } catch (_) { return []; } })() }) });
+    if (/\b(பொய்|தப்பு|அப்படி\s*இல்ல|வேலை\s*செய்யல|wrong|lie)\b/i.test(promptText) && window._yunaLastTurn) {
+      fetch(cloudUrl.replace(/\/+$/, '') + '/feedback/heal', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Yuna-Token': localStorage.getItem('yuna_app_token') || '' },
+        body: JSON.stringify({ user_input: window._yunaLastTurn.q + ' -> ' + promptText, bad_output: window._yunaLastTurn.a, error_type: 'user_correction' })
+      }).catch(() => {});
+    }
+    const r = await fetch(cloudUrl, { method: 'POST', signal: activeCloudAbort.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: enrichedPrompt, sessionId: yunaCloudSid, installed_apps: (window.YunaBridge && window.YunaBridge.getInstalledAppsCsv) ? window.YunaBridge.getInstalledAppsCsv() : "", contacts: (() => { try { return (window.YunaBridge && window.YunaBridge.getSyncedContactsJson) ? JSON.parse(window.YunaBridge.getSyncedContactsJson() || '[]').slice(0, 80).map(c => c.name).filter(Boolean) : []; } catch (_) { return []; } })() }) });
     clearTimeout(tid);
     const d = await r.json();
+    window._yunaLastTurn = { q: promptText, a: String(d.reply || "") };
     const list = Array.isArray(d.actions) ? d.actions.slice(0, 4) : (d.action && d.action !== 'NONE' ? [{ action: d.action, target: d.target || '' }] : []);
     const notes = [];
     const restricted = new Set(['CLEAR_RECENTS', 'LOCK_SCREEN', 'WA_REPLY']);
@@ -2929,6 +2936,24 @@ async function callYunaCloudRemote(promptText) {
       if (item.action === 'DIAL' && item.target && typeof handleTrustedCallSkill === 'function') {
         handleTrustedCallSkill(item.target);
         return 'TRUSTED_CALL_GATE';
+      }
+      if (item.action === 'RUN_AGENT_GOAL' && item.target && window.YunaBridge && window.YunaBridge.runAgentGoal) {
+        try {
+          if (window.YunaBridge.startGhostMode) window.YunaBridge.startGhostMode();
+          window.YunaBridge.runAgentGoal(String(item.target));
+          return 'AGENT_GOAL_STARTED';
+        } catch (err) {
+          fetch((cloudUrl || '').replace(/\/+$/, '') + '/feedback/heal', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Yuna-Token': localStorage.getItem('yuna_app_token') || '' },
+            body: JSON.stringify({ user_input: String(item.target), bad_output: String(err), error_type: 'agent_goal_fail' })
+          }).catch(() => {});
+        }
+      }
+      if (item.action === 'SET_ALARM' && item.target && window.YunaBridge && window.YunaBridge.setAlarm) {
+        const [hh, mm] = String(item.target).split(':').map(n => parseInt(n, 10));
+        if (Number.isFinite(hh) && Number.isFinite(mm)) {
+          try { window.YunaBridge.setAlarm(hh, mm); return 'ALARM_SET'; } catch (_) {}
+        }
       }
       if (item.action === 'OPEN_APP_DYNAMIC' && window.YunaBridge && window.YunaBridge.openAppByName) {
         let appTgt = String(item.target || '').trim();
@@ -5570,8 +5595,10 @@ window.v4RunLiveTool = async function(id){
   if (window.YunaBridge && typeof window.YunaBridge.speakSmartWithVoice === "function") {
     const _origSpeak = window.YunaBridge.speakSmartWithVoice.bind(window.YunaBridge);
     window.YunaBridge.speakSmartWithVoice = function(){
+      const a = [...arguments];
+      if (typeof a[0] === "string") a[0] = a[0].replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}]/gu, "").replace(/\s{2,}/g, " ").trim();
       document.body.classList.add("tts-active");
-      return _origSpeak.apply(this, arguments);
+      return _origSpeak.apply(this, a);
     };
   }
   const _origTtsDone = window.onYunaTtsDone;

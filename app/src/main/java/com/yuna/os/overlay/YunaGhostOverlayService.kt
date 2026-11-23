@@ -10,7 +10,10 @@ import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.*
+import androidx.core.content.ContextCompat
 import android.provider.MediaStore
 import android.util.Base64
 import android.view.*
@@ -94,7 +97,8 @@ class YunaGhostOverlayService : Service() {
         super.onCreate()
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
         createNotifChannel()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val hasMic = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && hasMic) {
             startForeground(NOTIF_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
         } else {
             startForeground(NOTIF_ID, buildNotification())

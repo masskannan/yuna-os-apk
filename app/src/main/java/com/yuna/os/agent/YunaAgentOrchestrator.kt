@@ -83,7 +83,10 @@ object YunaAgentOrchestrator {
 
                 val pkg = access.getActivePackage()
                 val uiTree = access.extractUiTreeJson(60)
-                val res = callAgentStep(cloudBaseUrl, appToken, goal, pkg, uiTree, history)
+                val screenDesc = if ((isScreenShareOn || uiTree.length() < 3) && screenVision != null) {
+                    screenVision?.captureAndAskVision("Summarize visible screen buttons and text in 2 lines.") ?: ""
+                } else ""
+                val res = callAgentStep(cloudBaseUrl, appToken, goal, pkg, uiTree, history, screenDesc)
                 if (res == null || isCancelled) break
 
                 val caption = res.optString("caption_ta", "")
@@ -126,7 +129,7 @@ object YunaAgentOrchestrator {
     }
 
     private fun callAgentStep(
-        baseUrl: String, token: String, goal: String, pkg: String, uiTree: JSONArray, history: JSONArray
+        baseUrl: String, token: String, goal: String, pkg: String, uiTree: JSONArray, history: JSONArray, screenDesc: String = ""
     ): JSONObject? {
         return try {
             val conn = (URL("${baseUrl.trimEnd('/')}/agent/step").openConnection() as HttpURLConnection).apply {
@@ -142,6 +145,7 @@ object YunaAgentOrchestrator {
                 put("app_package", pkg)
                 put("ui_tree", uiTree)
                 put("history", history)
+                if (screenDesc.isNotEmpty()) put("screen_context", screenDesc)
             }.toString()
             conn.outputStream.use { it.write(body.toByteArray()) }
             val raw = conn.inputStream.bufferedReader().use { it.readText() }

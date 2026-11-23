@@ -6,7 +6,10 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
@@ -17,6 +20,9 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.AudioFormat
 import android.media.AudioRecord
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.NoiseSuppressor
 import android.media.AudioTrack
 import android.media.MediaCodec
 import android.media.MediaFormat
@@ -150,6 +156,17 @@ class YunaVoiceEngine(
     private var audioRecord: AudioRecord? = null
     private var noiseSuppressor: NoiseSuppressor? = null
     private var echoCanceler: AcousticEchoCanceler? = null
+    private var autoGain: AutomaticGainControl? = null
+    @Volatile private var isRemoteMuted = false
+    private val muteReceiver = object : BroadcastReceiver() {
+        override fun onReceive(c: Context?, intent: Intent?) {
+            if (intent?.action == "com.yuna.os.VOICE_MUTE_STATE") {
+                isRemoteMuted = intent.getBooleanExtra("muted", false)
+            }
+        }
+    }
+    private var noiseSuppressor: NoiseSuppressor? = null
+    private var echoCanceler: AcousticEchoCanceler? = null
     private var autoGainControl: AutomaticGainControl? = null
     private var captureJob: Job? = null
     private var cooldownJob: Job? = null
@@ -202,7 +219,7 @@ class YunaVoiceEngine(
         }
 
         val minBuf = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
-        val record = AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION, SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT, maxOf(minBuf * 2, FRAME_BYTES * 8))
+        val record = AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT, maxOf(minBuf * 2, FRAME_BYTES * 8))
         if (record.state != AudioRecord.STATE_INITIALIZED) {
             isRunning.set(false)
             record.release()
@@ -210,7 +227,16 @@ class YunaVoiceEngine(
             return
         }
 
+        runCatching {
+            val f = IntentFilter("com.yuna.os.VOICE_MUTE_STATE")
+            if (Build.VERSION.SDK_INT >= 33) context.registerReceiver(muteReceiver, f, Context.RECEIVER_NOT_EXPORTED)
+            else context.registerReceiver(muteReceiver, f)
+        }
         audioRecord = record
+        val sid = record.audioSessionId
+        runCatching { if (NoiseSuppressor.isAvailable()) noiseSuppressor = NoiseSuppressor.create(sid)?.apply { enabled = true } }
+        runCatching { if (AcousticEchoCanceler.isAvailable()) echoCanceler = AcousticEchoCanceler.create(sid)?.apply { enabled = true } }
+        runCatching { if (AutomaticGainControl.isAvailable()) autoGain = AutomaticGainControl.create(sid)?.apply { enabled = true } }
         requestVoiceFocus()
         attachHardwareDsp(record.audioSessionId)
         record.startRecording()
@@ -415,7 +441,18 @@ class YunaVoiceEngine(
         obj.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("delta")?.optString("content") ?: raw
     } catch (_: Exception) { raw }
 
-    private fun speakWithGuaranteedFloor(text: String) {
+    private fun sanitizeForTts(raw: String): String {
+        return raw
+            .replace(Regex("[\\uD83C-\\uDBFF\\uDC00-\\uDFFF]+"), " ")
+            .replace(Regex("[\\u2600-\\u27BF\\uFE00-\\uFE0F]"), " ")
+            .replace(Regex("[*#`~]+"), " ")
+            .replace(Regex("\\s{2,}"), " ")
+            .trim()
+    }
+
+    private fun speakWithGuaranteedFloor(rawText: String) {
+        val text = sanitizeForTts(rawText)
+        if (text.isEmpty()) return
         cooldownJob?.cancel()
         setState(EngineState.SPEAKING)
         val gen = ttsGenId.incrementAndGet()
@@ -520,6 +557,8 @@ class YunaVoiceEngine(
     fun release() {
         stop()
         noiseSuppressor?.release(); echoCanceler?.release(); autoGainControl?.release()
+        runCatching { context.unregisterReceiver(muteReceiver) }
+        runCatching { noiseSuppressor?.release(); echoCanceler?.release(); autoGain?.release() }
         audioRecord?.release(); androidTts?.shutdown(); scope.cancel()
     }
 
