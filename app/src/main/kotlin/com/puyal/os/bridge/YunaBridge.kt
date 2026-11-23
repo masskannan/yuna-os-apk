@@ -146,6 +146,15 @@ class YunaBridge(
     fun dialContact(name: String): String = com.yuna.os.tools.YunaSystemTools.dialContactByName(ctx, name)
 
     @android.webkit.JavascriptInterface
+    fun findContactsPickerJson(namesCsv: String): String = com.yuna.os.tools.YunaSystemTools.findContactsPickerJson(ctx, namesCsv)
+
+    @android.webkit.JavascriptInterface
+    fun dialNumber(num: String): String = com.yuna.os.tools.YunaSystemTools.dialNumber(ctx, num)
+
+    @android.webkit.JavascriptInterface
+    fun setSpeakerphone(on: Boolean): String = com.yuna.os.tools.YunaSystemTools.setSpeakerphone(ctx, on)
+
+    @android.webkit.JavascriptInterface
     fun getInstalledAppsCsv(): String {
         return try {
             val pm = ctx.packageManager

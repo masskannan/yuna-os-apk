@@ -2971,6 +2971,28 @@ async function callYunaCloudRemote(promptText) {
       if (item.action === 'VOL_DOWN' && window.YunaBridge && window.YunaBridge.volumeDown) { try { window.YunaBridge.volumeDown(); return 'VOL_DOWN'; } catch (_) {} }
       if (item.action === 'STORAGE_REPORT' && window.YunaBridge && window.YunaBridge.getStorageReport) { try { const r = window.YunaBridge.getStorageReport(); if (typeof showToast === 'function') showToast(r); return 'STORAGE_REPORT'; } catch (_) {} }
       if (item.action === 'NOTIF_REPORT' && window.YunaBridge && window.YunaBridge.getNotificationReport) { try { const r = window.YunaBridge.getNotificationReport(); if (typeof showToast === 'function') showToast(r); return 'NOTIF_REPORT'; } catch (_) {} }
+      if (item.action === 'SPEAKER_ON' && window.YunaBridge && window.YunaBridge.setSpeakerphone) { try { window.YunaBridge.setSpeakerphone(true); return 'SPEAKER_ON'; } catch (_) {} }
+      if (item.action === 'SPEAKER_OFF' && window.YunaBridge && window.YunaBridge.setSpeakerphone) { try { window.YunaBridge.setSpeakerphone(false); return 'SPEAKER_OFF'; } catch (_) {} }
+      if (item.action === 'PICK_CONTACT_INDEX' && window._yunaLastContactChoices && window.YunaBridge && window.YunaBridge.dialNumber) {
+        const idx = (parseInt(item.target, 10) || 1) - 1;
+        const chosen = window._yunaLastContactChoices[idx];
+        if (chosen && chosen.number) { window.YunaBridge.dialNumber(chosen.number); return 'PICKED_' + (idx + 1); }
+      }
+      if (item.action === 'CALL_CONTACT' && item.target && window.YunaBridge && window.YunaBridge.findContactsPickerJson) {
+        try {
+          const data = JSON.parse(window.YunaBridge.findContactsPickerJson(String(item.target)) || '{}');
+          const matches = Array.isArray(data.matches) ? data.matches : [];
+          const missing = Array.isArray(data.missing) ? data.missing : [];
+          if (matches.length === 1 && missing.length === 0 && window.YunaBridge.dialNumber) {
+            window.YunaBridge.dialNumber(matches[0].number);
+            return 'DIALED_SINGLE';
+          }
+          if (typeof window.renderYunaContactPicker === 'function') {
+            window.renderYunaContactPicker(matches, missing);
+          }
+          return 'CONTACT_PICKER_SHOWN';
+        } catch (_) {}
+      }
       if (item.action === 'SET_ALARM' && item.target && window.YunaBridge && window.YunaBridge.setAlarm) {
         const [hh, mm] = String(item.target).split(':').map(n => parseInt(n, 10));
         if (Number.isFinite(hh) && Number.isFinite(mm)) {
@@ -5650,6 +5672,33 @@ window.triggerYunaGhost = function() {
   } else if (typeof showToast === "function") {
     showToast("Ghost Overlay ஆண்ட்ராய்டு ஆப்பில் மட்டுமே இயங்கும்.");
   }
+};
+</script>
+<script>
+window.renderYunaContactPicker = function(matches, missing) {
+  window._yunaLastContactChoices = matches || [];
+  const box = document.getElementById("chatBox") || document.querySelector(".chat-scroll") || document.body;
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "margin:8px 0;padding:12px;border-radius:16px;background:rgba(15,23,42,0.92);border:1px solid rgba(56,189,248,0.3);color:#E2E8F0;font-size:13px;";
+  const missTxt = missing.length ? ("தொடர்பில் கிடைக்காதவை: <b>" + missing.join(", ") + "</b>. ") : "";
+  const askTxt = matches.length ? "யாருக்கு எந்த நம்பரில் கால் பண்ணணும்?" : "தொடர்பு எதுவும் கிடைக்கவில்லை.";
+  let html = '<div style="margin-bottom:8px;">' + missTxt + askTxt + '</div>';
+  if (matches.length) {
+    html += '<div style="border-radius:12px;overflow:hidden;background:rgba(30,41,59,0.85);">';
+    html += '<div style="padding:8px 12px;font-size:12px;color:#94A3B8;border-bottom:1px solid rgba(148,163,184,0.15);">📞 Phone</div>';
+    matches.forEach(function(m) {
+      const n = String(m.number || "").replace(/"/g, "");
+      html += '<div onclick="if(window.YunaBridge&&window.YunaBridge.dialNumber)window.YunaBridge.dialNumber(\'' + n + '\')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid rgba(148,163,184,0.12);cursor:pointer;">'
+        + '<div style="width:34px;height:34px;border-radius:50%;background:#2563EB;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;">' + (window._yunaLastContactChoices.indexOf(m) + 1) + '</div>'
+        + '<div><div style="font-weight:600;color:#F8FAFC;">' + String(m.name || "") + '</div>'
+        + '<div style="font-size:12px;color:#94A3B8;">' + String(m.label || "Phone") + ' • ' + n + '</div></div></div>';
+    });
+    html += '</div>';
+  }
+  html += '<div style="margin-top:8px;font-size:11px;color:#38BDF8;">⚡ Thinking steps: Connected to 📞 Phone</div>';
+  wrap.innerHTML = html;
+  box.appendChild(wrap);
+  box.scrollTop = box.scrollHeight;
 };
 </script>
 </body>

@@ -448,6 +448,13 @@ class YunaVoiceEngine(
                                         })
                                     }
                                 }
+                            } else if (aName == "SPEAKER_ON") {
+                                com.yuna.os.tools.YunaSystemTools.setSpeakerphone(context, true)
+                            } else if (aName == "SPEAKER_OFF") {
+                                com.yuna.os.tools.YunaSystemTools.setSpeakerphone(context, false)
+                            } else if (aName == "CALL_CONTACT" && aTarget.isNotEmpty()) {
+                                val msg = com.yuna.os.tools.YunaSystemTools.dialContactByName(context, aTarget)
+                                context.sendBroadcast(Intent("com.yuna.os.GHOST_SHOW_CAPTION").putExtra("text", msg))
                             } else if (aName == "SET_TIMER") {
                                 val secs = aTarget.toIntOrNull() ?: 60
                                 com.yuna.os.tools.YunaSystemTools.setTimer(context, secs)

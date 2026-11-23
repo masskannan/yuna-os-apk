@@ -3,12 +3,16 @@ package com.yuna.os.tools
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
+import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.os.Build
 import android.net.Uri
 import android.os.Environment
 import android.os.StatFs
 import android.provider.AlarmClock
 import android.provider.ContactsContract
+import org.json.JSONArray
+import org.json.JSONObject
 import android.view.KeyEvent
 import java.io.File
 
@@ -102,4 +106,72 @@ object YunaSystemTools {
             String.format("Storage: %.1f GB காலி / %.1f GB மொத்தம் | Free RAM: %d MB%s", freeGb, totalGb, availRamMb, filesTxt)
         }.getOrDefault("Storage ரிப்போர்ட் எடுக்க முடியவில்லை (Storage Permission சரிபார்க்கவும்).")
     }
+
+    fun dialNumber(ctx: Context, rawNum: String): String {
+        val num = rawNum.trim()
+        if (num.isEmpty()) return "நம்பர் இல்லை."
+        ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$num")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        return "$num-க்கு டயல் செய்யப்படுகிறது."
+    }
+
+    fun findContactsPickerJson(ctx: Context, namesCsv: String): String {
+        val queries = namesCsv.split(",", "மற்றும்", " and ").map { it.trim() }.filter { it.isNotEmpty() }.take(6)
+        val missing = JSONArray()
+        val matches = JSONArray()
+        val seenNums = mutableSetOf<String>()
+        val rows = mutableListOf<Triple<String, String, String>>()
+        runCatching {
+            ctx.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(
+                    ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                    ContactsContract.CommonDataKinds.Phone.NUMBER,
+                    ContactsContract.CommonDataKinds.Phone.TYPE,
+                    ContactsContract.CommonDataKinds.Phone.LABEL
+                ), null, null, null
+            )?.use { c ->
+                while (c.moveToNext()) {
+                    val dn = c.getString(0) ?: ""
+                    val num = (c.getString(1) ?: "").replace("\s+".toRegex(), "")
+                    val tp = c.getInt(2)
+                    val customLbl = c.getString(3)
+                    val lbl = ContactsContract.CommonDataKinds.Phone.getTypeLabel(ctx.resources, tp, customLbl).toString()
+                    if (dn.isNotBlank() && num.isNotBlank()) rows.add(Triple(dn, lbl, num))
+                }
+            }
+        }
+        for (q in queries) {
+            var hit = false
+            for ((dn, lbl, num) in rows) {
+                if (dn.contains(q, ignoreCase = true)) {
+                    hit = true
+                    val key = "$dn|$num"
+                    if (seenNums.add(key)) {
+                        matches.put(JSONObject().put("name", dn).put("label", lbl).put("number", num))
+                    }
+                }
+            }
+            if (!hit) missing.put(q)
+        }
+        return JSONObject().put("missing", missing).put("matches", matches).toString()
+    }
+
+
+    fun setSpeakerphone(ctx: Context, on: Boolean): String {
+        return runCatching {
+            val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (on) {
+                    val spk = am.availableCommunicationDevices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+                    if (spk != null) am.setCommunicationDevice(spk)
+                } else {
+                    am.clearCommunicationDevice()
+                }
+            }
+            @Suppress("DEPRECATION")
+            am.isSpeakerphoneOn = on
+            if (on) "ஸ்பீக்கர் ஆன் செய்யப்பட்டது." else "ஸ்பீக்கர் ஆஃப் செய்யப்பட்டது."
+        }.getOrDefault("ஸ்பீக்கர் மாற்ற முடியவில்லை.")
+    }
+
 }
