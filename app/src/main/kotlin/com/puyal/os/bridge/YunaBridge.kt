@@ -125,6 +125,27 @@ class YunaBridge(
     }
 
     @android.webkit.JavascriptInterface
+    fun getStorageReport(): String = com.yuna.os.tools.YunaSystemTools.getReadOnlyStorageReport(ctx)
+
+    @android.webkit.JavascriptInterface
+    fun setTimer(secs: Int): String = com.yuna.os.tools.YunaSystemTools.setTimer(ctx, secs)
+
+    @android.webkit.JavascriptInterface
+    fun mediaNext(): String = com.yuna.os.tools.YunaSystemTools.mediaKey(ctx, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
+
+    @android.webkit.JavascriptInterface
+    fun mediaPause(): String = com.yuna.os.tools.YunaSystemTools.mediaKey(ctx, android.view.KeyEvent.KEYCODE_MEDIA_PAUSE)
+
+    @android.webkit.JavascriptInterface
+    fun volumeUp(): String = com.yuna.os.tools.YunaSystemTools.adjustVolume(ctx, android.media.AudioManager.ADJUST_RAISE)
+
+    @android.webkit.JavascriptInterface
+    fun volumeDown(): String = com.yuna.os.tools.YunaSystemTools.adjustVolume(ctx, android.media.AudioManager.ADJUST_LOWER)
+
+    @android.webkit.JavascriptInterface
+    fun dialContact(name: String): String = com.yuna.os.tools.YunaSystemTools.dialContactByName(ctx, name)
+
+    @android.webkit.JavascriptInterface
     fun getInstalledAppsCsv(): String {
         return try {
             val pm = ctx.packageManager

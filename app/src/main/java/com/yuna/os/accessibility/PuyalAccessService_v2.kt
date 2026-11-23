@@ -28,6 +28,7 @@ class PuyalAccessService_v2 : AccessibilityService() {
     }
 
     private val handler = Handler(Looper.getMainLooper())
+    private var lastSkipAt = 0L
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -35,7 +36,20 @@ class PuyalAccessService_v2 : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Lightweight passive hook; active tree extraction only when requested
+        if (event?.packageName?.toString() != "com.google.android.youtube") return
+        val now = System.currentTimeMillis()
+        if (now - lastSkipAt < 2000L) return
+        val root = rootInActiveWindow ?: return
+        val skipNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/skip_ad_button")
+            .ifEmpty { root.findAccessibilityNodeInfosByText("Skip") }
+        for (n in skipNodes) {
+            val txt = n.text?.toString()?.trim() ?: ""
+            if (n.isClickable && (txt.isEmpty() || txt.equals("Skip", true) || txt.contains("Skip Ad", true))) {
+                lastSkipAt = now
+                n.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                break
+            }
+        }
     }
 
     override fun onInterrupt() {}

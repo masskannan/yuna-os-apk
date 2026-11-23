@@ -448,6 +448,23 @@ class YunaVoiceEngine(
                                         })
                                     }
                                 }
+                            } else if (aName == "SET_TIMER") {
+                                val secs = aTarget.toIntOrNull() ?: 60
+                                com.yuna.os.tools.YunaSystemTools.setTimer(context, secs)
+                            } else if (aName == "MEDIA_NEXT") {
+                                com.yuna.os.tools.YunaSystemTools.mediaKey(context, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
+                            } else if (aName == "MEDIA_PAUSE") {
+                                com.yuna.os.tools.YunaSystemTools.mediaKey(context, android.view.KeyEvent.KEYCODE_MEDIA_PAUSE)
+                            } else if (aName == "VOL_UP") {
+                                com.yuna.os.tools.YunaSystemTools.adjustVolume(context, android.media.AudioManager.ADJUST_RAISE)
+                            } else if (aName == "VOL_DOWN") {
+                                com.yuna.os.tools.YunaSystemTools.adjustVolume(context, android.media.AudioManager.ADJUST_LOWER)
+                            } else if (aName == "STORAGE_REPORT") {
+                                val rep = com.yuna.os.tools.YunaSystemTools.getReadOnlyStorageReport(context)
+                                speakWithGuaranteedFloor(rep)
+                            } else if (aName == "NOTIF_REPORT") {
+                                val rep = com.yuna.os.notif.YunaNotifService.instance?.getReadOnlyReport() ?: "Notification Access ஆன் செய்யவும்."
+                                speakWithGuaranteedFloor(rep)
                             } else if (aName == "RUN_AGENT_GOAL" && aTarget.isNotEmpty()) {
                                 com.yuna.os.agent.YunaAgentOrchestrator.runGoal(context, aTarget, cloudBaseUrl, yunaToken)
                             }

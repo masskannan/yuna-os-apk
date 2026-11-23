@@ -2964,6 +2964,13 @@ async function callYunaCloudRemote(promptText) {
           }).catch(() => {});
         }
       }
+      if (item.action === 'SET_TIMER' && window.YunaBridge && window.YunaBridge.setTimer) { try { window.YunaBridge.setTimer(parseInt(item.target, 10) || 60); return 'TIMER_SET'; } catch (_) {} }
+      if (item.action === 'MEDIA_NEXT' && window.YunaBridge && window.YunaBridge.mediaNext) { try { window.YunaBridge.mediaNext(); return 'MEDIA_NEXT'; } catch (_) {} }
+      if (item.action === 'MEDIA_PAUSE' && window.YunaBridge && window.YunaBridge.mediaPause) { try { window.YunaBridge.mediaPause(); return 'MEDIA_PAUSE'; } catch (_) {} }
+      if (item.action === 'VOL_UP' && window.YunaBridge && window.YunaBridge.volumeUp) { try { window.YunaBridge.volumeUp(); return 'VOL_UP'; } catch (_) {} }
+      if (item.action === 'VOL_DOWN' && window.YunaBridge && window.YunaBridge.volumeDown) { try { window.YunaBridge.volumeDown(); return 'VOL_DOWN'; } catch (_) {} }
+      if (item.action === 'STORAGE_REPORT' && window.YunaBridge && window.YunaBridge.getStorageReport) { try { const r = window.YunaBridge.getStorageReport(); if (typeof showToast === 'function') showToast(r); return 'STORAGE_REPORT'; } catch (_) {} }
+      if (item.action === 'NOTIF_REPORT' && window.YunaBridge && window.YunaBridge.getNotificationReport) { try { const r = window.YunaBridge.getNotificationReport(); if (typeof showToast === 'function') showToast(r); return 'NOTIF_REPORT'; } catch (_) {} }
       if (item.action === 'SET_ALARM' && item.target && window.YunaBridge && window.YunaBridge.setAlarm) {
         const [hh, mm] = String(item.target).split(':').map(n => parseInt(n, 10));
         if (Number.isFinite(hh) && Number.isFinite(mm)) {
