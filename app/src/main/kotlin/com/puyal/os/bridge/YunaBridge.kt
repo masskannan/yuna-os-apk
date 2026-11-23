@@ -102,7 +102,6 @@ class YunaBridge(
         } catch (_: Throwable) { "[]" }
     }
 
-
     @android.webkit.JavascriptInterface
     fun getInstalledAppsCsv(): String {
         return try {
@@ -839,7 +838,6 @@ class YunaBridge(
                 mainH.post {
                     val i = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${ctx.packageName}"))
                     i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    ctx.startActivity(i)
                 }
             }
             "பேட்டரி சேமிப்பு விலக்கு அமைப்பு திறக்கப்பட்டது."
@@ -939,7 +937,6 @@ class YunaBridge(
                     else -> Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}"))
                 }
                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                ctx.startActivity(i)
             } catch (_: Exception) {}
         }
         "அனுமதி அமைப்புப் பக்கம் திறக்கப்பட்டது."
@@ -1050,7 +1047,6 @@ class YunaBridge(
                     putExtra(CalendarContract.EXTRA_EVENT_END_TIME, beginMs + 3600000L)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                ctx.startActivity(i)
                 "நாட்காட்டியில் '$title' நிகழ்வு திறக்கப்பட்டது."
             }
             "SET_REMINDER" -> launchMain {
@@ -1064,7 +1060,6 @@ class YunaBridge(
                     putExtra(CalendarContract.EXTRA_EVENT_END_TIME, beginMs + 1800000L)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                ctx.startActivity(i)
                 "நினைவூட்டல் '$title' பதிவுப் பக்கம் திறக்கப்பட்டது."
             }
             "SET_ALARM" -> setAlarm(target)
@@ -1092,7 +1087,6 @@ class YunaBridge(
             putExtra(AlarmClock.EXTRA_SKIP_UI, false)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        ctx.startActivity(i)
         "${String.format(Locale.US, "%02d:%02d", h, m)}-க்கு அலாரம் அமைக்கப்பட்டது."
     }
 
@@ -1104,7 +1098,6 @@ class YunaBridge(
             putExtra(AlarmClock.EXTRA_SKIP_UI, false)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        ctx.startActivity(i)
         "${secs} வினாடிகளுக்கு டைமர் அமைக்கப்பட்டது."
     }
 
@@ -1142,7 +1135,6 @@ class YunaBridge(
         var i = pm.getLaunchIntentForPackage(pkg)
         if (i == null && pkg == "com.whatsapp") i = pm.getLaunchIntentForPackage("com.whatsapp.w4b")
         i = i?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) ?: return@launchMain "செயலி நிறுவப்படவில்லை ($pkg)."
-        ctx.startActivity(i)
         "செயலி திறக்கப்பட்டது."
     }
 
@@ -1339,7 +1331,7 @@ object YunaMicRegistry {
     fun abortActiveMic() {
         try { activeBridge?.abortMicOnPause() } catch (_: Exception) {}
     }
-        ctx.startActivity(i)
-    }
 
+    
 
+}
