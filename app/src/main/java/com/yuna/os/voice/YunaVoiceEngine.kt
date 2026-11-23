@@ -173,6 +173,10 @@ class YunaVoiceEngine(
         override fun onReceive(c: Context?, intent: Intent?) {
             when (intent?.action) {
                 "com.yuna.os.VOICE_MUTE_STATE" -> isRemoteMuted = intent.getBooleanExtra("muted", false)
+                "com.yuna.os.GHOST_SPEAK_TEXT" -> {
+                    val t = intent.getStringExtra("text") ?: ""
+                    if (t.isNotEmpty()) speakWithGuaranteedFloor(t)
+                }
                 "com.yuna.os.GHOST_VOICE_TRIGGER" -> {
                     isRemoteMuted = false
                     if (!isRunning.get()) start()
@@ -241,7 +245,7 @@ class YunaVoiceEngine(
         }
 
         runCatching {
-            val f = IntentFilter().apply { addAction("com.yuna.os.VOICE_MUTE_STATE"); addAction("com.yuna.os.GHOST_VOICE_TRIGGER") }
+            val f = IntentFilter().apply { addAction("com.yuna.os.VOICE_MUTE_STATE"); addAction("com.yuna.os.GHOST_VOICE_TRIGGER"); addAction("com.yuna.os.GHOST_SPEAK_TEXT") }
             if (Build.VERSION.SDK_INT >= 33) context.registerReceiver(muteReceiver, f, Context.RECEIVER_NOT_EXPORTED)
             else context.registerReceiver(muteReceiver, f)
         }

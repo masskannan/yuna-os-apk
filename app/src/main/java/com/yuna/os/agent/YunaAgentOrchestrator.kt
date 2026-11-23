@@ -82,7 +82,7 @@ object YunaAgentOrchestrator {
                     .putExtra(YunaGhostOverlayService.EXTRA_STATE, "THINKING"))
 
                 val pkg = access.getActivePackage()
-                val uiTree = access.extractUiTreeJson(60)
+                val uiTree = access.extractUiTreeJson(90)
                 val screenDesc = if ((isScreenShareOn || uiTree.length() < 3) && screenVision != null) {
                     screenVision?.captureAndAskVision("Summarize visible screen buttons and text in 2 lines.") ?: ""
                 } else ""
@@ -90,9 +90,13 @@ object YunaAgentOrchestrator {
                 if (res == null || isCancelled) break
 
                 val caption = res.optString("caption_ta", "")
+                val speakTa = res.optString("speak_ta", "")
                 if (caption.isNotEmpty()) {
                     appCtx.sendBroadcast(Intent(YunaGhostOverlayService.ACTION_SHOW_CAPTION)
                         .putExtra(YunaGhostOverlayService.EXTRA_TEXT, caption))
+                }
+                if (speakTa.isNotEmpty()) {
+                    appCtx.sendBroadcast(Intent("com.yuna.os.GHOST_SPEAK_TEXT").putExtra("text", speakTa))
                 }
 
                 if (res.optBoolean("needs_confirm", false)) {

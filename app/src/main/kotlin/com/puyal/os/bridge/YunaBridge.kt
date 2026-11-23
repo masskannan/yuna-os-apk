@@ -109,6 +109,22 @@ class YunaBridge(
     }
 
     @android.webkit.JavascriptInterface
+    fun saveSkillRule(contact: String, replyText: String, autoSend: Boolean) {
+        com.yuna.os.notif.YunaNotifService.saveSkillRule(ctx, contact, replyText, autoSend)
+    }
+
+    @android.webkit.JavascriptInterface
+    fun getSkillRulesJson(): String {
+        return com.yuna.os.notif.YunaNotifService.getSkillRulesJson(ctx)
+    }
+
+    @android.webkit.JavascriptInterface
+    fun getNotificationReport(): String {
+        return com.yuna.os.notif.YunaNotifService.instance?.getReadOnlyReport()
+            ?: "Notification Access ஆன் செய்யவும் (Settings -> Notification access)."
+    }
+
+    @android.webkit.JavascriptInterface
     fun getInstalledAppsCsv(): String {
         return try {
             val pm = ctx.packageManager

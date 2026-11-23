@@ -20,7 +20,11 @@ class PuyalAccessService_v2 : AccessibilityService() {
     companion object {
         @Volatile
         var instance: PuyalAccessService_v2? = null
-        private val SENSITIVE_KEYWORDS = listOf("pay", "upi", "pin", "delete", "remove", "transfer", "confirm order")
+        private val SENSITIVE_KEYWORDS = listOf("pay", "upi", "pin", "delete", "remove", "transfer", "confirm order", "uninstall", "format")
+        private val RESTRICTED_PKG_TOKENS = listOf(
+            "paisa", "phonepe", "paytm", "bhim", "yono", "sbi", "hdfc", "icici", "axis", "kotak", "yesbank",
+            "bank", "cred", "authenticator", "bitwarden", "keepass", "1password", "lastpass", "packageinstaller"
+        )
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -43,8 +47,14 @@ class PuyalAccessService_v2 : AccessibilityService() {
 
     fun getActivePackage(): String = rootInActiveWindow?.packageName?.toString() ?: "unknown"
 
-    fun extractUiTreeJson(maxNodes: Int = 60): JSONArray {
+    fun isRestrictedApp(pkg: String = getActivePackage()): Boolean {
+        val low = pkg.lowercase()
+        return RESTRICTED_PKG_TOKENS.any { low.contains(it) }
+    }
+
+    fun extractUiTreeJson(maxNodes: Int = 90): JSONArray {
         val arr = JSONArray()
+        if (isRestrictedApp()) return arr
         val root = rootInActiveWindow ?: return arr
         val queue = ArrayDeque<AccessibilityNodeInfo>()
         queue.add(root)
@@ -60,8 +70,8 @@ class PuyalAccessService_v2 : AccessibilityService() {
                 if (rect.width() > 0 && rect.height() > 0) {
                     arr.put(JSONObject().apply {
                         if (rid.isNotEmpty()) put("id", rid)
-                        if (txt.isNotEmpty()) put("txt", txt.take(40))
-                        if (desc.isNotEmpty()) put("desc", desc.take(40))
+                        if (txt.isNotEmpty()) put("txt", txt.take(80))
+                        if (desc.isNotEmpty()) put("desc", desc.take(60))
                         put("cx", rect.centerX())
                         put("cy", rect.centerY())
                         if (node.isClickable) put("clk", 1)
@@ -77,6 +87,12 @@ class PuyalAccessService_v2 : AccessibilityService() {
     }
 
     fun executeBatchAndVerify(actions: JSONArray, onVerified: (JSONArray) -> Unit) {
+        if (isRestrictedApp()) {
+            sendBroadcast(Intent(YunaGhostOverlayService.ACTION_SHOW_CAPTION)
+                .putExtra(YunaGhostOverlayService.EXTRA_TEXT, "பாதுகாப்பு: Banking/UPI/Password ஆப்-ல் YUNA தலையிடாது."))
+            onVerified(JSONArray())
+            return
+        }
         sendBroadcast(Intent(YunaGhostOverlayService.ACTION_SET_STATE).putExtra(YunaGhostOverlayService.EXTRA_STATE, "EXECUTING"))
         runStep(actions, 0, onVerified)
     }
@@ -100,6 +116,20 @@ class PuyalAccessService_v2 : AccessibilityService() {
         }
 
         when (act) {
+            "open_app" -> {
+                val appName = step.optString("app", "").ifEmpty { targetTxt }
+                if (appName.isNotEmpty()) {
+                    runCatching {
+                        val pm = packageManager
+                        val mi = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+                        val match = pm.queryIntentActivities(mi, 0).firstOrNull {
+                            it.loadLabel(pm).toString().contains(appName, ignoreCase = true)
+                        }
+                        val launch = match?.let { pm.getLaunchIntentForPackage(it.activityInfo.packageName) }
+                        if (launch != null) startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    }
+                }
+            }
             "intent" -> {
                 val uriStr = step.optString("uri", "")
                 if (uriStr.isNotEmpty()) {
