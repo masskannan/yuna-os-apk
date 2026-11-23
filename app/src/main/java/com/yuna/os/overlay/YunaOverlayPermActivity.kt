@@ -9,6 +9,9 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import com.yuna.os.agent.YunaAgentOrchestrator
+import android.content.ComponentName
+import android.os.PowerManager
+import com.yuna.os.accessibility.PuyalAccessService_v2
 import com.yuna.os.vision.YunaScreenVision
 
 class YunaOverlayPermActivity : Activity() {
@@ -36,6 +39,26 @@ class YunaOverlayPermActivity : Activity() {
                 putExtra(EXTRA_MODE, MODE_SCREEN)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             })
+        }
+
+
+        fun ensureAllPermissions(context: Context) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
+                launchGhostMode(context); return
+            }
+            if (PuyalAccessService_v2.instance == null) {
+                context.sendBroadcast(Intent(YunaGhostOverlayService.ACTION_SHOW_CAPTION)
+                    .putExtra(YunaGhostOverlayService.EXTRA_TEXT, "PuyalAccessService_v2 ஆன் செய்யவும்"))
+                context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                return
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+                if (!pm.isIgnoringBatteryOptimizations(context.packageName)) {
+                    context.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+            }
         }
 
         private fun startGhostService(context: Context) {

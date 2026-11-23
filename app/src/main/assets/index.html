@@ -4050,8 +4050,8 @@ window.queryYunaRag = async function(qText) {
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), 1200);
     const r = await fetch(cloudUrl.replace(/\/+$/, '') + '/rag/query', {
-      method: 'POST', signal: ctrl.signal, headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: qText })
+      method: 'POST', signal: ctrl.signal, headers: { 'Content-Type': 'application/json', 'X-Yuna-Token': localStorage.getItem("yuna_app_token") || "4bd747f83a8dad82824e5533765a58e610aeae0b79f4cd90" },
+      body: JSON.stringify({ query: qText, question: qText })
     });
     clearTimeout(tid);
     const d = await r.json();
@@ -5635,6 +5635,10 @@ window.v4RunLiveTool = async function(id){
 })();
 window.triggerYunaGhost = function() {
   if (window.YunaBridge && typeof window.YunaBridge.startGhostMode === "function") {
+    if (!localStorage.getItem("yuna_perm_prompted") && typeof window.YunaBridge.setupAllPermissions === "function") {
+      localStorage.setItem("yuna_perm_prompted", "1");
+      try { window.YunaBridge.setupAllPermissions(); } catch (_) {}
+    }
     try { window.YunaBridge.startGhostMode(); } catch (_) {}
   } else if (typeof showToast === "function") {
     showToast("Ghost Overlay ஆண்ட்ராய்டு ஆப்பில் மட்டுமே இயங்கும்.");

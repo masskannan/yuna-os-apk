@@ -90,8 +90,8 @@ class YunaVoiceService : Service() {
                 val tok = prefs.getString("app_token", "") ?: ""
                 voiceEngine = YunaVoiceEngine(applicationContext, url, tok, object : YunaVoiceCallbacks {
                     override fun onStateChanged(state: EngineState) {}
-                    override fun onPartialTranscript(text: String) {}
-                    override fun onAssistantReply(text: String) {}
+                    override fun onPartialResponse(text: String) {}
+                    override fun onRequestScreenshot() {}
                     override fun onError(message: String) {}
                 })
             }
@@ -127,7 +127,8 @@ class YunaVoiceService : Service() {
             .build()
 
         // FIX: FOREGROUND_SERVICE_TYPE_MICROPHONE requires API 30 (R)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        val hasMic = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && hasMic) {
             startForeground(1001, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
         } else {
             startForeground(1001, notification)
@@ -174,7 +175,7 @@ class YunaVoiceEngine(
                 "com.yuna.os.VOICE_MUTE_STATE" -> isRemoteMuted = intent.getBooleanExtra("muted", false)
                 "com.yuna.os.GHOST_VOICE_TRIGGER" -> {
                     isRemoteMuted = false
-                    if (!isActive) start()
+                    if (!isRunning.get()) start()
                     else setState(EngineState.LISTENING)
                 }
             }
