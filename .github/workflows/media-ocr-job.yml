@@ -1,0 +1,72 @@
+# YUNA AI OS v4.2 - Step 7: Automated Slideshow Video + Scan OCR (CPU Worker)
+name: YUNA Step 7 Media & OCR Job
+
+on:
+  # WHY: repository_dispatch lets YUNA's Cloudflare Worker or Termux trigger this
+  # heavy CPU job remotely via a single GitHub REST API POST request.
+  repository_dispatch:
+    types: [yuna-step7-media-ocr]
+
+jobs:
+  run-media-or-ocr:
+    # WHY: GitHub-hosted ubuntu-latest gives us 4 vCPU + 16 GB RAM for free on
+    # public repos (or generous free minutes on private repos), ideal for CPU OCR & ffmpeg.
+    runs-on: ubuntu-latest
+
+    env:
+      JOB_MODE: ${{ github.event.client_payload.mode }}
+      INPUT_KEY: ${{ github.event.client_payload.input_key }}
+      OUTPUT_KEY: ${{ github.event.client_payload.output_key }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT_URL }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET_NAME }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies (ffmpeg, poppler, Tamil fonts)
+        # WHY: ffmpeg burns SRT subtitles, poppler-utils converts PDFs to images
+        # for OCR, and fonts-noto-core ensures Tamil Unicode characters render cleanly.
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg poppler-utils fonts-noto-core
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Python dependencies
+        # WHY: Installing paddlepaddle (CPU wheel) + paddleocr + edge-tts + moviepy
+        # gives us both pipelines without needing a GPU runner.
+        run: |
+          pip install --upgrade pip
+          pip install edge-tts moviepy pillow pdf2image paddlepaddle paddleocr awscli
+
+      - name: Download input file from Cloudflare R2
+        # WHY: R2 is S3-compatible, so awscli with --endpoint-url transfers files
+        # directly between Cloudflare R2 and the runner without extra SDK boilerplate.
+        run: |
+          mkdir -p work
+          aws s3 cp "s3://${R2_BUCKET}/${INPUT_KEY}" "work/input_file" --endpoint-url "${R2_ENDPOINT}"
+
+      - name: Run Step 7 Python pipeline
+        run: |
+          if [ "${JOB_MODE}" = "slideshow" ]; then
+            python step7_slideshow_ocr.py --mode slideshow --input work/input_file --output work/output_result.mp4
+          elif [ "${JOB_MODE}" = "ocr" ]; then
+            python step7_slideshow_ocr.py --mode ocr --input work/input_file --output work/output_result.json
+          else
+            echo "Invalid mode: ${JOB_MODE}" && exit 1
+          fi
+
+      - name: Upload output artifact to Cloudflare R2
+        run: |
+          if [ "${JOB_MODE}" = "slideshow" ]; then
+            aws s3 cp work/output_result.mp4 "s3://${R2_BUCKET}/${OUTPUT_KEY}" --endpoint-url "${R2_ENDPOINT}"
+          else
+            aws s3 cp work/output_result.json "s3://${R2_BUCKET}/${OUTPUT_KEY}" --endpoint-url "${R2_ENDPOINT}"
+          fi

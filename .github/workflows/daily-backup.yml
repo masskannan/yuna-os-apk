@@ -1,0 +1,154 @@
+# YUNA AI OS v4.2 — Step 10: Daily Cloudflare D1 & R2 Manifest Backup
+# Place this file at: .github/workflows/daily-backup.yml in your main YUNA repo.
+
+name: YUNA Daily D1 & R2 Backup
+
+on:
+  schedule:
+    # WHY: Runs daily at 02:00 UTC (07:30 AM IST) during low-traffic hours
+    # so database exports do not compete with daytime voice requests.
+    - cron: "0 2 * * *"
+  # WHY: Allows manual one-click runs from the GitHub Actions UI when testing
+  # or right before a risky schema migration.
+  workflow_dispatch:
+
+# WHY: Prevents two backup jobs from running at the same time and causing
+# Git push conflicts in the private backup repository.
+concurrency:
+  group: yuna-daily-backup
+  cancel-in-progress: false
+
+# WHY: Least-privilege principle — this workflow only needs read access to
+# the source repo; pushing to the separate private backup repo uses a dedicated PAT.
+permissions:
+  contents: read
+
+jobs:
+  backup-d1-and-r2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME || 'yuna_db' }}
+      R2_BUCKET_NAME: ${{ vars.R2_BUCKET_NAME || 'yuna-assets' }}
+
+    steps:
+      - name: Set backup date stamp (UTC)
+        id: date
+        run: |
+          # WHY: Using ISO YYYY-MM-DD keeps backup folders naturally sorted
+          # in chronological order inside the private GitHub repo.
+          echo "today=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js for Wrangler CLI
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Export Cloudflare D1 database tables (SQL + gzip)
+        run: |
+          mkdir -p backup_staging/d1
+          # WHY: `wrangler d1 export --remote` pulls a consistent snapshot
+          # of both schema and row data directly from Cloudflare's edge D1.
+          npx --yes wrangler@latest d1 export "$D1_DATABASE_NAME" \
+            --remote \
+            --output "backup_staging/d1/${D1_DATABASE_NAME}_${{ steps.date.outputs.today }}.sql"
+
+          # WHY: Compressing the SQL dump with gzip cuts repo storage by ~80%
+          # so we stay well within GitHub's free-tier repository size limits.
+          gzip -9 "backup_staging/d1/${D1_DATABASE_NAME}_${{ steps.date.outputs.today }}.sql"
+
+      - name: Export Cloudflare R2 object manifest (JSON)
+        run: |
+          mkdir -p backup_staging/r2
+          # WHY: Storing raw gigabytes of R2 audio/PDF blobs in Git hits repo
+          # limits quickly. Instead, we export a full paginated JSON manifest
+          # (object keys, sizes, ETags, timestamps) to track integrity & inventory.
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+
+          account_id = os.environ["CF_ACCOUNT_ID"]
+          api_token = os.environ["CLOUDFLARE_API_TOKEN"]
+          bucket = os.environ["R2_BUCKET_NAME"]
+
+          objects = []
+          cursor = None
+
+          while True:
+              params = {"limit": "1000"}
+              if cursor:
+                  params["cursor"] = cursor
+              query = urllib.parse.urlencode(params)
+              url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/r2/buckets/{bucket}/objects?{query}"
+
+              req = urllib.request.Request(
+                  url,
+                  headers={
+                      "Authorization": f"Bearer {api_token}",
+                      "Content-Type": "application/json",
+                  },
+              )
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  payload = json.loads(resp.read().decode("utf-8"))
+
+              if not payload.get("success"):
+                  raise RuntimeError(f"Cloudflare R2 API error: {payload}")
+
+              batch = payload.get("result", [])
+              # Normalize list/dict response depending on API version
+              if isinstance(batch, dict):
+                  batch = batch.get("objects", [])
+              objects.extend(batch)
+
+              result_info = payload.get("result_info", {})
+              cursor = result_info.get("cursor")
+              if not cursor or not result_info.get("is_truncated", False):
+                  break
+
+          manifest = {
+              "bucket": bucket,
+              "object_count": len(objects),
+              "total_bytes": sum(int(o.get("size", 0)) for o in objects),
+              "objects": objects,
+          }
+
+          out_path = "backup_staging/r2/r2_manifest_${{ steps.date.outputs.today }}.json"
+          with open(out_path, "w", encoding="utf-8") as fh:
+              json.dump(manifest, fh, indent=2)
+
+          print(f"Exported R2 manifest: {manifest['object_count']} objects ({manifest['total_bytes']} bytes)")
+          PY
+
+      - name: Checkout private GitHub backup repository
+        uses: actions/checkout@v4
+        with:
+          # WHY: Keeping backups in a separate PRIVATE repository ensures user
+          # D1 memory/intent data never leaks into a public code repo.
+          repository: ${{ secrets.BACKUP_REPO }}
+          token: ${{ secrets.BACKUP_REPO_PAT }}
+          path: private_backup_repo
+
+      - name: Copy snapshots & commit to private backup repo
+        working-directory: private_backup_repo
+        run: |
+          SNAPSHOT_DIR="snapshots/${{ steps.date.outputs.today }}"
+          mkdir -p "$SNAPSHOT_DIR"
+          cp -r ../backup_staging/* "$SNAPSHOT_DIR/"
+
+          git config user.name "yuna-backup-bot"
+          git config user.email "yuna-backup-bot@users.noreply.github.com"
+
+          git add "$SNAPSHOT_DIR"
+          # WHY: `git diff --staged --quiet` avoids failing the workflow when a
+          # manual re-run produces identical files on the same day.
+          if git diff --staged --quiet; then
+            echo "No changes to commit for ${{ steps.date.outputs.today }}."
+          else
+            git commit -m "chore(backup): daily D1 + R2 manifest for ${{ steps.date.outputs.today }}"
+            git push origin HEAD
+          fi

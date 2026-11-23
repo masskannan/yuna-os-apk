@@ -4945,7 +4945,7 @@ function renderV4(){
       { id: 'B11', t: isEn ? 'Memory' : 'நினைவகம் (Memory)' }
     ];
     let h = '<div class="v4-h"><b>' + t('v4.ws') + '</b><button class="v4-x" onclick="closeV4()" aria-label="' + t('v4.close') + '">×</button></div>';
-    h += '<div class="v4-grid">' + items.map(x => '<button class="v4-t" onclick="showToast(\'' + (isEn ? 'Backend pending' : 'Backend தயாரான பின் இணையும்') + '\')">' + x.t + '<small>' + x.id + ' · ' + (isEn ? 'Planned' : 'திட்டம்') + '</small></button>').join('') + '</div>';
+    h += '<div class="v4-grid">' + items.map(x => '<button class="v4-t" onclick="v4RunLiveTool(\x27" + (x.id || x.t) + "\x27)">' + x.t + '<small>' + x.id + ' · ' + (isEn ? 'Planned' : 'திட்டம்') + '</small></button>').join('') + '</div>';
     el.innerHTML = h;
   };
 })();
@@ -5474,6 +5474,36 @@ function renderV4(){
     return _origFetch.call(this, input, init);
   };
 })();
+</script>
+<script>
+window.v4RunLiveTool = async function(id){
+  try {
+    if (typeof closeV4 === "function") closeV4();
+    const base = (typeof cloudUrl !== "undefined" && cloudUrl) ? cloudUrl.replace(/\/+$/, "") : "https://yuna-ai-gateway-v4.masskannan719.workers.dev";
+    const key = String(id || "").toLowerCase();
+    if (key.includes("rag") || key.includes("pdf") || key.includes("doc")) {
+      const q = prompt("PDF/Knowledge கேள்வியை உள்ளிடவும்:");
+      if (!q) return;
+      const r = await fetch(base + "/rag/query", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q }) });
+      const d = await r.json();
+      if (typeof showToast === "function") showToast(d.context ? "RAG தயார் (" + (d.citations||[]).length + ")" : (d.message || "RAG ready"));
+      if (d.context && typeof ask === "function") ask(q + "\n\nContext:\n" + d.context);
+      return;
+    }
+    if (key.includes("img") || key.includes("image") || key.includes("comfy")) {
+      const p = prompt("உருவாக்க வேண்டிய படத்தின் விவரம் (Prompt):");
+      if (!p) return;
+      if (typeof showToast === "function") showToast("படம் உருவாக்கப்படுகிறது...");
+      const r = await fetch(base + "/image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: p, mode: "fast" }) });
+      const d = await r.json();
+      if (typeof showToast === "function") showToast(d.actionNeeded || (d.ok ? "படம் தயார்!" : (d.message || "Error")));
+      return;
+    }
+    if (typeof ask === "function") ask("YUNA v4 Tool: " + id);
+  } catch (e) {
+    if (typeof showToast === "function") showToast("Tool error: " + e.message);
+  }
+};
 </script>
 </body>
 
