@@ -12,6 +12,7 @@ import com.yuna.os.agent.YunaAgentOrchestrator
 import android.content.ComponentName
 import android.os.PowerManager
 import com.yuna.os.accessibility.PuyalAccessService_v2
+import com.yuna.os.notif.YunaNotifService
 import com.yuna.os.vision.YunaScreenVision
 
 class YunaOverlayPermActivity : Activity() {
@@ -48,8 +49,14 @@ class YunaOverlayPermActivity : Activity() {
             }
             if (PuyalAccessService_v2.instance == null) {
                 context.sendBroadcast(Intent(YunaGhostOverlayService.ACTION_SHOW_CAPTION)
-                    .putExtra(YunaGhostOverlayService.EXTRA_TEXT, "PuyalAccessService_v2 ஆன் செய்யவும்"))
+                    .putExtra(YunaGhostOverlayService.EXTRA_TEXT, "App Info -> ⋮ -> Allow restricted settings, பிறகு PuyalAccessService_v2 ஆன் செய்யவும்"))
                 context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                return
+            }
+            if (YunaNotifService.instance == null) {
+                context.sendBroadcast(Intent(YunaGhostOverlayService.ACTION_SHOW_CAPTION)
+                    .putExtra(YunaGhostOverlayService.EXTRA_TEXT, "App Info -> ⋮ -> Allow restricted settings, பிறகு YunaNotifService ஆன் செய்யவும்"))
+                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 return
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

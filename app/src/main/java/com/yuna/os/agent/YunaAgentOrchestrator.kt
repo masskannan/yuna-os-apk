@@ -83,9 +83,18 @@ object YunaAgentOrchestrator {
 
                 val pkg = access.getActivePackage()
                 val uiTree = access.extractUiTreeJson(90)
-                val screenDesc = if ((isScreenShareOn || uiTree.length() < 3) && screenVision != null) {
-                    screenVision?.captureAndAskVision("Summarize visible screen buttons and text in 2 lines.") ?: ""
-                } else ""
+                var screenDesc = ""
+                if (isScreenShareOn || uiTree.length() < 3) {
+                    if (screenVision != null) {
+                        screenDesc = screenVision?.captureAndAskVision("Summarize visible screen buttons and text in 2 lines.") ?: ""
+                    } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                        val shotLatch = CountDownLatch(1)
+                        var b64Shot: String? = null
+                        access.takeScreenshotCompat { b64Shot = it; shotLatch.countDown() }
+                        shotLatch.await(2, TimeUnit.SECONDS)
+                        if (!b64Shot.isNullOrEmpty()) screenDesc = askVisionRaw(cloudBaseUrl, appToken, b64Shot!!)
+                    }
+                }
                 val res = callAgentStep(cloudBaseUrl, appToken, goal, pkg, uiTree, history, screenDesc)
                 if (res == null || isCancelled) break
 
@@ -158,4 +167,18 @@ object YunaAgentOrchestrator {
             null
         }
     }
+
+    private fun askVisionRaw(baseUrl: String, token: String, b64: String): String {
+        return try {
+            val conn = (URL("${baseUrl.trimEnd('/')}/vision").openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"; connectTimeout = 4000; readTimeout = 10000
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("X-Yuna-Token", token); doOutput = true
+            }
+            val p = JSONObject().put("prompt", "Summarize visible screen buttons and text in 2 lines.").put("image_base64", b64).toString()
+            conn.outputStream.use { it.write(p.toByteArray()) }
+            JSONObject(conn.inputStream.bufferedReader().use { it.readText() }).optString("reply", "")
+        } catch (_: Exception) { "" }
+    }
+
 }

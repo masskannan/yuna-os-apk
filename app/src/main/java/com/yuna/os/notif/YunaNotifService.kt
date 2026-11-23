@@ -3,7 +3,9 @@ package com.yuna.os.notif
 import android.app.Notification
 import android.app.RemoteInput
 import android.content.Context
+import android.content.ComponentName
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -48,6 +50,9 @@ class YunaNotifService : NotificationListenerService() {
     override fun onListenerDisconnected() {
         instance = null
         super.onListenerDisconnected()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            runCatching { requestRebind(ComponentName(this, YunaNotifService::class.java)) }
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {

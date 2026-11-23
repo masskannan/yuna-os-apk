@@ -4,7 +4,12 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.content.Intent
 import android.graphics.Path
+import android.graphics.Bitmap
 import android.graphics.Rect
+import android.os.Build
+import android.util.Base64
+import android.view.Display
+import java.io.ByteArrayOutputStream
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -212,4 +217,44 @@ class PuyalAccessService_v2 : AccessibilityService() {
             .build()
         dispatchGesture(gesture, null, null)
     }
+
+    fun takeScreenshotCompat(onDone: (String?) -> Unit) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            onDone(null); return
+        }
+        runCatching {
+            takeScreenshot(Display.DEFAULT_DISPLAY, mainExecutor, object : TakeScreenshotCallback {
+                override fun onSuccess(res: ScreenshotResult) {
+                    runCatching {
+                        val bmp = Bitmap.wrapHardwareBuffer(res.hardwareBuffer, res.colorSpace)
+                        res.hardwareBuffer.close()
+                        if (bmp == null) { onDone(null); return }
+                        val sw = bmp.copy(Bitmap.Config.ARGB_8888, false)
+                        bmp.recycle()
+                        val w = 640
+                        val h = (sw.height * 640f / sw.width).toInt().coerceAtLeast(480)
+                        val scaled = Bitmap.createScaledBitmap(sw, w, h, true)
+                        sw.recycle()
+                        var nonBlackFound = false
+                        var pxY = 40
+                        while (pxY < scaled.height && !nonBlackFound) {
+                            var pxX = 40
+                            while (pxX < scaled.width) {
+                                if ((scaled.getPixel(pxX, pxY) and 0x00FFFFFF) != 0) { nonBlackFound = true; break }
+                                pxX += 80
+                            }
+                            pxY += 80
+                        }
+                        if (!nonBlackFound) { scaled.recycle(); onDone(null); return }
+                        val out = ByteArrayOutputStream()
+                        scaled.compress(Bitmap.CompressFormat.JPEG, 70, out)
+                        scaled.recycle()
+                        onDone(Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP))
+                    }.onFailure { onDone(null) }
+                }
+                override fun onFailure(errorCode: Int) { onDone(null) }
+            })
+        }.onFailure { onDone(null) }
+    }
+
 }

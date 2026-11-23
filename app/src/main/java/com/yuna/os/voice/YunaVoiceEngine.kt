@@ -18,6 +18,7 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.AudioFormat
+import android.media.AudioRecordingConfiguration
 import android.media.AudioRecord
 import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.AutomaticGainControl
@@ -154,6 +155,7 @@ class YunaVoiceEngine(
         private const val BARGE_IN_REQUIRED_MS = 200L
         private const val EDGE_TTS_TIMEOUT_MS = 1000L
         private const val POST_TTS_COOLDOWN_MS = 500L
+        private const val ALLOW_BARGE_IN = false
         private const val OFFLINE_DEGRADE_TAMIL = "இணையம் தேவை. தற்பொழுது இணைய இணைப்பு இல்லை."
     }
 
@@ -168,6 +170,8 @@ class YunaVoiceEngine(
     private var noiseSuppressor: NoiseSuppressor? = null
     private var echoCanceler: AcousticEchoCanceler? = null
     private var autoGain: AutomaticGainControl? = null
+    private var recordingCallback: AudioManager.AudioRecordingCallback? = null
+    @Volatile private var zeroPcmFrames = 0
     @Volatile private var isRemoteMuted = false
     private val muteReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, intent: Intent?) {
@@ -250,6 +254,19 @@ class YunaVoiceEngine(
             else context.registerReceiver(muteReceiver, f)
         }
         audioRecord = record
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            runCatching {
+                val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                val rcb = object : AudioManager.AudioRecordingCallback() {
+                    override fun onRecordingConfigChanged(configs: MutableList<AudioRecordingConfiguration>?) {
+                        val silenced = configs?.any { it.clientAudioSessionId == record.audioSessionId && it.isClientSilenced } == true
+                        if (silenced) postError("வேற ஆப்/கால் Mic-ஐப் பயன்படுத்துகிறது.")
+                    }
+                }
+                recordingCallback = rcb
+                am.registerAudioRecordingCallback(rcb, mainHandler)
+            }
+        }
 
         requestVoiceFocus()
         attachHardwareDsp(record.audioSessionId)
@@ -295,7 +312,14 @@ class YunaVoiceEngine(
 
         while (scope.isActive && isRunning.get()) {
             val readCount = record.read(rawShorts, 0, FRAME_SAMPLES)
-            if (readCount <= 0) continue
+            if (readCount <= 0 || isRemoteMuted) continue
+            if (!ALLOW_BARGE_IN && state.get() == EngineState.SPEAKING) continue
+            var peak = 0
+            for (k in 0 until readCount step 8) { val av = kotlin.math.abs(rawShorts[k].toInt()); if (av > peak) peak = av }
+            if (peak == 0) {
+                zeroPcmFrames++
+                if (zeroPcmFrames >= 25) { zeroPcmFrames = 0; postError("Mic இடைநிறுத்தப்பட்டது; மீண்டும் இணைக்கிறேன்...") }
+            } else { zeroPcmFrames = 0 }
 
             highPassFilter.processInPlace(rawShorts, readCount)
             val currentState = state.get()
