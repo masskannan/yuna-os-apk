@@ -1307,4 +1307,18 @@ object YunaMicRegistry {
 
     
 
+
+    @android.webkit.JavascriptInterface
+    fun startGhostMode() {
+        com.yuna.os.overlay.YunaOverlayPermActivity.launchGhostMode(context)
+    }
+
+    @android.webkit.JavascriptInterface
+    fun runAgentGoal(goal: String) {
+        val prefs = context.getSharedPreferences("yuna_prefs", android.content.Context.MODE_PRIVATE)
+        val url = prefs.getString("cloud_url", "https://yuna-ai-gateway-v4.masskannan719.workers.dev") ?: ""
+        val tok = prefs.getString("app_token", "") ?: ""
+        com.yuna.os.agent.YunaAgentOrchestrator.runGoal(context, goal, url, tok)
+    }
+
 }
