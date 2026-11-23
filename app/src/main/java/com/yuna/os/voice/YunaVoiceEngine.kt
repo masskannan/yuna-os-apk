@@ -341,7 +341,7 @@ class YunaVoiceEngine(
         sseJob = scope.launch(Dispatchers.IO) {
             var conn: HttpURLConnection? = null
             try {
-                val endpoint = if (encoded != null) "${cloudBaseUrl.trimEnd('/')}/stt" else "${cloudBaseUrl.trimEnd('/')}/chat"
+                val endpoint = if (encoded != null) "${cloudBaseUrl.trimEnd('/')}/stt" else "${cloudBaseUrl.trimEnd('/')}/"
                 conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"
                     connectTimeout = 4000
@@ -356,7 +356,7 @@ class YunaVoiceEngine(
 
                 conn.outputStream.use { out ->
                     if (encoded != null) out.write(encoded.bytes)
-                    else if (textPrompt != null) out.write(JSONObject().put("prompt", textPrompt).toString().toByteArray(Charsets.UTF_8))
+                    else if (textPrompt != null) out.write(JSONObject().put("prompt", textPrompt).put("stream", false).toString().toByteArray(Charsets.UTF_8))
                 }
 
                 if (conn.responseCode !in 200..299) {
@@ -366,22 +366,37 @@ class YunaVoiceEngine(
                     return@launch
                 }
 
-                val fullReply = StringBuilder()
-                conn.inputStream.bufferedReader().useLines { lines ->
-                    for (line in lines) {
-                        if (!isActive) break
-                        if (line.startsWith("data:")) {
-                            val raw = line.removePrefix("data:").removePrefix(" ")
-                            if (raw == "[DONE]") break
-                            val token = extractSseToken(raw)
-                            fullReply.append(token)
-                            mainHandler.post { callbacks.onPartialResponse(token) }
-                        }
-                    }
+                val rawBody = conn.inputStream.bufferedReader().use { it.readText() }
+                if (encoded != null) {
+                    // /stt returned transcribed text -> route via Tier-0 or /chat
+                    val sttText = try { JSONObject(rawBody).optString("text", "").trim() } catch (_: Exception) { "" }
+                    if (sttText.isNotEmpty()) handleTextCommand(sttText)
+                    else if (isActive) setState(EngineState.LISTENING)
+                    return@launch
                 }
 
-                if (isActive && fullReply.isNotEmpty()) speakWithGuaranteedFloor(fullReply.toString())
-                else if (isActive) setState(EngineState.LISTENING)
+                // /chat or / returned JSON { reply, actions } or SSE
+                val replyText = if (rawBody.trimStart().startsWith("{")) {
+                    val obj = JSONObject(rawBody)
+                    val acts = obj.optJSONArray("actions")
+                    if (acts != null) {
+                        for (i in 0 until acts.length()) {
+                            val act = acts.optJSONObject(i) ?: continue
+                            val aName = act.optString("action", "")
+                            val aTarget = act.optString("target", "")
+                            if (aName == "OPEN_APP_DYNAMIC" && aTarget.isNotEmpty()) tier0Router.tryExecute("open $aTarget")
+                            else if (aName == "TORCH_ON") tier0Router.tryExecute("torch on")
+                            else if (aName == "TORCH_OFF") tier0Router.tryExecute("torch off")
+                            else if (aName == "SCREENSHOT") tier0Router.tryExecute("screenshot")
+                        }
+                    }
+                    obj.optString("reply", "")
+                } else rawBody
+
+                if (isActive && replyText.isNotEmpty()) {
+                    mainHandler.post { callbacks.onPartialResponse(replyText) }
+                    speakWithGuaranteedFloor(replyText)
+                } else if (isActive) setState(EngineState.LISTENING)
             } catch (_: CancellationException) {
             } catch (e: Exception) {
                 if (isActive) {
