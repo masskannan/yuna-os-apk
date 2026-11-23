@@ -57,7 +57,8 @@
   }
   .circle-glass-btn:active { transform: scale(0.93); border-color: var(--accent-a); }
   header#topHeader > .circle-glass-btn { justify-self: start; }
-  .brand-row { justify-self: center; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 4px 8px; border-radius: 999px; }
+  .brand-row { justify-self: center; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 6px; border-radius: 999px; flex: 1; min-width: 0; overflow: hidden; }
+  .tag-pill { white-space: nowrap; max-width: 112px; overflow: hidden; text-overflow: ellipsis; }
   .yuna-logo-svg { height: 19px; width: auto; display: block; filter: drop-shadow(0 0 10px rgba(124, 232, 245, 0.30)); }
   .tag-pill {
     font-family: ui-monospace, monospace; font-size: 10px; font-weight: 600; color: #E0F2FE;
@@ -2940,7 +2941,7 @@ async function callYunaCloudRemote(promptText) {
         body: JSON.stringify({ user_input: window._yunaLastTurn.q + ' -> ' + promptText, bad_output: window._yunaLastTurn.a, error_type: 'user_correction' })
       }).catch(() => {});
     }
-    const r = await fetch(cloudUrl, { method: 'POST', signal: activeCloudAbort.signal, headers: { 'Content-Type': 'application/json', 'X-Yuna-Token': localStorage.getItem("yuna_app_token") || "4bd747f83a8dad82824e5533765a58e610aeae0b79f4cd90" }, body: JSON.stringify({ prompt: enrichedPrompt, sessionId: yunaCloudSid, installed_apps: (window.YunaBridge && window.YunaBridge.getInstalledAppsCsv) ? window.YunaBridge.getInstalledAppsCsv() : "", contacts: (() => { try { return (window.YunaBridge && window.YunaBridge.getSyncedContactsJson) ? JSON.parse(window.YunaBridge.getSyncedContactsJson() || '[]').slice(0, 80).map(c => c.name).filter(Boolean) : []; } catch (_) { return []; } })() }) });
+    const r = await fetch(cloudUrl, { method: 'POST', signal: activeCloudAbort.signal, headers: { 'Content-Type': 'application/json', 'X-Yuna-Token': localStorage.getItem("yuna_app_token") || "" }, body: JSON.stringify({ prompt: enrichedPrompt, sessionId: yunaCloudSid, installed_apps: (window.YunaBridge && window.YunaBridge.getInstalledAppsCsv) ? window.YunaBridge.getInstalledAppsCsv() : "", contacts: (() => { try { return (window.YunaBridge && window.YunaBridge.getSyncedContactsJson) ? JSON.parse(window.YunaBridge.getSyncedContactsJson() || '[]').slice(0, 80).map(c => c.name).filter(Boolean) : []; } catch (_) { return []; } })() }) });
     clearTimeout(tid);
     const d = await r.json();
     window._yunaLastTurn = { q: promptText, a: String(d.reply || "") };
@@ -4079,7 +4080,7 @@ window.queryYunaRag = async function(qText) {
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), 1200);
     const r = await fetch(cloudUrl.replace(/\/+$/, '') + '/rag/query', {
-      method: 'POST', signal: ctrl.signal, headers: { 'Content-Type': 'application/json', 'X-Yuna-Token': localStorage.getItem("yuna_app_token") || "4bd747f83a8dad82824e5533765a58e610aeae0b79f4cd90" },
+      method: 'POST', signal: ctrl.signal, headers: { 'Content-Type': 'application/json', 'X-Yuna-Token': localStorage.getItem("yuna_app_token") || "" },
       body: JSON.stringify({ query: qText, question: qText })
     });
     clearTimeout(tid);
@@ -4507,7 +4508,7 @@ window.runEgmCodeAudit = async function(codeText) {
   try {
     const base = (typeof cloudUrl !== 'undefined' && cloudUrl) ? cloudUrl.replace(/\/+$/, '') : 'https://yuna-ai-gateway-v4.masskannan719.workers.dev';
     const r = await fetch(base + '/egm/review', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Yuna-Token': localStorage.getItem("yuna_app_token") || "4bd747f83a8dad82824e5533765a58e610aeae0b79f4cd90" },
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Yuna-Token': localStorage.getItem("yuna_app_token") || "" },
       body: JSON.stringify({ mode: 'code', title: 'YUNA UI Code Audit', content: txt })
     });
     const d = await r.json();
@@ -5591,7 +5592,7 @@ function renderV4(){
     try {
       const url = typeof input === "string" ? input : (input && input.url) || "";
       if (url.includes("yuna-ai-gateway-v4.masskannan719.workers.dev")) {
-        const tok = localStorage.getItem("yuna_app_token") || "4bd747f83a8dad82824e5533765a58e610aeae0b79f4cd90";
+        const tok = localStorage.getItem("yuna_app_token") || "";
         if (tok) {
           init = init ? Object.assign({}, init) : {};
           const hdrs = new Headers(init.headers || {});
@@ -5613,7 +5614,7 @@ window.v4RunLiveTool = async function(id){
     if (key.includes("rag") || key.includes("pdf") || key.includes("doc")) {
       const q = prompt("PDF/Knowledge கேள்வியை உள்ளிடவும்:");
       if (!q) return;
-      const r = await fetch(base + "/rag/query", { method: "POST", headers: { "Content-Type": "application/json", "X-Yuna-Token": localStorage.getItem("yuna_app_token") || "4bd747f83a8dad82824e5533765a58e610aeae0b79f4cd90" }, body: JSON.stringify({ question: q }) });
+      const r = await fetch(base + "/rag/query", { method: "POST", headers: { "Content-Type": "application/json", "X-Yuna-Token": localStorage.getItem("yuna_app_token") || "" }, body: JSON.stringify({ question: q }) });
       const d = await r.json();
       if (typeof showToast === "function") showToast(d.context ? "RAG தயார் (" + (d.citations||[]).length + ")" : (d.message || "RAG ready"));
       if (d.context && typeof ask === "function") ask(q + "\n\nContext:\n" + d.context);
@@ -5623,7 +5624,7 @@ window.v4RunLiveTool = async function(id){
       const p = prompt("உருவாக்க வேண்டிய படத்தின் விவரம் (Prompt):");
       if (!p) return;
       if (typeof showToast === "function") showToast("படம் உருவாக்கப்படுகிறது...");
-      const r = await fetch(base + "/image", { method: "POST", headers: { "Content-Type": "application/json", "X-Yuna-Token": localStorage.getItem("yuna_app_token") || "4bd747f83a8dad82824e5533765a58e610aeae0b79f4cd90" }, body: JSON.stringify({ prompt: p, mode: "fast" }) });
+      const r = await fetch(base + "/image", { method: "POST", headers: { "Content-Type": "application/json", "X-Yuna-Token": localStorage.getItem("yuna_app_token") || "" }, body: JSON.stringify({ prompt: p, mode: "fast" }) });
       const d = await r.json();
       if (typeof showToast === "function") showToast(d.actionNeeded || (d.ok ? "படம் தயார்!" : (d.message || "Error")));
       return;
@@ -5655,7 +5656,7 @@ window.v4RunLiveTool = async function(id){
 <script>
 (function(){
   try {
-    const tok = localStorage.getItem("yuna_app_token") || "4bd747f83a8dad82824e5533765a58e610aeae0b79f4cd90";
+    const tok = localStorage.getItem("yuna_app_token") || "";
     const cu = (typeof getCloudUrl === "function" ? getCloudUrl() : "") || "https://yuna-ai-gateway-v4.masskannan719.workers.dev";
     if (window.YunaBridge && typeof window.YunaBridge.saveCloudConfig === "function" && tok) {
       window.YunaBridge.saveCloudConfig(cu, tok);

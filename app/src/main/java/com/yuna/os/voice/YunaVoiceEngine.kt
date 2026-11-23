@@ -177,6 +177,7 @@ class YunaVoiceEngine(
         override fun onReceive(c: Context?, intent: Intent?) {
             when (intent?.action) {
                 "com.yuna.os.VOICE_MUTE_STATE" -> isRemoteMuted = intent.getBooleanExtra("muted", false)
+                "com.yuna.os.VOICE_STOP" -> { triggerBargeIn(); setState(EngineState.IDLE) }
                 "com.yuna.os.GHOST_SPEAK_TEXT" -> {
                     val t = intent.getStringExtra("text") ?: ""
                     if (t.isNotEmpty()) speakWithGuaranteedFloor(t)
@@ -249,7 +250,7 @@ class YunaVoiceEngine(
         }
 
         runCatching {
-            val f = IntentFilter().apply { addAction("com.yuna.os.VOICE_MUTE_STATE"); addAction("com.yuna.os.GHOST_VOICE_TRIGGER"); addAction("com.yuna.os.GHOST_SPEAK_TEXT") }
+            val f = IntentFilter().apply { addAction("com.yuna.os.VOICE_MUTE_STATE"); addAction("com.yuna.os.VOICE_STOP"); addAction("com.yuna.os.GHOST_VOICE_TRIGGER"); addAction("com.yuna.os.GHOST_SPEAK_TEXT") }
             if (Build.VERSION.SDK_INT >= 33) context.registerReceiver(muteReceiver, f, Context.RECEIVER_NOT_EXPORTED)
             else context.registerReceiver(muteReceiver, f)
         }
@@ -447,6 +448,7 @@ class YunaVoiceEngine(
                 }
 
                 // /chat or / returned JSON { reply, actions } or SSE
+                var actionSpoke = false
                 val replyText = if (rawBody.trimStart().startsWith("{")) {
                     val obj = JSONObject(rawBody)
                     val acts = obj.optJSONArray("actions")
@@ -492,9 +494,11 @@ class YunaVoiceEngine(
                                 com.yuna.os.tools.YunaSystemTools.adjustVolume(context, android.media.AudioManager.ADJUST_LOWER)
                             } else if (aName == "STORAGE_REPORT") {
                                 val rep = com.yuna.os.tools.YunaSystemTools.getReadOnlyStorageReport(context)
+                                actionSpoke = true
                                 speakWithGuaranteedFloor(rep)
                             } else if (aName == "NOTIF_REPORT") {
                                 val rep = com.yuna.os.notif.YunaNotifService.instance?.getReadOnlyReport() ?: "Notification Access ஆன் செய்யவும்."
+                                actionSpoke = true
                                 speakWithGuaranteedFloor(rep)
                             } else if (aName == "RUN_AGENT_GOAL" && aTarget.isNotEmpty()) {
                                 com.yuna.os.agent.YunaAgentOrchestrator.runGoal(context, aTarget, cloudBaseUrl, yunaToken)
@@ -508,8 +512,8 @@ class YunaVoiceEngine(
                 if (isActive && replyText.isNotEmpty()) {
                     mainHandler.post { callbacks.onPartialResponse(replyText) }
                     context.sendBroadcast(Intent("com.yuna.os.GHOST_SHOW_CAPTION").putExtra("text", replyText))
-                    speakWithGuaranteedFloor(replyText)
-                } else if (isActive) setState(EngineState.LISTENING)
+                    if (!actionSpoke) speakWithGuaranteedFloor(replyText)
+                } else if (isActive && !actionSpoke) setState(EngineState.LISTENING)
             } catch (_: CancellationException) {
             } catch (e: Exception) {
                 if (isActive) {

@@ -128,7 +128,23 @@ class PuyalAccessService_v2 : AccessibilityService() {
         val step = actions.optJSONObject(idx) ?: return runStep(actions, idx + 1, onVerified)
         val act = step.optString("action", "")
         val targetTxt = step.optString("target_text", "")
-        if (SENSITIVE_KEYWORDS.any { targetTxt.lowercase().contains(it) }) {
+        if (SENSITIVE_KEYWORDS.any { targetTxt.lowercase().contains(it) } && !step.optBoolean("_confirmed", false)) {
+            val rcv = object : android.content.BroadcastReceiver() {
+                override fun onReceive(c: Context?, i: Intent?) {
+                    runCatching { unregisterReceiver(this) }
+                    val ok = i?.getBooleanExtra(YunaGhostOverlayService.EXTRA_CONFIRMED, false) == true
+                    if (ok) {
+                        step.put("_confirmed", true)
+                        handler.post { runStep(actions, idx, onVerified) }
+                    } else {
+                        sendBroadcast(Intent(YunaGhostOverlayService.ACTION_SET_STATE).putExtra(YunaGhostOverlayService.EXTRA_STATE, "IDLE"))
+                        onVerified(JSONArray())
+                    }
+                }
+            }
+            val flt = android.content.IntentFilter(YunaGhostOverlayService.ACTION_USER_CONFIRMED)
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(rcv, flt, Context.RECEIVER_NOT_EXPORTED)
+            else registerReceiver(rcv, flt)
             sendBroadcast(Intent(YunaGhostOverlayService.ACTION_REQUEST_CONFIRM)
                 .putExtra(YunaGhostOverlayService.EXTRA_TEXT, "தொடரவா: $targetTxt?"))
             return
