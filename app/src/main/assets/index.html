@@ -1664,6 +1664,50 @@ main#chat {
   -webkit-overflow-scrolling: touch !important;
   touch-action: pan-y !important;
 }
+
+/* Fix: Live transcript alignment, Tamil dock vertical clipping, & action-row alignment */
+body.live-mode #liveTranscriptBox {
+  text-align: left !important;
+  padding: 10px 14px 14px !important;
+  line-height: 1.6 !important;
+}
+body.live-mode #liveTranscriptBox .lt-u {
+  align-self: flex-end !important;
+  text-align: right !important;
+}
+body.live-mode #liveTranscriptBox .lt-y {
+  align-self: flex-start !important;
+  text-align: left !important;
+}
+#inp, .dock textarea, .dock input {
+  line-height: 1.45 !important;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  min-height: 38px !important;
+}
+.msg-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+}
+
+/* Fix 1000591053.jpg: prevent vertical clipping of #inp ("கேட்கிறேன்...") inside .dock when keyboard is open */
+.dock {
+  height: auto !important;
+  min-height: 52px !important;
+  align-items: center !important;
+  overflow: visible !important;
+}
+#inp {
+  height: auto !important;
+  min-height: 24px !important;
+  max-height: 110px !important;
+  line-height: 1.45 !important;
+  padding: 6px 4px !important;
+  overflow-y: auto !important;
+  box-sizing: border-box !important;
+}
 </style>
 </head>
 <body>
