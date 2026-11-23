@@ -37,7 +37,7 @@ Pg.def('voice',()=>T('குரல்','Voice'),p=>{
 Pg.def('models',()=>T('AI மாதிரி & Cloud','AI model & Cloud'),p=>{
  UI.sec(p,T('மூளை','Brain'));const br=ls.g('yuna_brain')==='LOCAL'?'LOCAL':'CLOUD';
  UI.row(p,T('செயல்முறை','Mode'),UI.pill(br==='CLOUD'?'Cloud':'Local',b=>{const n=ls.g('yuna_brain')==='LOCAL'?'CLOUD':'LOCAL';ls.s('yuna_brain',n);b.textContent=n==='CLOUD'?'Cloud':'Local'}),T('இந்தப் பதிப்பில் எல்லாக் கோரிக்கைகளும் Cloud வழியாகவே செல்லும்','In this version every request still goes through Cloud'));
- UI.sec(p,'Cloud URL');const f=el('input','fld');f.type='url';f.placeholder='https://…workers.dev/chat';f.value=ls.g('yuna_cloud_url')||'';f.autocomplete='off';p.appendChild(f);
+ UI.sec(p,'Cloud URL');const f=el('input','fld');f.type='url';f.placeholder='https://…workers.dev/chat';f.value=ls.g('yuna_cloud_url')||'https://yuna-ai-gateway.masskannan719.workers.dev';f.autocomplete='off';p.appendChild(f);
  const st=el('p','note','');p.appendChild(st);
  UI.btn(p,T('சோதித்துச் சேமி','Test & save'),()=>{const v=f.value.trim();
   if(!v){UI.ask(T('Cloud URL-ஐ நீக்கவா?','Remove the Cloud URL?'),()=>{try{localStorage.removeItem('yuna_cloud_url')}catch(_){}st.textContent=T('நீக்கப்பட்டது','Removed')});return}

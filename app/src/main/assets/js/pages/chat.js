@@ -24,7 +24,7 @@ const Yuna={
  sayDone(){const b=Yuna.spk;Yuna.spk=null;if(b){b.classList.remove('on');b.textContent='🔊'}},
  tts(x,force){const p=ls.g('yuna_voice_persona')||'YUNA';if(p==='SILENT'&&!force)return;
   x=String(x||'').replace(/```[\s\S]*?```/g,' ').replace(/https?:\/\/\S+/g,' ').replace(/[*_#`>~|]/g,'').replace(/\s+/g,' ').trim().slice(0,900);if(!x)return;
-  if(B()&&typeof B().speakSmartWithVoice==='function')call('speakSmartWithVoice',x,p,ls.g('yuna_cloud_url')||'',ls.g('yuna_ta_voice')||'ta-SG-VenbaNeural');else call('speakSmart',x)}
+  if(B()&&typeof B().speakSmartWithVoice==='function')call('speakSmartWithVoice',x,p,ls.g('yuna_cloud_url')||'https://yuna-ai-gateway.masskannan719.workers.dev',ls.g('yuna_ta_voice')||'ta-SG-VenbaNeural');else call('speakSmart',x)}
 };
 function copyText(x){const fb=()=>{const a=document.createElement('textarea');a.value=x;document.body.appendChild(a);a.select();try{document.execCommand('copy');toast(t('copied'))}catch(_){}a.remove()};try{navigator.clipboard.writeText(x).then(()=>toast(t('copied')),fb)}catch(_){fb()}}
 /* reply action row: copy, speak one message, 👍/👎 (stored in the chat's own message, no new key), regenerate (last reply only), share */
