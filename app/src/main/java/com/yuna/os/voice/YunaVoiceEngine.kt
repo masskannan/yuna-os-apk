@@ -13,6 +13,8 @@ import android.content.pm.ServiceInfo
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.AudioTrack
@@ -159,6 +161,8 @@ class YunaVoiceEngine(
     @Volatile private var activeSseConnection: HttpURLConnection? = null
     private val activeAudioTrackRef = AtomicReference<AudioTrack?>(null)
     private var androidTts: TextToSpeech? = null
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private var focusRequest: AudioFocusRequest? = null
 
     private val tier0Router = Tier0IntentRouter(context) {
         mainHandler.post { callbacks.onRequestScreenshot() }
@@ -207,10 +211,33 @@ class YunaVoiceEngine(
         }
 
         audioRecord = record
+        requestVoiceFocus()
         attachHardwareDsp(record.audioSessionId)
         record.startRecording()
         setState(EngineState.LISTENING)
         captureJob = scope.launch(Dispatchers.IO) { runCaptureLoop(record) }
+    }
+
+
+    private fun requestVoiceFocus() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                .build()
+            focusRequest = req
+            audioManager.requestAudioFocus(req)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+        }
+    }
+    private fun abandonVoiceFocus() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            focusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(null)
+        }
     }
 
     private fun attachHardwareDsp(sessionId: Int) {
@@ -471,6 +498,7 @@ class YunaVoiceEngine(
         triggerBargeIn()
         captureJob?.cancel(); captureJob = null
         try { audioRecord?.stop() } catch (_: IllegalStateException) {}
+        abandonVoiceFocus()
         setState(EngineState.IDLE)
     }
 
