@@ -129,6 +129,11 @@ class YunaBridge(
     }
 
     @android.webkit.JavascriptInterface
+    fun setupAllPermissions() {
+        com.yuna.os.overlay.YunaOverlayPermActivity.ensureAllPermissions(ctx)
+    }
+
+    @android.webkit.JavascriptInterface
     fun startGhostMode() {
         com.yuna.os.overlay.YunaOverlayPermActivity.launchGhostMode(ctx)
     }
