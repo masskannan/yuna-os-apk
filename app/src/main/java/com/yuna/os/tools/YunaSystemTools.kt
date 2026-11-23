@@ -132,7 +132,7 @@ object YunaSystemTools {
             )?.use { c ->
                 while (c.moveToNext()) {
                     val dn = c.getString(0) ?: ""
-                    val num = (c.getString(1) ?: "").replace("\s+".toRegex(), "")
+                    val num = (c.getString(1) ?: "").replace("\\s+".toRegex(), "")
                     val tp = c.getInt(2)
                     val customLbl = c.getString(3)
                     val lbl = ContactsContract.CommonDataKinds.Phone.getTypeLabel(ctx.resources, tp, customLbl).toString()
