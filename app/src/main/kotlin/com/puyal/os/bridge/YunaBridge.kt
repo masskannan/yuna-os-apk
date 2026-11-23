@@ -101,6 +101,40 @@ class YunaBridge(
             out.toString()
         } catch (_: Throwable) { "[]" }
     }
+
+    @android.webkit.JavascriptInterface
+    fun getInstalledAppsCsv(): String {
+        return try {
+            val pm = ctx.packageManager
+            val intent = android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+            pm.queryIntentActivities(intent, 0).map { it.loadLabel(pm).toString() }.distinct().take(45).joinToString(", ")
+        } catch (_: Exception) { "" }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun setAlarm(hour: Int, min: Int) {
+        val i = android.content.Intent(android.provider.AlarmClock.ACTION_SET_ALARM).apply {
+            putExtra(android.provider.AlarmClock.EXTRA_HOUR, hour)
+            putExtra(android.provider.AlarmClock.EXTRA_MINUTES, min)
+            putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, true)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        ctx.startActivity(i)
+    }
+
+    @android.webkit.JavascriptInterface
+    fun startGhostMode() {
+        com.yuna.os.overlay.YunaOverlayPermActivity.launchGhostMode(ctx)
+    }
+
+    @android.webkit.JavascriptInterface
+    fun runAgentGoal(goal: String) {
+        val prefs = ctx.getSharedPreferences("yuna_prefs", android.content.Context.MODE_PRIVATE)
+        val url = prefs.getString("cloud_url", "https://yuna-ai-gateway-v4.masskannan719.workers.dev") ?: ""
+        val tok = prefs.getString("app_token", "") ?: ""
+        com.yuna.os.agent.YunaAgentOrchestrator.runGoal(ctx, goal, url, tok)
+    }
+
 },
     private val onBiometricReq: () -> Unit = {},
     private val onTtsDone: () -> Unit = {},
@@ -1304,55 +1338,7 @@ object YunaMicRegistry {
     fun abortActiveMic() {
         try { activeBridge?.abortMicOnPause() } catch (_: Exception) {}
     }
-
-    
-
-
-    @android.webkit.JavascriptInterface
-    fun startGhostMode() {
-        com.yuna.os.overlay.YunaOverlayPermActivity.launchGhostMode(context)
-    }
-
-    @android.webkit.JavascriptInterface
-    fun runAgentGoal(goal: String) {
-        val prefs = context.getSharedPreferences("yuna_prefs", android.content.Context.MODE_PRIVATE)
-        val url = prefs.getString("cloud_url", "https://yuna-ai-gateway-v4.masskannan719.workers.dev") ?: ""
-        val tok = prefs.getString("app_token", "") ?: ""
-        com.yuna.os.agent.YunaAgentOrchestrator.runGoal(context, goal, url, tok)
-    }
-
-
-    @android.webkit.JavascriptInterface
-    fun getInstalledAppsCsv(): String {
-        return try {
-            val pm = ctx.packageManager
-            val intent = android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_LAUNCHER)
-            pm.queryIntentActivities(intent, 0).map { it.loadLabel(pm).toString() }.distinct().take(45).joinToString(", ")
-        } catch (_: Exception) { "" }
-    }
-
-    @android.webkit.JavascriptInterface
-    fun setAlarm(hour: Int, min: Int) {
-        val i = android.content.Intent(android.provider.AlarmClock.ACTION_SET_ALARM).apply {
-            putExtra(android.provider.AlarmClock.EXTRA_HOUR, hour)
-            putExtra(android.provider.AlarmClock.EXTRA_MINUTES, min)
-            putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, true)
-            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
         ctx.startActivity(i)
-    }
-
-    @android.webkit.JavascriptInterface
-    fun startGhostMode() {
-        com.yuna.os.overlay.YunaOverlayPermActivity.launchGhostMode(ctx)
-    }
-
-    @android.webkit.JavascriptInterface
-    fun runAgentGoal(goal: String) {
-        val prefs = ctx.getSharedPreferences("yuna_prefs", android.content.Context.MODE_PRIVATE)
-        val url = prefs.getString("cloud_url", "https://yuna-ai-gateway-v4.masskannan719.workers.dev") ?: ""
-        val tok = prefs.getString("app_token", "") ?: ""
-        com.yuna.os.agent.YunaAgentOrchestrator.runGoal(ctx, goal, url, tok)
     }
 
 }

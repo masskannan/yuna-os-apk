@@ -20,7 +20,6 @@ import android.view.*
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.*
 import androidx.core.app.NotificationCompat
-import com.yuna.os.R
 import com.yuna.os.agent.YunaAgentOrchestrator
 
 class YunaGhostOverlayService : Service() {
@@ -89,6 +88,11 @@ class YunaGhostOverlayService : Service() {
                 ACTION_END_SESSION -> { YunaAgentOrchestrator.cancel(); stopSelf() }
             }
         }
+    }
+
+    private fun drawableId(name: String): Int {
+        val id = resources.getIdentifier(name, "drawable", packageName)
+        return if (id != 0) id else android.R.drawable.ic_btn_speak_now
     }
 
     override fun onBind(intent: Intent?) = null
@@ -262,7 +266,7 @@ class YunaGhostOverlayService : Service() {
         }.apply { alpha = 0.55f }
 
         ghostOrb = ImageView(this).apply {
-            setImageResource(R.drawable.yuna_ghost_idle)
+            setImageResource(drawableId("yuna_ghost_idle"))
             setPadding(dp(6), dp(4), dp(6), dp(4))
             setOnClickListener {
                 if (currentState == GhostState.EXECUTING || currentState == GhostState.THINKING) {
@@ -385,12 +389,12 @@ class YunaGhostOverlayService : Service() {
 
         when (state) {
             GhostState.IDLE -> {
-                ghostOrb.setImageResource(R.drawable.yuna_ghost_idle)
+                ghostOrb.setImageResource(drawableId("yuna_ghost_idle"))
                 if (!isExpanded) ghostOrb.alpha = 0.45f
             }
             GhostState.LISTENING -> {
                 ghostOrb.alpha = 1f
-                ghostOrb.setImageResource(R.drawable.yuna_ghost_listen)
+                ghostOrb.setImageResource(drawableId("yuna_ghost_listen"))
                 activeAnimator = ObjectAnimator.ofPropertyValuesHolder(
                     ghostOrb,
                     PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.12f, 1f),
@@ -399,7 +403,7 @@ class YunaGhostOverlayService : Service() {
             }
             GhostState.THINKING -> {
                 ghostOrb.alpha = 1f
-                ghostOrb.setImageResource(R.drawable.yuna_ghost_peek)
+                ghostOrb.setImageResource(drawableId("yuna_ghost_peek"))
                 activeAnimator = ObjectAnimator.ofFloat(ghostOrb, View.ROTATION_Y, -18f, 18f).apply {
                     duration = 700; repeatMode = ObjectAnimator.REVERSE; repeatCount = ObjectAnimator.INFINITE
                     interpolator = AccelerateDecelerateInterpolator(); start()
@@ -407,7 +411,7 @@ class YunaGhostOverlayService : Service() {
             }
             GhostState.EXECUTING -> {
                 ghostOrb.alpha = 1f
-                ghostOrb.setImageResource(R.drawable.yuna_ghost_think)
+                ghostOrb.setImageResource(drawableId("yuna_ghost_think"))
             }
             GhostState.NEEDS_CONFIRM -> {
                 ghostOrb.alpha = 1f
@@ -480,7 +484,7 @@ class YunaGhostOverlayService : Service() {
         return NotificationCompat.Builder(this, CH_ID)
             .setContentTitle("YUNA Live Ghost")
             .setContentText(if (isMuted) "Mic Muted — Tap Mute to resume" else "Mic is ON — Listening in background")
-            .setSmallIcon(R.drawable.yuna_ghost_idle)
+            .setSmallIcon(drawableId("yuna_ghost_idle"))
             .setOngoing(true)
             .addAction(0, "End", endPi)
             .addAction(0, if (isMuted) "Unmute" else "Mute", mutePi)

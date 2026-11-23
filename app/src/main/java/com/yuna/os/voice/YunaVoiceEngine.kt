@@ -10,7 +10,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.hardware.camera2.CameraCharacteristics
@@ -28,9 +27,6 @@ import android.media.MediaCodec
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.media.MediaRecorder
-import android.media.audiofx.AcousticEchoCanceler
-import android.media.audiofx.AutomaticGainControl
-import android.media.audiofx.NoiseSuppressor
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Binder
@@ -165,9 +161,6 @@ class YunaVoiceEngine(
             }
         }
     }
-    private var noiseSuppressor: NoiseSuppressor? = null
-    private var echoCanceler: AcousticEchoCanceler? = null
-    private var autoGainControl: AutomaticGainControl? = null
     private var captureJob: Job? = null
     private var cooldownJob: Job? = null
 
@@ -233,10 +226,7 @@ class YunaVoiceEngine(
             else context.registerReceiver(muteReceiver, f)
         }
         audioRecord = record
-        val sid = record.audioSessionId
-        runCatching { if (NoiseSuppressor.isAvailable()) noiseSuppressor = NoiseSuppressor.create(sid)?.apply { enabled = true } }
-        runCatching { if (AcousticEchoCanceler.isAvailable()) echoCanceler = AcousticEchoCanceler.create(sid)?.apply { enabled = true } }
-        runCatching { if (AutomaticGainControl.isAvailable()) autoGain = AutomaticGainControl.create(sid)?.apply { enabled = true } }
+
         requestVoiceFocus()
         attachHardwareDsp(record.audioSessionId)
         record.startRecording()
@@ -269,7 +259,7 @@ class YunaVoiceEngine(
     private fun attachHardwareDsp(sessionId: Int) {
         if (NoiseSuppressor.isAvailable()) noiseSuppressor = NoiseSuppressor.create(sessionId)?.apply { enabled = true }
         if (AcousticEchoCanceler.isAvailable()) echoCanceler = AcousticEchoCanceler.create(sessionId)?.apply { enabled = true }
-        if (AutomaticGainControl.isAvailable()) autoGainControl = AutomaticGainControl.create(sessionId)?.apply { enabled = true }
+        if (AutomaticGainControl.isAvailable()) autoGain = AutomaticGainControl.create(sessionId)?.apply { enabled = true }
     }
 
     private fun runCaptureLoop(record: AudioRecord) {
@@ -556,7 +546,7 @@ class YunaVoiceEngine(
 
     fun release() {
         stop()
-        noiseSuppressor?.release(); echoCanceler?.release(); autoGainControl?.release()
+        noiseSuppressor?.release(); echoCanceler?.release(); autoGain?.release()
         runCatching { context.unregisterReceiver(muteReceiver) }
         runCatching { noiseSuppressor?.release(); echoCanceler?.release(); autoGain?.release() }
         audioRecord?.release(); androidTts?.shutdown(); scope.cancel()
