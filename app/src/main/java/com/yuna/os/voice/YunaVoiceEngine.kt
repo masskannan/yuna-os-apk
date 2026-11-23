@@ -666,17 +666,24 @@ class Tier0IntentRouter(private val context: Context, private val onScreenshotRe
         return null
     }
 
-    private fun setTorch(enabled: Boolean): Boolean = try {
-        val cm = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        val id = cm.cameraIdList.firstOrNull { cm.getCameraCharacteristics(it).get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true } ?: return false
-        cm.setTorchMode(id, enabled); true
-    } catch (_: Exception) { false }
+    private fun setTorch(enabled: Boolean): Boolean {
+        return try {
+            val cm = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            val id = cm.cameraIdList.firstOrNull { cm.getCameraCharacteristics(it).get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true } ?: return false
+            cm.setTorchMode(id, enabled)
+            true
+        } catch (_: Exception) { false }
+    }
 
-    private fun launchAppByName(appName: String): Boolean = try {
-        val pm = context.packageManager
-        val apps = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
-        val matched = apps.firstOrNull { it.loadLabel(pm).toString().contains(appName, ignoreCase = true) } ?: return false
-        val launch = pm.getLaunchIntentForPackage(matched.activityInfo.packageName) ?: return false
-        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); context.startActivity(launch); true
-    } catch (_: Exception) { false }
+    private fun launchAppByName(appName: String): Boolean {
+        return try {
+            val pm = context.packageManager
+            val apps = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+            val matched = apps.firstOrNull { it.loadLabel(pm).toString().contains(appName, ignoreCase = true) } ?: return false
+            val launch = pm.getLaunchIntentForPackage(matched.activityInfo.packageName) ?: return false
+            launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(launch)
+            true
+        } catch (_: Exception) { false }
+    }
 }
