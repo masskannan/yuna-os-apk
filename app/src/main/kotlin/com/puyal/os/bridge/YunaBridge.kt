@@ -102,6 +102,7 @@ class YunaBridge(
         } catch (_: Throwable) { "[]" }
     }
 
+
     @android.webkit.JavascriptInterface
     fun getInstalledAppsCsv(): String {
         return try {
