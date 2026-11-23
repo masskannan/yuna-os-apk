@@ -103,6 +103,12 @@ class YunaBridge(
     }
 
     @android.webkit.JavascriptInterface
+    fun saveCloudConfig(url: String, token: String) {
+        ctx.getSharedPreferences("yuna_prefs", android.content.Context.MODE_PRIVATE)
+            .edit().putString("cloud_url", url).putString("app_token", token).apply()
+    }
+
+    @android.webkit.JavascriptInterface
     fun getInstalledAppsCsv(): String {
         return try {
             val pm = ctx.packageManager

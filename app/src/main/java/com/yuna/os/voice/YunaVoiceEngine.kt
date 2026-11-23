@@ -83,6 +83,20 @@ class YunaVoiceService : Service() {
     override fun onBind(intent: Intent?): IBinder = binder
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startMicForegroundNotification()
+        if (intent?.action == "com.yuna.os.GHOST_VOICE_TRIGGER") {
+            if (voiceEngine == null) {
+                val prefs = getSharedPreferences("yuna_prefs", Context.MODE_PRIVATE)
+                val url = prefs.getString("cloud_url", "https://yuna-ai-gateway-v4.masskannan719.workers.dev") ?: ""
+                val tok = prefs.getString("app_token", "") ?: ""
+                voiceEngine = YunaVoiceEngine(applicationContext, url, tok, object : YunaVoiceCallbacks {
+                    override fun onStateChanged(state: EngineState) {}
+                    override fun onPartialTranscript(text: String) {}
+                    override fun onAssistantReply(text: String) {}
+                    override fun onError(message: String) {}
+                })
+            }
+            voiceEngine?.start()
+        }
         return START_STICKY
     }
 
@@ -156,8 +170,13 @@ class YunaVoiceEngine(
     @Volatile private var isRemoteMuted = false
     private val muteReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, intent: Intent?) {
-            if (intent?.action == "com.yuna.os.VOICE_MUTE_STATE") {
-                isRemoteMuted = intent.getBooleanExtra("muted", false)
+            when (intent?.action) {
+                "com.yuna.os.VOICE_MUTE_STATE" -> isRemoteMuted = intent.getBooleanExtra("muted", false)
+                "com.yuna.os.GHOST_VOICE_TRIGGER" -> {
+                    isRemoteMuted = false
+                    if (!isActive) start()
+                    else setState(EngineState.LISTENING)
+                }
             }
         }
     }
@@ -221,7 +240,7 @@ class YunaVoiceEngine(
         }
 
         runCatching {
-            val f = IntentFilter("com.yuna.os.VOICE_MUTE_STATE")
+            val f = IntentFilter().apply { addAction("com.yuna.os.VOICE_MUTE_STATE"); addAction("com.yuna.os.GHOST_VOICE_TRIGGER") }
             if (Build.VERSION.SDK_INT >= 33) context.registerReceiver(muteReceiver, f, Context.RECEIVER_NOT_EXPORTED)
             else context.registerReceiver(muteReceiver, f)
         }
@@ -372,7 +391,14 @@ class YunaVoiceEngine(
 
                 conn.outputStream.use { out ->
                     if (encoded != null) out.write(encoded.bytes)
-                    else if (textPrompt != null) out.write(JSONObject().put("prompt", textPrompt).put("stream", false).toString().toByteArray(Charsets.UTF_8))
+                    else if (textPrompt != null) {
+                        val appsCsv = runCatching {
+                            val pm = context.packageManager
+                            val mi = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+                            pm.queryIntentActivities(mi, 0).map { it.loadLabel(pm).toString() }.distinct().take(45).joinToString(", ")
+                        }.getOrDefault("")
+                        out.write(JSONObject().put("prompt", textPrompt).put("installed_apps", appsCsv).put("stream", false).toString().toByteArray(Charsets.UTF_8))
+                    }
                 }
 
                 if (conn.responseCode !in 200..299) {
@@ -403,6 +429,23 @@ class YunaVoiceEngine(
                             if (aName == "OPEN_APP_DYNAMIC" && aTarget.isNotEmpty()) tier0Router.tryExecute("open $aTarget")
                             else if (aName == "TORCH_ON") tier0Router.tryExecute("torch on")
                             else if (aName == "TORCH_OFF") tier0Router.tryExecute("torch off")
+                            else if (aName == "SET_ALARM" && aTarget.contains(":")) {
+                                val parts = aTarget.split(":")
+                                val hh = parts.getOrNull(0)?.toIntOrNull()
+                                val mm = parts.getOrNull(1)?.toIntOrNull()
+                                if (hh != null && mm != null) {
+                                    runCatching {
+                                        context.startActivity(Intent(android.provider.AlarmClock.ACTION_SET_ALARM).apply {
+                                            putExtra(android.provider.AlarmClock.EXTRA_HOUR, hh)
+                                            putExtra(android.provider.AlarmClock.EXTRA_MINUTES, mm)
+                                            putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, true)
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        })
+                                    }
+                                }
+                            } else if (aName == "RUN_AGENT_GOAL" && aTarget.isNotEmpty()) {
+                                com.yuna.os.agent.YunaAgentOrchestrator.runGoal(context, aTarget, cloudBaseUrl, yunaToken)
+                            }
                             else if (aName == "SCREENSHOT") tier0Router.tryExecute("screenshot")
                         }
                     }
@@ -411,6 +454,7 @@ class YunaVoiceEngine(
 
                 if (isActive && replyText.isNotEmpty()) {
                     mainHandler.post { callbacks.onPartialResponse(replyText) }
+                    context.sendBroadcast(Intent("com.yuna.os.GHOST_SHOW_CAPTION").putExtra("text", replyText))
                     speakWithGuaranteedFloor(replyText)
                 } else if (isActive) setState(EngineState.LISTENING)
             } catch (_: CancellationException) {

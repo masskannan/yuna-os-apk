@@ -1708,6 +1708,12 @@ body.live-mode #liveTranscriptBox .lt-y {
   overflow-y: auto !important;
   box-sizing: border-box !important;
 }
+
+@keyframes yunaGhostFloat {
+  0%, 100% { transform: translateY(0px); filter: drop-shadow(0 0 4px rgba(56,189,248,0.45)); }
+  50% { transform: translateY(-2.5px); filter: drop-shadow(0 0 8px rgba(56,189,248,0.85)); }
+}
+.yuna-ghost-anim { animation: yunaGhostFloat 2.4s ease-in-out infinite; }
 </style>
 </head>
 <body>
@@ -1735,6 +1741,15 @@ body.live-mode #liveTranscriptBox .lt-y {
     </div>
   </div>
   <div class="top-right-pill">
+    <button id="ghostModeBtn" onclick="window.triggerYunaGhost()" title="Ghost Overlay Mode" aria-label="Ghost Overlay Mode">
+      <svg class="yuna-ghost-anim" width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <path d="M12 3C7.5 3 5 6.4 5 11v8.5l2.3-1.4 2.3 1.4 2.4-1.4 2.4 1.4 2.3-1.4 2.3 1.4V11c0-4.6-2.5-8-7-8z" fill="#E2E8F0"/>
+        <circle cx="9.6" cy="10" r="1.4" fill="#0F172A"/>
+        <circle cx="14.4" cy="10" r="1.4" fill="#0F172A"/>
+        <circle cx="9.6" cy="10" r="0.55" fill="#38BDF8"/>
+        <circle cx="14.4" cy="10" r="0.55" fill="#38BDF8"/>
+      </svg>
+    </button>
     <button onclick="resetHome()" title="New Chat" aria-label="New Chat">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#BAE6FD" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
     </button>
@@ -2537,7 +2552,7 @@ async function callPuyalCloud(promptText) {
   const safePrompt = redactSensitiveLocal(promptText);
   const ctrl = new AbortController(); const tid = setTimeout(() => ctrl.abort(), 9000);
   try {
-    const res = await fetch('https://puyal-edge-gateway.masskannan719.workers.dev/chat', {
+    const res = await fetch('https://yuna-ai-gateway-v4.masskannan719.workers.dev/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(Object.assign(window.__lastV4Payload ? { tools: window.__lastV4Payload.tools, attachments: window.__lastV4Payload.attachments } : {}, { prompt: safePrompt, lang: voiceLang, mood: personaMood })), signal: ctrl.signal
     }); clearTimeout(tid);
@@ -2925,7 +2940,7 @@ async function callYunaCloudRemote(promptText) {
         body: JSON.stringify({ user_input: window._yunaLastTurn.q + ' -> ' + promptText, bad_output: window._yunaLastTurn.a, error_type: 'user_correction' })
       }).catch(() => {});
     }
-    const r = await fetch(cloudUrl, { method: 'POST', signal: activeCloudAbort.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: enrichedPrompt, sessionId: yunaCloudSid, installed_apps: (window.YunaBridge && window.YunaBridge.getInstalledAppsCsv) ? window.YunaBridge.getInstalledAppsCsv() : "", contacts: (() => { try { return (window.YunaBridge && window.YunaBridge.getSyncedContactsJson) ? JSON.parse(window.YunaBridge.getSyncedContactsJson() || '[]').slice(0, 80).map(c => c.name).filter(Boolean) : []; } catch (_) { return []; } })() }) });
+    const r = await fetch(cloudUrl, { method: 'POST', signal: activeCloudAbort.signal, headers: { 'Content-Type': 'application/json', 'X-Yuna-Token': localStorage.getItem("yuna_app_token") || "4bd747f83a8dad82824e5533765a58e610aeae0b79f4cd90" }, body: JSON.stringify({ prompt: enrichedPrompt, sessionId: yunaCloudSid, installed_apps: (window.YunaBridge && window.YunaBridge.getInstalledAppsCsv) ? window.YunaBridge.getInstalledAppsCsv() : "", contacts: (() => { try { return (window.YunaBridge && window.YunaBridge.getSyncedContactsJson) ? JSON.parse(window.YunaBridge.getSyncedContactsJson() || '[]').slice(0, 80).map(c => c.name).filter(Boolean) : []; } catch (_) { return []; } })() }) });
     clearTimeout(tid);
     const d = await r.json();
     window._yunaLastTurn = { q: promptText, a: String(d.reply || "") };
@@ -4463,7 +4478,7 @@ window.runEgmCodeAudit = async function(codeText) {
   try {
     const base = (typeof cloudUrl !== 'undefined' && cloudUrl) ? cloudUrl.replace(/\/+$/, '') : 'https://yuna-ai-gateway-v4.masskannan719.workers.dev';
     const r = await fetch(base + '/egm/review', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Yuna-Token': localStorage.getItem("yuna_app_token") || "4bd747f83a8dad82824e5533765a58e610aeae0b79f4cd90" },
       body: JSON.stringify({ mode: 'code', title: 'YUNA UI Code Audit', content: txt })
     });
     const d = await r.json();
@@ -5569,7 +5584,7 @@ window.v4RunLiveTool = async function(id){
     if (key.includes("rag") || key.includes("pdf") || key.includes("doc")) {
       const q = prompt("PDF/Knowledge கேள்வியை உள்ளிடவும்:");
       if (!q) return;
-      const r = await fetch(base + "/rag/query", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q }) });
+      const r = await fetch(base + "/rag/query", { method: "POST", headers: { "Content-Type": "application/json", "X-Yuna-Token": localStorage.getItem("yuna_app_token") || "4bd747f83a8dad82824e5533765a58e610aeae0b79f4cd90" }, body: JSON.stringify({ question: q }) });
       const d = await r.json();
       if (typeof showToast === "function") showToast(d.context ? "RAG தயார் (" + (d.citations||[]).length + ")" : (d.message || "RAG ready"));
       if (d.context && typeof ask === "function") ask(q + "\n\nContext:\n" + d.context);
@@ -5579,7 +5594,7 @@ window.v4RunLiveTool = async function(id){
       const p = prompt("உருவாக்க வேண்டிய படத்தின் விவரம் (Prompt):");
       if (!p) return;
       if (typeof showToast === "function") showToast("படம் உருவாக்கப்படுகிறது...");
-      const r = await fetch(base + "/image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: p, mode: "fast" }) });
+      const r = await fetch(base + "/image", { method: "POST", headers: { "Content-Type": "application/json", "X-Yuna-Token": localStorage.getItem("yuna_app_token") || "4bd747f83a8dad82824e5533765a58e610aeae0b79f4cd90" }, body: JSON.stringify({ prompt: p, mode: "fast" }) });
       const d = await r.json();
       if (typeof showToast === "function") showToast(d.actionNeeded || (d.ok ? "படம் தயார்!" : (d.message || "Error")));
       return;
@@ -5607,6 +5622,24 @@ window.v4RunLiveTool = async function(id){
     if (typeof _origTtsDone === "function") return _origTtsDone.apply(this, arguments);
   };
 })();
+</script>
+<script>
+(function(){
+  try {
+    const tok = localStorage.getItem("yuna_app_token") || "4bd747f83a8dad82824e5533765a58e610aeae0b79f4cd90";
+    const cu = (typeof getCloudUrl === "function" ? getCloudUrl() : "") || "https://yuna-ai-gateway-v4.masskannan719.workers.dev";
+    if (window.YunaBridge && typeof window.YunaBridge.saveCloudConfig === "function" && tok) {
+      window.YunaBridge.saveCloudConfig(cu, tok);
+    }
+  } catch (_) {}
+})();
+window.triggerYunaGhost = function() {
+  if (window.YunaBridge && typeof window.YunaBridge.startGhostMode === "function") {
+    try { window.YunaBridge.startGhostMode(); } catch (_) {}
+  } else if (typeof showToast === "function") {
+    showToast("Ghost Overlay ஆண்ட்ராய்டு ஆப்பில் மட்டுமே இயங்கும்.");
+  }
+};
 </script>
 </body>
 

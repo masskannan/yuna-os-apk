@@ -250,7 +250,13 @@ class YunaGhostOverlayService : Service() {
             }
         }
         val plusBtn = makeDockBtn("+", dp) {
-            showCaption("என்ன செய்யணும்னு சொல்லுங்க...")
+            runCatching {
+                val vi = Intent("com.yuna.os.GHOST_VOICE_TRIGGER").setClassName(packageName, "com.yuna.os.voice.YunaVoiceService")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(vi) else startService(vi)
+            }
+            sendBroadcast(Intent("com.yuna.os.GHOST_VOICE_TRIGGER").setPackage(packageName))
+            applyGhostState(GhostState.LISTENING)
+            showCaption("கேட்கிறேன்... சொல்லுங்க")
             scheduleAutoCollapse()
         }
         screenBtn = makeDockBtn("📺", dp) {
